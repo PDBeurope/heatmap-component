@@ -1,0 +1,15 @@
+/build
+/lib
+/node_modules
+/tmp
+
+tsconfig.tsbuildinfo
+debug.log
+npm-debug.log
+*.sublime-workspace
+.idea
+.DS_Store
+
+# NPM built package
+/package/
+/hotmap-*.tgz

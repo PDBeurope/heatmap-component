@@ -1,0 +1,27 @@
+{
+    "compilerOptions": {
+        "declaration": true,
+        "target": "es5",
+        "alwaysStrict": true,
+        "noImplicitAny": true,
+        "noImplicitThis": true,
+        "sourceMap": false,
+        "noUnusedLocals": false,
+        "strictNullChecks": true,
+        "strictFunctionTypes": true,
+        "module": "CommonJS",
+        "esModuleInterop": true,
+        "moduleResolution": "node",
+        "importHelpers": true,
+        "noEmitHelpers": true,
+        "allowSyntheticDefaultImports": true,
+        "jsx": "react-jsx",
+        "lib": [ "es6", "dom", "esnext.asynciterable", "es2016" ],
+        "rootDir": "src",
+        "outDir": "lib",
+        // "composite": true,
+        // "tsBuildInfoFile": "tsconfig.tsbuildinfo",
+        "baseUrl": "./"
+    },
+    "include": ["src"]
+}

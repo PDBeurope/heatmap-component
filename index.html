@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>D3.js App</title>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="build/hotmap.css" />
+  <script src="build/hotmap.js"></script>
+</head>
+
+<body>
+  <!-- Your visualization will be placed here -->
+  <div id="app" style="width: 1600px; height: 300px; max-width: 95%; min-width: 400px; border: solid black 1px;"></div>
+  <p>
+    Use Ctrl+scroll to zoom, Shift+scroll to pan, horizontal scroll to pan.
+  </p>
+  <script>new Hotmap.Hotmap('app');</script>
+</body>
+
+</html>
