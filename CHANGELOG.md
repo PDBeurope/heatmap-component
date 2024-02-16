@@ -3,7 +3,7 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
-- Nothing
+- Support for setting data via contructor or `setData`
 
 ## [0.1.0] - 2024-02-16
 

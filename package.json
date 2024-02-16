@@ -27,6 +27,7 @@
     "@types/d3-selection-multi": "^1.0.14",
     "concurrently": "^8.2.2",
     "extra-watch-webpack-plugin": "^1.0.3",
+    "http-server": "^14.1.1",
     "mini-css-extract-plugin": "^2.8.0",
     "webpack": "^5.90.1",
     "webpack-cli": "^5.1.4"
