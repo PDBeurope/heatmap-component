@@ -3,8 +3,9 @@ import { Heatmap } from './heatmap';
 
 
 export function demo(divElementOrId: HTMLDivElement | string) {
-    const hm1 = Heatmap.create();
-    const data = [
+    // const hm = Heatmap.create();  // Heatmap<number, number, number>
+
+    const items = [
         { col: 1, row: 'A', score: 0.0 },
         { col: 1, row: 'B', score: 0.2 },
         { col: 1, row: 'C', score: 0.4 },
@@ -18,15 +19,20 @@ export function demo(divElementOrId: HTMLDivElement | string) {
 
         { col: 4, row: 'B', score: 0.5 },
     ];
-    const hm2 = Heatmap.create({
+
+    // Creating a heatmap with 4 columns (1, 2, 3, 4) and 3 rows (A, B, C)
+    // Heatmap<number, string, { col: number, row: string, score: number }>
+    const hm = Heatmap.create({
         xDomain: [1, 2, 3, 4],
         yDomain: ['A', 'B', 'C'],
-        items: data,
+        items: items,
         x: d => d.col,
         y: d => d.row,
     });
-    const colorScale = d3.scaleLinear([0, 0.5, 1], ['white', 'yellow', 'red']);
-    hm2.setColorScale(d => colorScale(d.score));
-    hm2.render(divElementOrId);
+
+    const colorScale = d3.scaleLinear([0, 0.5, 1], ['#eeeeee', 'gold', 'red']);
+    hm.setColor(d => colorScale(d.score));
+
+    hm.render(divElementOrId);
 }
 

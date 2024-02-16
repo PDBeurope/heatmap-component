@@ -10,16 +10,20 @@ const Class = {
     CanvasDiv: `${AppName}-canvas-div`,
     Marker: `${AppName}-marker`,
     Tooltip: `${AppName}-tooltip`,
+    Overlay: `${AppName}-overlay`,
 }
-const MIN_ZOOMED_DATAPOINTS = 15;
+const MIN_ZOOMED_DATAPOINTS = 1;
 
 
 export type DataDescription<TX, TY, TItem> = {
-    items: TItem[],
-    x: TX[] | ((d: TItem, i: number) => TX),
-    y: TY[] | ((d: TItem, i: number) => TY),
-    xDomain: TX[],  // | (TX extends number ? { min: TX, max: TX } : never),
+    xDomain: TX[],  // TODO: | (TX extends number ? { min: TX, max: TX } : never),
     yDomain: TY[],
+    /** Data items to show in the heatmap (each item is visualized as a rectangle) */
+    items: TItem[],
+    /** X values for the data items (either an array with the X values (must have the same length as `items`), or a function that computes X value for given item)  */
+    x: ((dataItem: TItem, index: number) => TX) | TX[],
+    /** Y values for the data items (either an array with the Y values (must have the same length as `items`), or a function that computes X value for given item)  */
+    y: ((dataItem: TItem, index: number) => TY) | TY[],
 }
 
 // const DefaultColorScale = d3.scaleLinear([0, 0.5, 1], ['#2222dd', '#ffffff', '#dd2222']);
@@ -27,11 +31,15 @@ const DefaultColorScale = d3.scaleSequential(d3.interpolateOrRd);
 const DefaultItemColor = '#888888';
 
 
-export class Heatmap<TXLabel, TYLabel, TDataItem> {
-    private data: Data<TDataItem>;
-    private downsampling: TDataItem extends number ? Downsampling<TDataItem> : undefined;
+export class Heatmap<TX, TY, TItem> {
+    private data: Data<TItem>;
+    private downsampling: TItem extends number ? Downsampling<TItem> : undefined;
+    private xDomain: TX[];
+    private yDomain: TY[];
+    private xDomainIndex: Map<TX, number>;
+    private yDomainIndex: Map<TY, number>;
     private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
-    private colorScale?: (d: TDataItem) => string;
+    private colorScale?: (d: TItem) => string;
 
     private rootDiv: d3.Selection<HTMLDivElement, any, any, any>;
     private mainDiv: d3.Selection<HTMLDivElement, any, any, any>;
@@ -49,18 +57,17 @@ export class Heatmap<TXLabel, TYLabel, TDataItem> {
 
 
     static create(): Heatmap<number, number, number>
-    static create<TX, TY, TItem>(data: DataDescription<TX, TY, TItem>): Heatmap<TX, TY, TItem>
-    static create<TX, TY, TItem>(data?: DataDescription<TX, TY, TItem>): Heatmap<TX, TY, TItem> | Heatmap<number, number, number> {
+    static create<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>): Heatmap<TX_, TY_, TItem_>
+    static create<TX_, TY_, TItem_>(data?: DataDescription<TX_, TY_, TItem_>): Heatmap<TX_, TY_, TItem_> | Heatmap<number, number, number> {
         if (data !== undefined) {
             return new this(data);
         } else {
-            return new this(makeRandomData(8, 20)).setColorScale(DefaultColorScale);
+            return new this(makeRandomData(100, 20)).setColor(DefaultColorScale);
         }
     }
 
-    private constructor(data: DataDescription<TXLabel, TYLabel, TDataItem>) {
+    private constructor(data: DataDescription<TX, TY, TItem>) {
         this.setData(data);
-        console.log('data:', this.data);
     }
 
     /** Clear all the contents of the root div. */
@@ -83,7 +90,7 @@ export class Heatmap<TXLabel, TYLabel, TDataItem> {
 
         this.mainDiv = attrd(this.rootDiv.append('div'), {
             class: Class.MainDiv,
-            style: { position: 'relative', width: '100%', height: '100%', backgroundColor: '#eeeeff' },
+            style: { position: 'relative', width: '100%', height: '100%', backgroundColor: 'white' },
         });
 
         const canvasDiv = attrd(this.mainDiv.append('div'), {
@@ -132,7 +139,7 @@ export class Heatmap<TXLabel, TYLabel, TDataItem> {
         return this;
     }
 
-    private setRawData(data: Data<TDataItem>): this {
+    private setRawData(data: Data<TItem>): this {
         this.data = data;
         if (typeof data.items[0] === 'number') {
             (this as unknown as Heatmap<any, any, number>).downsampling = Downsampling.create(data as Data<number>);
@@ -144,11 +151,11 @@ export class Heatmap<TXLabel, TYLabel, TDataItem> {
         this.renderData();
         return this;
     }
-    setData<TX, TY, TItem>(data: DataDescription<TX, TY, TItem>): Heatmap<TX, TY, TItem> {
+    setData<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>): Heatmap<TX_, TY_, TItem_> {
         const { items, x, y, xDomain, yDomain } = data;
         const nColumns = xDomain.length;
         const nRows = yDomain.length;
-        const array = new Array<TItem | undefined>(nColumns * nRows).fill(undefined);
+        const array = new Array<TItem_ | undefined>(nColumns * nRows).fill(undefined);
         const xs = (typeof x === 'function') ? items.map(x) : x;
         const ys = (typeof y === 'function') ? items.map(y) : y;
         const xDomainIndex = new Map(xDomain.map((x, i) => [x, i])); // TODO avoid creating array of arrays
@@ -172,35 +179,34 @@ export class Heatmap<TXLabel, TYLabel, TDataItem> {
                 array[nColumns * yDomainIndex.get(y)! + xDomainIndex.get(x)!] = d;
             }
         }
-        this.setRawData({ items: array, nRows, nColumns } as Data<TDataItem>);
-
-        return this as unknown as Heatmap<TXLabel, TYLabel, TItem>;
+        const self = this as unknown as Heatmap<TX_, TY_, TItem_>;
+        self.setRawData({ items: array, nRows, nColumns });
+        self.xDomain = xDomain;
+        self.yDomain = yDomain;
+        self.xDomainIndex = xDomainIndex;
+        self.yDomainIndex = yDomainIndex;
+        return self;
     }
-    setColorScale(scale: (d: TDataItem) => string): this {
-        this.colorScale = scale;
+    setColor(colorScale: (d: TItem) => string): this {
+        this.colorScale = colorScale;
         return this;
     }
 
-    private getDataItem(x: number, y: number): TDataItem | undefined {
+    private getDataItem(x: number, y: number): TItem | undefined {
         return getDataItem(this.data, x, y);
     }
     private renderData() {
         if (!this.rootDiv) return;
         const xResolution = this.canvasDomSize.width / this.downsamplingPixelsPerRect;
-        console.log('xResolution', xResolution)
         const colFrom = Math.floor(this.boxes.visWorld.xmin);
         const colTo = Math.ceil(this.boxes.visWorld.xmax); // exclusive
         const downsamplingCoefficient = Downsampling.downsamplingCoefficient(colTo - colFrom, xResolution);
-        console.log('datapoints:', colTo - colFrom, 'downsamplingCoefficient:', downsamplingCoefficient, '->', Math.ceil((colTo - colFrom) / downsamplingCoefficient))
-        console.time('downsampling')
         const downsampled = this.downsampling ? Downsampling.getDownsampled(this.downsampling, downsamplingCoefficient) : this.data;
-        console.timeEnd('downsampling')
         return this.renderTheseData(downsampled, downsamplingCoefficient);
         // return this.renderTheseData(this.data, downsamplingCoefficient);
     }
-    private renderTheseData(data: Data<TDataItem>, scale: number) {
+    private renderTheseData(data: Data<TItem>, scale: number) {
         if (!this.rootDiv) return;
-        console.time('renderData');
         // this.ctx.resetTransform(); this.ctx.scale(scale, 1);
         this.ctx.clearRect(0, 0, this.canvasInnerSize.width, this.canvasInnerSize.height);
         const width = scaleDistance(this.scales.worldToCanvas.x, 1) * scale;
@@ -209,7 +215,6 @@ export class Heatmap<TXLabel, TYLabel, TDataItem> {
         const yGap = scaleDistance(this.scales.domToCanvas.y, 1); // 1px on screen
         const colFrom = Math.floor(this.boxes.visWorld.xmin / scale);
         const colTo = Math.ceil(this.boxes.visWorld.xmax / scale); // exclusive
-        // console.log('col from', colFrom, 'to', colTo, 'scale', scale);
 
         for (let row = 0; row < data.nRows; row++) {
             for (let col = colFrom; col < colTo; col++) {
@@ -221,10 +226,9 @@ export class Heatmap<TXLabel, TYLabel, TDataItem> {
                 this.ctx.fillRect(x + xGap, y + yGap, width - 2 * xGap, height - 2 * yGap);
             }
         }
-        console.timeEnd('renderData');
     }
 
-    private scaleColor(item: TDataItem): string {
+    private scaleColor(item: TItem): string {
         if (this.colorScale) return this.colorScale(item);
         return DefaultItemColor;
     }
@@ -271,7 +275,6 @@ export class Heatmap<TXLabel, TYLabel, TDataItem> {
             this.mainDiv.selectAll('.' + Class.Tooltip).remove();
             return;
         }
-        // console.log('mousemove', e)
         const x = Math.floor(this.scales.domToWorld.x(event.offsetX));
         const y = Math.floor(this.scales.domToWorld.y(event.offsetY));
         const dataItem = this.getDataItem(x, y);
@@ -290,7 +293,9 @@ export class Heatmap<TXLabel, TYLabel, TDataItem> {
         attrd(marker.enter().append('rect'), {
             class: Class.Marker,
             stroke: 'black',
-            strokeWidth: 2,
+            strokeWidth: 3,
+            rx: 1,
+            ry: 1,
             fill: 'none',
             ...variableAttrs,
         });
@@ -299,7 +304,7 @@ export class Heatmap<TXLabel, TYLabel, TDataItem> {
         const tooltip = this.mainDiv.selectAll('.' + Class.Tooltip).data([1]);
         const tooltipLeft = `${(event.clientX ?? 0) + 5}px`;
         const tooltipBottom = `${document.documentElement.clientHeight - (event.clientY ?? 0) + 5}px`;
-        const tooltipText = `x-index: ${x}<br>y-index: ${y}<br>item: ${formatDataItem(dataItem)}`;
+        const tooltipText = `x index: ${x}<br>y index: ${y}<br>x value: ${this.xDomain[x]}<br>y value: ${this.yDomain[y]}<br>item: ${formatDataItem(dataItem)}`;
         attrd(tooltip.enter().append('div'), {
             class: Class.Tooltip,
             style: {
@@ -311,6 +316,21 @@ export class Heatmap<TXLabel, TYLabel, TDataItem> {
             style: { left: tooltipLeft, bottom: tooltipBottom },
         }).html(tooltipText);
     }
+    private showScrollingMessage() {
+        if (!this.mainDiv.selectAll(`.${Class.Overlay}`).empty()) return;
+
+        const overlay = attrd(this.mainDiv.append('div'), {
+            class: Class.Overlay,
+            style: { position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none', display: 'flex', flexDirection: 'column', justifyContent: 'center', zIndex: 0 },
+        });
+        attrd(overlay.append('div'), {
+            style: { position: 'absolute', width: '100%', height: '100%', backgroundColor: '#cccccc', opacity: 0.8, zIndex: -1 },
+        });
+        attrd(overlay.append('div'), {
+            style: { paddingInline: '2em', textAlign: 'center', fontSize: '150%', fontWeight: 'bold' },
+        }).text('Press Ctrl and scroll to apply zoom');
+        setTimeout(() => overlay.remove(), 750);
+    }
 
     private readonly handlers = {
         mousemove: (e: any) => this.handleHover(e),
@@ -320,11 +340,17 @@ export class Heatmap<TXLabel, TYLabel, TDataItem> {
             // Interpret horizontal scroll (and vertical with Shift key) as panning
             if (!this.zoomBehavior) return;
             const isHorizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
-            const translation = isHorizontal ? e.deltaX : e.shiftKey ? e.deltaY : 0;
+            const isVertical = Math.abs(e.deltaX) < Math.abs(e.deltaY);
+            // ignoring cases when Math.abs(e.deltaX) === Math.abs(e.deltaY)
+            const translation = isHorizontal ? e.deltaX : (e.shiftKey && isVertical) ? e.deltaY : 0;
             if (translation !== 0) {
                 const shift = scaleDistance(this.scales.domToWorld.x, -translation);
                 this.zoomBehavior.translateBy(this.svg as any, shift, 0);
+            } else if (isVertical && !e.ctrlKey && Math.abs(e.deltaY) >= 10) {
+                this.showScrollingMessage();
             }
+            // TODO: relatively scale events from touchpad and wheel
+            // TODO: use e.shiftKey and e.ctrlKey from the beginning of the gesture
         },
     } satisfies Record<string, (e: any) => any>;
 }

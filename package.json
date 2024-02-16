@@ -1,7 +1,12 @@
 {
   "name": "hotmap",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "",
+  "files": [
+    "build",
+    "lib",
+    "CHANGELOG.md"
+  ],
   "main": "lib/main.js",
   "scripts": {
     "rebuild": "rm -rf tsconfig.tsbuildinfo lib/ build/ && npm run build",

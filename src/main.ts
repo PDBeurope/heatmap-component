@@ -1,4 +1,4 @@
-/** Main file for imports when using as a dependency */
+/** Main file for importing `Hotmap` as a dependency */
 
 export { demo } from './hotmap/demo';
 export { Heatmap } from './hotmap/heatmap';
