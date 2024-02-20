@@ -5,7 +5,6 @@ import { Box, BoxSize, Boxes, Scales, scaleDistance } from './scales';
 import { attrd, getSize, nextIfChanged } from './utils';
 
 
-// TODO: zoom event
 // TODO: handle resize
 // TODO: configurable rect x and y margins
 // TODO: style via CSS file, avoid inline styles
@@ -39,7 +38,33 @@ type ProviderParams<TX, TY, TItem> = [d: TItem, x: TX, y: TY, xIndex: number, yI
 
 type Provider<TX, TY, TItem, TResult> = (...args: ProviderParams<TX, TY, TItem>) => TResult
 
-type ItemEventParam<TX, TY, TItem> = { datum: TItem, x: TX, y: TY, xIndex: number, yIndex: number } | undefined
+type ItemEventParam<TX, TY, TItem> = {
+    datum: TItem,
+    x: TX,
+    y: TY,
+    xIndex: number,
+    yIndex: number,
+} | undefined
+
+type ZoomEventParam<TX, TY, TItem> = {
+    /** Continuous X-index corresponding to the left edge of the viewport */
+    xMinIndex: number,
+    /** Continuous X-index corresponding to the right edge of the viewport */
+    xMaxIndex: number,
+    /** X value of the first (at least partially) visible column, corresponds to index `Math.floor(xMinIndex)` */
+    xFirstVisible: TX,
+    /** X value of the last (at least partially) visible column, corresponds to index `Math.ceil(xMaxIndex)-1` */
+    xLastVisible: TX,
+
+    /** Continuous Y-index corresponding to the top edge of the viewport */
+    yMinIndex: number,
+    /** Continuous Y-index corresponding to the bottom edge of the viewport */
+    yMaxIndex: number,
+    /** Y value of the first (at least partially) visible row, corresponds to index `Math.floor(yMinIndex)` */
+    yFirstVisible: TY,
+    /** Y value of the last (at least partially) visible row, corresponds to index `Math.ceil(yMaxIndex)-1` */
+    yLastVisible: TY,
+} | undefined
 
 
 const DefaultColorProvider = () => '#888888';
@@ -67,6 +92,7 @@ export class Heatmap<TX, TY, TItem> {
     public readonly events = {
         hover: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
         click: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
+        zoom: new BehaviorSubject<ZoomEventParam<TX, TY, TItem>>(undefined),
     } as const;
 
     private rootDiv: d3.Selection<HTMLDivElement, any, any, any>;
@@ -290,6 +316,7 @@ export class Heatmap<TX, TY, TItem> {
             };
             this.scales = Scales(this.boxes);
             this.handleHover(e.sourceEvent);
+            this.emitZoom();
             this.renderData();
         });
         this.svg.call(this.zoomBehavior as any);
@@ -302,6 +329,19 @@ export class Heatmap<TX, TY, TItem> {
         this.zoomBehavior.translateExtent([[this.boxes.wholeWorld.xmin, -Infinity], [this.boxes.wholeWorld.xmax, Infinity]]);
         this.zoomBehavior.transform(this.svg as any, d3.zoomIdentity.scale(minZoom));
         // TODO: limit zooming
+    }
+    private emitZoom() {
+        const xMinIndex = this.boxes.visWorld.xmin;
+        const xMaxIndex = this.boxes.visWorld.xmax;
+        const xFirstVisible = this.xDomain[Math.floor(xMinIndex)];
+        const xLastVisible = this.xDomain[Math.ceil(xMaxIndex) - 1];
+
+        const yMinIndex = this.boxes.visWorld.ymin;
+        const yMaxIndex = this.boxes.visWorld.ymax;
+        const yFirstVisible = this.yDomain[Math.floor(yMinIndex)];
+        const yLastVisible = this.yDomain[Math.ceil(yMaxIndex) - 1];
+
+        this.events.zoom.next({ xMinIndex, xMaxIndex, xFirstVisible, xLastVisible, yMinIndex, yMaxIndex, yFirstVisible, yLastVisible });
     }
 
     private getPointedItem(event: MouseEvent | undefined): ItemEventParam<TX, TY, TItem> {

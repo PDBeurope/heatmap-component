@@ -53,5 +53,12 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
             console.log('clicking', e.datum, e.x, e.y, e.xIndex, e.yIndex);
         }
     });
+    hm.events.zoom.subscribe(e => {
+        if (!e) {
+            console.log('zooming nothing');
+        } else {
+            console.log('zooming', e);
+        }
+    });
 }
 

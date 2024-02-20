@@ -4,9 +4,10 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
-- Click and hover events
-- Filtering via `setFilter`
 - Customizing tooltips via `setTooltip`
+- Filtering via `setFilter`
+- Click and hover events
+- Zoom event
 
 ## [0.2.0] - 2024-02-16
 
