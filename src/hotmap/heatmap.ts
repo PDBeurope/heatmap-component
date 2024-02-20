@@ -1,12 +1,11 @@
 import * as d3 from 'd3';
+import { BehaviorSubject } from 'rxjs';
+import { Data, Downsampling, getDataItem, makeRandomRawData } from './data';
 import { Box, BoxSize, Boxes, Scales, scaleDistance } from './scales';
-import { attrd, getSize } from './utils';
-import { Data, makeRandomRawData, getDataItem, Downsampling } from './data';
+import { attrd, getSize, nextIfChanged } from './utils';
 
 
 // TODO: zoom event
-// TODO: click event
-// TODO: hover event
 // TODO: handle resize
 // TODO: configurable rect x and y margins
 // TODO: style via CSS file, avoid inline styles
@@ -35,8 +34,13 @@ export type DataDescription<TX, TY, TItem> = {
     y: ((dataItem: TItem, index: number) => TY) | TY[],
 }
 
+/** Types of input parameters of provider functions (that are passed to setTooltip etc.) */
 type ProviderParams<TX, TY, TItem> = [d: TItem, x: TX, y: TY, xIndex: number, yIndex: number]
+
 type Provider<TX, TY, TItem, TResult> = (...args: ProviderParams<TX, TY, TItem>) => TResult
+
+type ItemEventParam<TX, TY, TItem> = { datum: TItem, x: TX, y: TY, xIndex: number, yIndex: number } | undefined
+
 
 const DefaultColorProvider = () => '#888888';
 const DefaultNumericColorProvider = d3.scaleSequential(d3.interpolateOrRd);
@@ -45,9 +49,6 @@ const DefaultNumericColorProvider = d3.scaleSequential(d3.interpolateOrRd);
 function DefaultTooltipProvider(dataItem: unknown, x: unknown, y: unknown, xIndex: number, yIndex: number): string {
     return `x index: ${xIndex}<br>y index: ${yIndex}<br>x value: ${x}<br>y value: ${y}<br>item: ${formatDataItem(dataItem)}`;
 }
-
-
-/** Types of input parameters of provider functions (that are passed to setTooltip etc.) */
 
 
 export class Heatmap<TX, TY, TItem> {
@@ -63,6 +64,10 @@ export class Heatmap<TX, TY, TItem> {
     private colorProvider: Provider<TX, TY, TItem, string> = DefaultColorProvider;
     private tooltipProvider: Provider<TX, TY, TItem, string> = DefaultTooltipProvider;
     private filter?: Provider<TX, TY, TItem, boolean> = undefined;
+    public readonly events = {
+        hover: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
+        click: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
+    } as const;
 
     private rootDiv: d3.Selection<HTMLDivElement, any, any, any>;
     private mainDiv: d3.Selection<HTMLDivElement, any, any, any>;
@@ -299,18 +304,29 @@ export class Heatmap<TX, TY, TItem> {
         // TODO: limit zooming
     }
 
-    private handleHover(event: MouseEvent | undefined) {
+    private getPointedItem(event: MouseEvent | undefined): ItemEventParam<TX, TY, TItem> {
         if (!event) {
+            return undefined;
+        }
+        const xIndex = Math.floor(this.scales.domToWorld.x(event.offsetX));
+        const yIndex = Math.floor(this.scales.domToWorld.y(event.offsetY));
+        const datum = this.getDataItem(xIndex, yIndex);
+        if (!datum) {
+            return undefined;
+        }
+        const x = this.xDomain[xIndex];
+        const y = this.yDomain[yIndex];
+        return { datum, x, y, xIndex, yIndex };
+    }
+
+    private handleHover(event: MouseEvent | undefined) {
+        const pointed = this.getPointedItem(event);
+        nextIfChanged(this.events.hover, pointed);
+
+        if (!event || !pointed) {
             // on mouseleave or when cursor is not at any data point
             this.svg.selectAll('.' + Class.Marker).remove();
             this.mainDiv.selectAll('.' + Class.Tooltip).remove();
-            return;
-        }
-        const ix = Math.floor(this.scales.domToWorld.x(event.offsetX));
-        const iy = Math.floor(this.scales.domToWorld.y(event.offsetY));
-        const dataItem = this.getDataItem(ix, iy);
-        if (!dataItem) {
-            this.handleHover(undefined);
             return;
         }
 
@@ -318,8 +334,8 @@ export class Heatmap<TX, TY, TItem> {
         const variableAttrs = {
             width: scaleDistance(this.scales.worldToDom.x, 1),
             height: scaleDistance(this.scales.worldToDom.y, 1),
-            x: this.scales.worldToDom.x(ix),
-            y: this.scales.worldToDom.y(iy),
+            x: this.scales.worldToDom.x(pointed.xIndex),
+            y: this.scales.worldToDom.y(pointed.yIndex),
         };
         attrd(marker.enter().append('rect'), {
             class: Class.Marker,
@@ -335,7 +351,7 @@ export class Heatmap<TX, TY, TItem> {
         const tooltip = this.mainDiv.selectAll('.' + Class.Tooltip).data([1]);
         const tooltipLeft = `${(event.clientX ?? 0) + 5}px`;
         const tooltipBottom = `${document.documentElement.clientHeight - (event.clientY ?? 0) + 5}px`;
-        const tooltipText = this.tooltipProvider(dataItem, this.xDomain[ix], this.yDomain[iy], ix, iy);
+        const tooltipText = this.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
         attrd(tooltip.enter().append('div'), {
             class: Class.Tooltip,
             style: {
@@ -364,9 +380,10 @@ export class Heatmap<TX, TY, TItem> {
     }
 
     private readonly handlers = {
-        mousemove: (e: any) => this.handleHover(e),
-        mouseleave: (e: any) => this.handleHover(undefined),
-        wheel: (e: any) => {
+        mousemove: (e: MouseEvent) => this.handleHover(e),
+        mouseleave: (e: MouseEvent) => this.handleHover(undefined),
+        click: (e: MouseEvent) => this.events.click.next(this.getPointedItem(e)),
+        wheel: (e: WheelEvent) => {
             e.preventDefault();
             // Interpret horizontal scroll (and vertical with Shift key) as panning
             if (!this.zoomBehavior) return;

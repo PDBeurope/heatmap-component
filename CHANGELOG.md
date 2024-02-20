@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+- Click and hover events
 - Filtering via `setFilter`
 - Customizing tooltips via `setTooltip`
 

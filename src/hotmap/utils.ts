@@ -1,3 +1,5 @@
+import { isEqual } from 'lodash';
+import { BehaviorSubject } from 'rxjs';
 import { BoxSize } from './scales';
 
 
@@ -25,3 +27,8 @@ export function kebabCase(str: string) {
     return str.replace(/([A-Z])/g, '-$1').toLowerCase();
 }
 
+export function nextIfChanged<T>(subject: BehaviorSubject<T>, newValue: T) {
+    if (!isEqual(subject.getValue(), newValue)) {
+        subject.next(newValue);
+    }
+}

@@ -39,5 +39,19 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
     hm.setFilter((d, x, y, xIndex, yIndex) => d.score > 0);
     hm.render(divElementOrId);
     setTimeout(() => hm.setFilter(undefined), 2000);
+    hm.events.hover.subscribe(e => {
+        if (!e) {
+            console.log('hovering nothing');
+        } else {
+            console.log('hovering', e.datum, e.x, e.y, e.xIndex, e.yIndex);
+        }
+    });
+    hm.events.click.subscribe(e => {
+        if (!e) {
+            console.log('clicking nothing');
+        } else {
+            console.log('clicking', e.datum, e.x, e.y, e.xIndex, e.yIndex);
+        }
+    });
 }
 
