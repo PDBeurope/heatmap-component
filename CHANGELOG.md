@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+- Customizing tooltips via `setTooltip`
+
 ## [0.2.0] - 2024-02-16
 
 - Support for setting data via contructor or `setData`

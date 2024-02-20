@@ -14,9 +14,11 @@
     "build-tsc": "tsc",
     "build-webpack": "webpack --mode production --config ./webpack.config.js",
     "build-cp": "cp src/*.css build/",
-    "watch": "concurrently -c 'green,blue' --names 'tsc,wpc' --kill-others 'npm:watch-tsc' 'npm:watch-webpack'",
-    "watch-tsc": "tsc --watch --incremental",
+    "start": "concurrently -c 'green,blue,magenta' --names 'tsc,wpk,srv' --kill-others 'npm:watch-tsc' 'npm:watch-webpack' 'npm:serve'",
+    "watch": "concurrently -c 'green,blue' --names 'tsc,wpk,' --kill-others 'npm:watch-tsc' 'npm:watch-webpack'",
+    "watch-tsc": "tsc --watch --preserveWatchOutput --incremental",
     "watch-webpack": "webpack -w --mode development --stats minimal --config ./webpack.config.js",
+    "serve": "http-server -p 7000",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",

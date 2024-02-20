@@ -4,6 +4,15 @@ import { attrd, getSize } from './utils';
 import { Data, makeRandomRawData, getDataItem, Downsampling } from './data';
 
 
+// TODO: zoom event
+// TODO: click event
+// TODO: hover event
+// TODO: setFilter
+// TODO: handle resize
+// TODO: configurable rect x and y margins
+// TODO: style via CSS file, avoid inline styles
+// TODO: use OrRd color scale automatically when data are numeric?
+
 const AppName = 'hotmap';
 const Class = {
     MainDiv: `${AppName}-main-div`,
@@ -26,9 +35,19 @@ export type DataDescription<TX, TY, TItem> = {
     y: ((dataItem: TItem, index: number) => TY) | TY[],
 }
 
+type ProviderParams<TX, TY, TItem> = [d: TItem, x: TX, y: TY, xIndex: number, yIndex: number]
+type Provider<TX, TY, TItem, TResult> = (...args: ProviderParams<TX, TY, TItem>) => TResult
+
+const DefaultColorProvider = () => '#888888';
+const DefaultNumericColorProvider = d3.scaleSequential(d3.interpolateOrRd);
 // const DefaultColorScale = d3.scaleLinear([0, 0.5, 1], ['#2222dd', '#ffffff', '#dd2222']);
-const DefaultColorScale = d3.scaleSequential(d3.interpolateOrRd);
-const DefaultItemColor = '#888888';
+
+function DefaultTooltipProvider(dataItem: unknown, x: unknown, y: unknown, xIndex: number, yIndex: number): string {
+    return `x index: ${xIndex}<br>y index: ${yIndex}<br>x value: ${x}<br>y value: ${y}<br>item: ${formatDataItem(dataItem)}`;
+}
+
+
+/** Types of input parameters of provider functions (that are passed to setTooltip etc.) */
 
 
 export class Heatmap<TX, TY, TItem> {
@@ -39,7 +58,9 @@ export class Heatmap<TX, TY, TItem> {
     private xDomainIndex: Map<TX, number>;
     private yDomainIndex: Map<TY, number>;
     private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
-    private colorScale?: (d: TItem) => string;
+
+    private colorProvider: Provider<TX, TY, TItem, string> = DefaultColorProvider;
+    private tooltipProvider: Provider<TX, TY, TItem, string> = DefaultTooltipProvider;
 
     private rootDiv: d3.Selection<HTMLDivElement, any, any, any>;
     private mainDiv: d3.Selection<HTMLDivElement, any, any, any>;
@@ -62,7 +83,7 @@ export class Heatmap<TX, TY, TItem> {
         if (data !== undefined) {
             return new this(data);
         } else {
-            return new this(makeRandomData(100, 20)).setColor(DefaultColorScale);
+            return new this(makeRandomData(100, 20)).setColor(DefaultNumericColorProvider);
         }
     }
 
@@ -187,8 +208,12 @@ export class Heatmap<TX, TY, TItem> {
         self.yDomainIndex = yDomainIndex;
         return self;
     }
-    setColor(colorScale: (d: TItem) => string): this {
-        this.colorScale = colorScale;
+    setColor(colorProvider: (...args: ProviderParams<TX, TY, TItem>) => string): this {
+        this.colorProvider = colorProvider;
+        return this;
+    }
+    setTooltip(tooltipProvider: (...args: ProviderParams<TX, TY, TItem>) => string): this { // TODO: type: 'text' | 'html' = 'html'?
+        this.tooltipProvider = tooltipProvider;
         return this;
     }
 
@@ -203,7 +228,6 @@ export class Heatmap<TX, TY, TItem> {
         const downsamplingCoefficient = Downsampling.downsamplingCoefficient(colTo - colFrom, xResolution);
         const downsampled = this.downsampling ? Downsampling.getDownsampled(this.downsampling, downsamplingCoefficient) : this.data;
         return this.renderTheseData(downsampled, downsamplingCoefficient);
-        // return this.renderTheseData(this.data, downsamplingCoefficient);
     }
     private renderTheseData(data: Data<TItem>, scale: number) {
         if (!this.rootDiv) return;
@@ -216,21 +240,16 @@ export class Heatmap<TX, TY, TItem> {
         const colFrom = Math.floor(this.boxes.visWorld.xmin / scale);
         const colTo = Math.ceil(this.boxes.visWorld.xmax / scale); // exclusive
 
-        for (let row = 0; row < data.nRows; row++) {
-            for (let col = colFrom; col < colTo; col++) {
-                const item = getDataItem(data, col, row);
+        for (let iy = 0; iy < data.nRows; iy++) {
+            for (let ix = colFrom; ix < colTo; ix++) {
+                const item = getDataItem(data, ix, iy);
                 if (item === undefined) continue;
-                this.ctx.fillStyle = this.scaleColor(item);
-                const x = this.scales.worldToCanvas.x(col * scale);
-                const y = this.scales.worldToCanvas.y(row);
+                this.ctx.fillStyle = this.colorProvider(item, this.xDomain[ix], this.yDomain[iy], ix, iy);
+                const x = this.scales.worldToCanvas.x(ix * scale);
+                const y = this.scales.worldToCanvas.y(iy);
                 this.ctx.fillRect(x + xGap, y + yGap, width - 2 * xGap, height - 2 * yGap);
             }
         }
-    }
-
-    private scaleColor(item: TItem): string {
-        if (this.colorScale) return this.colorScale(item);
-        return DefaultItemColor;
     }
 
     private applyZoom() {
@@ -275,9 +294,9 @@ export class Heatmap<TX, TY, TItem> {
             this.mainDiv.selectAll('.' + Class.Tooltip).remove();
             return;
         }
-        const x = Math.floor(this.scales.domToWorld.x(event.offsetX));
-        const y = Math.floor(this.scales.domToWorld.y(event.offsetY));
-        const dataItem = this.getDataItem(x, y);
+        const ix = Math.floor(this.scales.domToWorld.x(event.offsetX));
+        const iy = Math.floor(this.scales.domToWorld.y(event.offsetY));
+        const dataItem = this.getDataItem(ix, iy);
         if (!dataItem) {
             this.handleHover(undefined);
             return;
@@ -287,8 +306,8 @@ export class Heatmap<TX, TY, TItem> {
         const variableAttrs = {
             width: scaleDistance(this.scales.worldToDom.x, 1),
             height: scaleDistance(this.scales.worldToDom.y, 1),
-            x: this.scales.worldToDom.x(x),
-            y: this.scales.worldToDom.y(y),
+            x: this.scales.worldToDom.x(ix),
+            y: this.scales.worldToDom.y(iy),
         };
         attrd(marker.enter().append('rect'), {
             class: Class.Marker,
@@ -304,7 +323,7 @@ export class Heatmap<TX, TY, TItem> {
         const tooltip = this.mainDiv.selectAll('.' + Class.Tooltip).data([1]);
         const tooltipLeft = `${(event.clientX ?? 0) + 5}px`;
         const tooltipBottom = `${document.documentElement.clientHeight - (event.clientY ?? 0) + 5}px`;
-        const tooltipText = `x index: ${x}<br>y index: ${y}<br>x value: ${this.xDomain[x]}<br>y value: ${this.yDomain[y]}<br>item: ${formatDataItem(dataItem)}`;
+        const tooltipText = this.tooltipProvider(dataItem, this.xDomain[ix], this.yDomain[iy], ix, iy);
         attrd(tooltip.enter().append('div'), {
             class: Class.Tooltip,
             style: {
@@ -367,8 +386,7 @@ function makeRandomData(nColumns: number, nRows: number): DataDescription<number
     }
 }
 
-function formatDataItem(item: any): string {
+export function formatDataItem(item: any): string {
     if (typeof item === 'number') return item.toFixed(3);
-    if (typeof item === 'object') return JSON.stringify(item);
-    return `${item}`;
+    else return JSON.stringify(item);
 }
