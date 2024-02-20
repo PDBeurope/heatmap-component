@@ -36,7 +36,8 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
     const colorScale = d3.scaleLinear([0, 0.5, 1], ['#eeeeee', 'gold', 'red']);
     hm.setColor(d => colorScale(d.score));
     hm.setTooltip((d, x, y, xIndex, yIndex) => `<div style="font-weight: bold; margin-bottom: 0.5em;">${formatDataItem(d)}</div>Column ${x}, Row ${y}<br>Indices [${xIndex},${yIndex}]`);
-
+    hm.setFilter((d, x, y, xIndex, yIndex) => d.score > 0);
     hm.render(divElementOrId);
+    setTimeout(() => hm.setFilter(undefined), 2000);
 }
 

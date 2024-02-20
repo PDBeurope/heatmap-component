@@ -7,11 +7,11 @@ import { Data, makeRandomRawData, getDataItem, Downsampling } from './data';
 // TODO: zoom event
 // TODO: click event
 // TODO: hover event
-// TODO: setFilter
 // TODO: handle resize
 // TODO: configurable rect x and y margins
 // TODO: style via CSS file, avoid inline styles
 // TODO: use OrRd color scale automatically when data are numeric?
+// TODO: think in more depth what could happen when changing data type with filters, providers, etc. already set
 
 const AppName = 'hotmap';
 const Class = {
@@ -51,6 +51,7 @@ function DefaultTooltipProvider(dataItem: unknown, x: unknown, y: unknown, xInde
 
 
 export class Heatmap<TX, TY, TItem> {
+    private originalData: DataDescription<TX, TY, TItem>;
     private data: Data<TItem>;
     private downsampling: TItem extends number ? Downsampling<TItem> : undefined;
     private xDomain: TX[];
@@ -61,6 +62,7 @@ export class Heatmap<TX, TY, TItem> {
 
     private colorProvider: Provider<TX, TY, TItem, string> = DefaultColorProvider;
     private tooltipProvider: Provider<TX, TY, TItem, string> = DefaultTooltipProvider;
+    private filter?: Provider<TX, TY, TItem, boolean> = undefined;
 
     private rootDiv: d3.Selection<HTMLDivElement, any, any, any>;
     private mainDiv: d3.Selection<HTMLDivElement, any, any, any>;
@@ -173,6 +175,7 @@ export class Heatmap<TX, TY, TItem> {
         return this;
     }
     setData<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>): Heatmap<TX_, TY_, TItem_> {
+        const self = this as unknown as Heatmap<TX_, TY_, TItem_>;
         const { items, x, y, xDomain, yDomain } = data;
         const nColumns = xDomain.length;
         const nRows = yDomain.length;
@@ -186,21 +189,25 @@ export class Heatmap<TX, TY, TItem> {
             const d = items[i];
             const x = xs[i];
             const y = ys[i];
-            if (!xDomainIndex.has(x)) {
+            const ix = xDomainIndex.get(x);
+            const iy = yDomainIndex.get(y);
+            if (ix === undefined) {
                 if (!warned) {
                     console.warn('Some data items map to X values out of the X domain.'); // TODO add details
                     warned = true;
                 }
-            } else if (!yDomainIndex.has(y)) {
+            } else if (iy === undefined) {
                 if (!warned) {
                     console.warn('Some data items map to Y values out of the Y domain.'); // TODO add details
                     warned = true;
                 }
+            } else if (self.filter !== undefined && !self.filter(d, x, y, ix, iy)) {
+                // skipping this item
             } else {
-                array[nColumns * yDomainIndex.get(y)! + xDomainIndex.get(x)!] = d;
+                array[nColumns * iy + ix] = d;
             }
         }
-        const self = this as unknown as Heatmap<TX_, TY_, TItem_>;
+        self.originalData = data;
         self.setRawData({ items: array, nRows, nColumns });
         self.xDomain = xDomain;
         self.yDomain = yDomain;
@@ -212,8 +219,13 @@ export class Heatmap<TX, TY, TItem> {
         this.colorProvider = colorProvider;
         return this;
     }
-    setTooltip(tooltipProvider: (...args: ProviderParams<TX, TY, TItem>) => string): this { // TODO: type: 'text' | 'html' = 'html'?
+    setTooltip(tooltipProvider: (...args: ProviderParams<TX, TY, TItem>) => string): this { // TODO: type: 'text' | 'html' = 'html'?, TODO: allow resetting default tooltip and disabling it altogether
         this.tooltipProvider = tooltipProvider;
+        return this;
+    }
+    setFilter(filter: ((...args: ProviderParams<TX, TY, TItem>) => boolean) | undefined): this {
+        this.filter = filter;
+        this.setData(this.originalData); // reapplies filter
         return this;
     }
 
