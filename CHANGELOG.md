@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+## [0.3.0] - 2024-02-21
+
 - Customizing tooltips via `setTooltip`
 - Filtering via `setFilter`
 - Click and hover events
