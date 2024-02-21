@@ -32,7 +32,7 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
         x: d => d.col,
         y: d => d.row,
     });
-
+    hm.setAlignment('center', 'center');
     const colorScale = d3.scaleLinear([0, 0.5, 1], ['#eeeeee', 'gold', 'red']);
     hm.setColor(d => colorScale(d.score));
     hm.setTooltip((d, x, y, xIndex, yIndex) => `<div style="font-weight: bold; margin-bottom: 0.5em;">${formatDataItem(d)}</div>Column ${x}, Row ${y}<br>Indices [${xIndex},${yIndex}]`);

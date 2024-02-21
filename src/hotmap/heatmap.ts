@@ -77,6 +77,8 @@ function DefaultTooltipProvider(dataItem: unknown, x: unknown, y: unknown, xInde
     return `x index: ${xIndex}<br>y index: ${yIndex}<br>x value: ${x}<br>y value: ${y}<br>item: ${formatDataItem(dataItem)}`;
 }
 
+type XAlignment = 'left' | 'center' | 'right'
+type YAlignment = 'top' | 'center' | 'bottom'
 
 export type VisualParams = typeof DefaultVisualParams;
 
@@ -104,6 +106,8 @@ export class Heatmap<TX, TY, TItem> {
     private xDomainIndex: Map<TX, number>;
     private yDomainIndex: Map<TY, number>;
     private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
+    private xAlignment: XAlignment = 'center';
+    private yAlignment: YAlignment = 'center';
 
     private colorProvider: Provider<TX, TY, TItem, string> = DefaultColorProvider;
     private tooltipProvider: Provider<TX, TY, TItem, string> = DefaultTooltipProvider;
@@ -277,9 +281,17 @@ export class Heatmap<TX, TY, TItem> {
         this.setData(this.originalData); // reapplies filter
         return this;
     }
-    setVisualParams(params: Partial<VisualParams>) {
+    setVisualParams(params: Partial<VisualParams>): this {
         this.visualParams = merge(cloneDeep(this.visualParams), params);
         this.draw();
+        return this;
+    }
+    /** Controls how column/row indices and names map to X and Y axes. */
+    setAlignment(x: XAlignment | undefined, y: YAlignment | undefined): this {
+        if (x) this.xAlignment = x;
+        if (y) this.yAlignment = y;
+        this.emitZoom();
+        return this;
     }
 
     private getDataItem(x: number, y: number): TItem | undefined {
@@ -363,6 +375,8 @@ export class Heatmap<TX, TY, TItem> {
         // TODO: limit zooming
     }
     private emitZoom() {
+        if (!this.boxes?.visWorld) return;
+
         const xMinIndex = this.boxes.visWorld.xmin;
         const xMaxIndex = this.boxes.visWorld.xmax;
         const xFirstVisible = this.xDomain[Math.floor(xMinIndex)];
@@ -490,4 +504,10 @@ function makeRandomData(nColumns: number, nRows: number): DataDescription<number
 export function formatDataItem(item: any): string {
     if (typeof item === 'number') return item.toFixed(3);
     else return JSON.stringify(item);
+}
+
+function indexAlignmentShift(alignment: XAlignment | YAlignment): number {
+    if (alignment === 'left' || alignment === 'top') return 0;
+    if (alignment === 'center') return -0.5;
+    return -1;
 }
