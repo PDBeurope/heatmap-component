@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file, following t
 - Filtering via `setFilter`
 - Click and hover events
 - Zoom event
+- Customizing gaps between rectangles by `setVisualParams`
 
 ## [0.2.0] - 2024-02-16
 

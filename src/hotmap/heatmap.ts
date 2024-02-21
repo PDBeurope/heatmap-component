@@ -2,11 +2,12 @@ import * as d3 from 'd3';
 import { BehaviorSubject } from 'rxjs';
 import { Data, Downsampling, getDataItem, makeRandomRawData } from './data';
 import { Box, BoxSize, Boxes, Scales, scaleDistance } from './scales';
-import { attrd, getSize, nextIfChanged } from './utils';
+import { attrd, getSize, minimum, nextIfChanged } from './utils';
+import { clamp, cloneDeep, isNil, merge } from 'lodash';
 
 
 // TODO: handle resize
-// TODO: configurable rect x and y margins
+// TODO: apply zoom from outside
 // TODO: style via CSS file, avoid inline styles
 // TODO: use OrRd color scale automatically when data are numeric?
 // TODO: think in more depth what could happen when changing data type with filters, providers, etc. already set
@@ -44,6 +45,7 @@ type ItemEventParam<TX, TY, TItem> = {
     y: TY,
     xIndex: number,
     yIndex: number,
+    sourceEvent: MouseEvent,
 } | undefined
 
 type ZoomEventParam<TX, TY, TItem> = {
@@ -76,6 +78,23 @@ function DefaultTooltipProvider(dataItem: unknown, x: unknown, y: unknown, xInde
 }
 
 
+export type VisualParams = typeof DefaultVisualParams;
+
+export const DefaultVisualParams = {
+    /** Horizontal gap between neighboring columns in pixels. If both `xGapPixels` and `xGapRelative` are non-null, the smaller final gap value will be used. The margin before the first and after the last column is half of the gap between columns. */
+    xGapPixels: 2 as number | null,
+    /** Horizontal gap between neighboring columns relative to (column width + gap). If both `xGapPixels` and `xGapRelative` are non-null, the smaller final gap value will be used. The margin before the first and after the last column is half of the gap between columns. */
+    xGapRelative: 0.1 as number | null,
+    /** Vertical gap between neighboring rows in pixels. If both `yGapPixels` and `yGapRelative` are non-null, the smaller final gap value will be used. The margin before the first and after the last row is half of the gap between rows. */
+    yGapPixels: 2 as number | null,
+    /** Vertical gap between neighboring rows relative to (row height + gap). If both `yGapPixels` and `yGapRelative` are non-null, the smaller final gap value will be used. The margin before the first and after the last row is half of the gap between rows. */
+    yGapRelative: 0.1 as number | null,
+
+    // More config via CSS:
+    // .hotmap-canvas-div { background-color: none; }
+};
+
+
 export class Heatmap<TX, TY, TItem> {
     private originalData: DataDescription<TX, TY, TItem>;
     private data: Data<TItem>;
@@ -89,6 +108,7 @@ export class Heatmap<TX, TY, TItem> {
     private colorProvider: Provider<TX, TY, TItem, string> = DefaultColorProvider;
     private tooltipProvider: Provider<TX, TY, TItem, string> = DefaultTooltipProvider;
     private filter?: Provider<TX, TY, TItem, boolean> = undefined;
+    private visualParams: VisualParams = DefaultVisualParams;
     public readonly events = {
         hover: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
         click: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
@@ -144,16 +164,14 @@ export class Heatmap<TX, TY, TItem> {
 
         this.mainDiv = attrd(this.rootDiv.append('div'), {
             class: Class.MainDiv,
-            style: { position: 'relative', width: '100%', height: '100%', backgroundColor: 'white' },
+            style: { position: 'relative', width: '100%', height: '100%' },
         });
 
         const canvasDiv = attrd(this.mainDiv.append('div'), {
             class: Class.CanvasDiv,
             style: {
                 position: 'absolute',
-                // left: '20px', right: '20px', top: '20px', bottom: '20px',
                 left: '0px', right: '0px', top: '0px', bottom: '0px',
-                // border: 'solid black 1px',
             },
         });
 
@@ -180,7 +198,7 @@ export class Heatmap<TX, TY, TItem> {
         };
         this.scales = Scales(this.boxes);
 
-        this.renderData();
+        this.draw();
 
         for (const eventName in this.handlers) {
             this.svg.on(eventName, e => this.handlers[eventName as keyof typeof this.handlers](e));
@@ -202,7 +220,7 @@ export class Heatmap<TX, TY, TItem> {
         }
         // TODO update world and visWorld
         // TODO trigger data render
-        this.renderData();
+        this.draw();
         return this;
     }
     setData<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>): Heatmap<TX_, TY_, TItem_> {
@@ -259,27 +277,31 @@ export class Heatmap<TX, TY, TItem> {
         this.setData(this.originalData); // reapplies filter
         return this;
     }
+    setVisualParams(params: Partial<VisualParams>) {
+        this.visualParams = merge(cloneDeep(this.visualParams), params);
+        this.draw();
+    }
 
     private getDataItem(x: number, y: number): TItem | undefined {
         return getDataItem(this.data, x, y);
     }
-    private renderData() {
+    private draw() {
         if (!this.rootDiv) return;
         const xResolution = this.canvasDomSize.width / this.downsamplingPixelsPerRect;
         const colFrom = Math.floor(this.boxes.visWorld.xmin);
         const colTo = Math.ceil(this.boxes.visWorld.xmax); // exclusive
         const downsamplingCoefficient = Downsampling.downsamplingCoefficient(colTo - colFrom, xResolution);
         const downsampled = this.downsampling ? Downsampling.getDownsampled(this.downsampling, downsamplingCoefficient) : this.data;
-        return this.renderTheseData(downsampled, downsamplingCoefficient);
+        return this.drawTheseData(downsampled, downsamplingCoefficient);
     }
-    private renderTheseData(data: Data<TItem>, scale: number) {
+    private drawTheseData(data: Data<TItem>, scale: number) {
         if (!this.rootDiv) return;
         // this.ctx.resetTransform(); this.ctx.scale(scale, 1);
         this.ctx.clearRect(0, 0, this.canvasInnerSize.width, this.canvasInnerSize.height);
         const width = scaleDistance(this.scales.worldToCanvas.x, 1) * scale;
         const height = scaleDistance(this.scales.worldToCanvas.y, 1);
-        const xGap = scale === 1 ? Math.min(scaleDistance(this.scales.domToCanvas.x, 1), 0.1 * width) : 0; // 1px on screen or 10% of the rect width
-        const yGap = scaleDistance(this.scales.domToCanvas.y, 1); // 1px on screen
+        const xHalfGap = scale === 1 ? 0.5 * this.getXGap(width) : 0;
+        const yHalfGap = 0.5 * this.getYGap(height);
         const colFrom = Math.floor(this.boxes.visWorld.xmin / scale);
         const colTo = Math.ceil(this.boxes.visWorld.xmax / scale); // exclusive
 
@@ -290,9 +312,19 @@ export class Heatmap<TX, TY, TItem> {
                 this.ctx.fillStyle = this.colorProvider(item, this.xDomain[ix], this.yDomain[iy], ix, iy);
                 const x = this.scales.worldToCanvas.x(ix * scale);
                 const y = this.scales.worldToCanvas.y(iy);
-                this.ctx.fillRect(x + xGap, y + yGap, width - 2 * xGap, height - 2 * yGap);
+                this.ctx.fillRect(x + xHalfGap, y + yHalfGap, width - 2 * xHalfGap, height - 2 * yHalfGap);
             }
         }
+    }
+    private getXGap(colWidthOnCanvas: number): number {
+        const gap1 = isNil(this.visualParams.xGapPixels) ? undefined : scaleDistance(this.scales.domToCanvas.x, this.visualParams.xGapPixels);
+        const gap2 = isNil(this.visualParams.xGapRelative) ? undefined : this.visualParams.xGapRelative * colWidthOnCanvas;
+        return clamp(minimum(gap1, gap2) ?? 0, 0, colWidthOnCanvas);
+    }
+    private getYGap(rowHeightOnCanvas: number): number {
+        const gap1 = isNil(this.visualParams.yGapPixels) ? undefined : scaleDistance(this.scales.domToCanvas.y, this.visualParams.yGapPixels);
+        const gap2 = isNil(this.visualParams.yGapRelative) ? undefined : this.visualParams.yGapRelative * rowHeightOnCanvas;
+        return clamp(minimum(gap1, gap2) ?? 0, 0, rowHeightOnCanvas);
     }
 
     private applyZoom() {
@@ -317,7 +349,7 @@ export class Heatmap<TX, TY, TItem> {
             this.scales = Scales(this.boxes);
             this.handleHover(e.sourceEvent);
             this.emitZoom();
-            this.renderData();
+            this.draw();
         });
         this.svg.call(this.zoomBehavior as any);
         // .on('wheel', e => e.preventDefault()); // Prevent fallback to normal scroll when on min/max zoom
@@ -356,12 +388,12 @@ export class Heatmap<TX, TY, TItem> {
         }
         const x = this.xDomain[xIndex];
         const y = this.yDomain[yIndex];
-        return { datum, x, y, xIndex, yIndex };
+        return { datum, x, y, xIndex, yIndex, sourceEvent: event };
     }
 
     private handleHover(event: MouseEvent | undefined) {
         const pointed = this.getPointedItem(event);
-        nextIfChanged(this.events.hover, pointed);
+        nextIfChanged(this.events.hover, pointed, v => ({ ...v, sourceEvent: undefined }));
 
         if (!event || !pointed) {
             // on mouseleave or when cursor is not at any data point

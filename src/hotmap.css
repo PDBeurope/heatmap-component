@@ -1,3 +1,8 @@
 .hotmap-main-div {
     font-family: sans-serif;
 }
+
+.hotmap-canvas-div {
+    /* Set background-color here to change the background of the heatmap */
+    background-color: none;
+}
