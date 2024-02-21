@@ -12,7 +12,13 @@
 <body>
   <!-- Your visualization will be placed here -->
   <div id="app" style="width: 1600px; height: 300px; max-width: 95%; min-width: 400px; border: solid black 1px;"></div>
-  <p>
+  <div>
+    <span id="xmin">X</span>
+  </div>
+  <div style="text-align: right;">
+    <span id="xmax">X</span>
+  </div>
+  <p style="margin-top: 30px;">
     Use Ctrl+scroll to zoom, Shift+scroll to pan, horizontal scroll to pan.
   </p>
   <script>Hotmap.demo2('app');</script>

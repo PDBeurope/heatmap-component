@@ -1,7 +1,11 @@
-import { isEqual, isNil } from 'lodash';
+import * as d3 from 'd3';
+import { clamp, isEqual, isNil } from 'lodash';
 import { BehaviorSubject } from 'rxjs';
 import { BoxSize } from './scales';
 
+
+/** `true` if type `T` is number, `false` for any other type */
+export type IsNumeric<T> = T extends number ? true : false;
 
 export async function sleep(ms: number) {
     await new Promise(resolve => setTimeout(resolve, ms));
@@ -38,4 +42,13 @@ export function minimum(...values: (number | null | undefined)[]): number | unde
     const definedValues = values.filter(x => !isNil(x)) as number[];
     if (definedValues.length > 0) return Math.min(...definedValues);
     else return undefined;
+}
+
+/** Return `array[index]` if `index` is an integer within [0, array.length).
+ * Interpolate/extrapolate if `index` is non-integer number or out of range. */
+export function getItemWithInterpolation(array: number[], index: number): number {
+    const previousIndex = clamp(Math.floor(index), 0, array.length - 2);
+    const previousValue = array[previousIndex];
+    const nextValue = array[previousIndex + 1];
+    return d3.interpolateNumber(previousValue, nextValue)(index - previousIndex);
 }

@@ -1,11 +1,12 @@
 import * as d3 from 'd3';
+import { IsNumeric } from './utils';
 
 
 export interface Data<TItem> {
     nColumns: number,
     nRows: number,
     items: (TItem | undefined)[],
-    isNumeric: TItem extends number ? true : false,
+    isNumeric: IsNumeric<TItem>,
 }
 
 export function makeRandomRawData(nColumns: number, nRows: number): Data<number> {

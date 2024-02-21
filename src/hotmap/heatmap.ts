@@ -1,11 +1,12 @@
 import * as d3 from 'd3';
+import { clamp, cloneDeep, isNil, merge } from 'lodash';
 import { BehaviorSubject } from 'rxjs';
 import { Data, Downsampling, getDataItem, makeRandomRawData } from './data';
 import { Box, BoxSize, Boxes, Scales, scaleDistance } from './scales';
-import { attrd, getSize, minimum, nextIfChanged } from './utils';
-import { clamp, cloneDeep, isNil, merge } from 'lodash';
+import { IsNumeric, attrd, getItemWithInterpolation, getSize, minimum, nextIfChanged } from './utils';
 
 
+// TODO: pinnable tooltip with "close" button (behaves the same as clicking nothing / zooming / panning)
 // TODO: handle resize
 // TODO: apply zoom from outside
 // TODO: style via CSS file, avoid inline styles
@@ -53,22 +54,36 @@ type ZoomEventParam<TX, TY, TItem> = {
     xMinIndex: number,
     /** Continuous X index corresponding to the right edge of the viewport */
     xMaxIndex: number,
-    /** (Only if the X domain is numeric!) Continuous X value corresponding to the left edge of the viewport.  */
-    xMinInterpolated: TX extends number ? number : undefined,
-    /** (Only if the X domain is numeric!) Continuous X value corresponding to the right edge of the viewport.  */
-    xMaxInterpolated: TX extends number ? number : undefined,
-    /** X value of the first (at least partially) visible column, corresponds to index `Math.floor(xMinIndex)` */
+    /** (Only if the X domain is numeric and linear!) Continuous X value corresponding to the left edge of the viewport. */
+    xMin: TX extends number ? number : undefined,
+    /** (Only if the X domain is numeric and linear!) Continuous X value corresponding to the right edge of the viewport. */
+    xMax: TX extends number ? number : undefined,
+
+    /** X index of the first (at least partially) visible column` */
+    xFirstVisibleIndex: number,
+    /** X index of the last (at least partially) visible column` */
+    xLastVisibleIndex: number,
+    /** X value of the first (at least partially) visible column` */
     xFirstVisible: TX,
-    /** X value of the last (at least partially) visible column, corresponds to index `Math.ceil(xMaxIndex)-1` */
+    /** X value of the last (at least partially) visible column` */
     xLastVisible: TX,
 
     /** Continuous Y-index corresponding to the top edge of the viewport */
     yMinIndex: number,
     /** Continuous Y-index corresponding to the bottom edge of the viewport */
     yMaxIndex: number,
-    /** Y value of the first (at least partially) visible row, corresponds to index `Math.floor(yMinIndex)` */
+    /** (Only if the Y domain is numeric and linear!) Continuous Y value corresponding to the top edge of the viewport. */
+    yMin: TY extends number ? number : undefined,
+    /** (Only if the Y domain is numeric and linear!) Continuous Y value corresponding to the bottom edge of the viewport. */
+    yMax: TY extends number ? number : undefined,
+
+    /** Y index of the first (at least partially) visible row` */
+    yFirstVisibleIndex: number,
+    /** Y index of the last (at least partially) visible row` */
+    yLastVisibleIndex: number,
+    /** Y value of the first (at least partially) visible row` */
     yFirstVisible: TY,
-    /** Y value of the last (at least partially) visible row, corresponds to index `Math.ceil(yMaxIndex)-1` */
+    /** Y value of the last (at least partially) visible row` */
     yLastVisible: TY,
 } | undefined
 
@@ -101,14 +116,15 @@ export const DefaultVisualParams = {
 };
 
 
+
 export class Heatmap<TX, TY, TItem> {
     private originalData: DataDescription<TX, TY, TItem>;
     private data: Data<TItem>;
     private downsampling: TItem extends number ? Downsampling<TItem> : undefined;
     private xDomain: TX[];
     private yDomain: TY[];
-    private xDomainNumeric: boolean;
-    private yDomainNumeric: boolean;
+    private xDomainNumeric: IsNumeric<TX>;
+    private yDomainNumeric: IsNumeric<TY>;
     private xDomainIndex: Map<TX, number>;
     private yDomainIndex: Map<TY, number>;
     private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
@@ -271,8 +287,8 @@ export class Heatmap<TX, TY, TItem> {
         self.setRawData({ items: array, nRows, nColumns, isNumeric });
         self.xDomain = xDomain;
         self.yDomain = yDomain;
-        self.xDomainNumeric = xDomain.every(x => typeof x === 'number');
-        self.yDomainNumeric = yDomain.every(y => typeof y === 'number');
+        self.xDomainNumeric = xDomain.every(x => typeof x === 'number') as IsNumeric<TX_>;
+        self.yDomainNumeric = yDomain.every(y => typeof y === 'number') as IsNumeric<TY_>;
         self.xDomainIndex = xDomainIndex;
         self.yDomainIndex = yDomainIndex;
         return self;
@@ -386,28 +402,46 @@ export class Heatmap<TX, TY, TItem> {
     private emitZoom() {
         if (!this.boxes?.visWorld) return;
 
-        const xMinIndex = this.boxes.visWorld.xmin;
-        const xMaxIndex = this.boxes.visWorld.xmax;
-        const xFirstVisibleIndex = Math.max(Math.floor(xMinIndex), 0);
-        const xLastVisibleIndex = Math.min(Math.ceil(xMaxIndex), this.data.nColumns) - 1;
-        const xFirstVisible = this.xDomain[xFirstVisibleIndex];
-        const xLastVisible = this.xDomain[xLastVisibleIndex];
+        const xMinIndex_ = this.boxes.visWorld.xmin; // This only holds for xAlignment left
+        const xMaxIndex_ = this.boxes.visWorld.xmax; // This only holds for xAlignment left
+        const xFirstVisibleIndex = clamp(Math.floor(xMinIndex_), 0, this.data.nColumns - 1);
+        const xLastVisibleIndex = clamp(Math.ceil(xMaxIndex_) - 1, 0, this.data.nColumns - 1);
 
-        const yMinIndex = this.boxes.visWorld.ymin;
-        const yMaxIndex = this.boxes.visWorld.ymax;
-        const yFirstVisible = this.yDomain[Math.floor(yMinIndex)];
-        const yLastVisible = this.yDomain[Math.ceil(yMaxIndex) - 1];
+        const yMinIndex_ = this.boxes.visWorld.ymin; // This only holds for yAlignment top
+        const yMaxIndex_ = this.boxes.visWorld.ymax; // This only holds for yAlignment top
+        const yFirstVisibleIndex = clamp(Math.floor(yMinIndex_), 0, this.data.nRows - 1);
+        const yLastVisibleIndex = clamp(Math.ceil(yMaxIndex_) - 1, 0, this.data.nRows - 1);
 
-        let xMin = undefined;
-        let xMax = undefined;
-        if (this.xDomainNumeric) {
-            xMin = d3.scaleLinear([xFirstVisibleIndex, xFirstVisibleIndex + 1], [this.xDomain[xFirstVisibleIndex], this.xDomain[xFirstVisibleIndex + 1]])(xMinIndex);
-            xMax = d3.scaleLinear([xLastVisibleIndex - 1, xLastVisibleIndex], [this.xDomain[xLastVisibleIndex - 1], this.xDomain[xLastVisibleIndex]])(xMaxIndex);
-            // TODO solve singularity cases (one column etc.)
-        }
-        console.log('data', this.data)
+        const xShift = indexAlignmentShift(this.xAlignment);
+        const yShift = indexAlignmentShift(this.yAlignment);
 
-        this.events.zoom.next({ xMinIndex, xMaxIndex, xFirstVisible, xLastVisible, yMinIndex, yMaxIndex, yFirstVisible, yLastVisible, xMinInterpolated: xMin as any, xMaxInterpolated: xMax as any });
+        this.events.zoom.next({
+            xMinIndex: xMinIndex_ + xShift,
+            xMaxIndex: xMaxIndex_ + xShift,
+            xMin: this.interpolateX(xMinIndex_ + xShift),
+            xMax: this.interpolateX(xMaxIndex_ + xShift),
+            xFirstVisibleIndex,
+            xLastVisibleIndex,
+            xFirstVisible: this.xDomain[xFirstVisibleIndex],
+            xLastVisible: this.xDomain[xLastVisibleIndex],
+
+            yMinIndex: yMinIndex_ + yShift,
+            yMaxIndex: yMaxIndex_ + yShift,
+            yMin: this.interpolateY(yMinIndex_ + yShift),
+            yMax: this.interpolateY(yMaxIndex_ + yShift),
+            yFirstVisibleIndex,
+            yLastVisibleIndex,
+            yFirstVisible: this.yDomain[yFirstVisibleIndex],
+            yLastVisible: this.yDomain[yLastVisibleIndex],
+        });
+    }
+    private interpolateX(xIndex: number): TX extends number ? number : undefined {
+        if (this.xDomainNumeric) return getItemWithInterpolation(this.xDomain as number[], xIndex) as any;
+        else return undefined as any;
+    }
+    private interpolateY(yIndex: number): TY extends number ? number : undefined {
+        if (this.yDomainNumeric) return getItemWithInterpolation(this.yDomain as number[], yIndex) as any;
+        else return undefined as any;
     }
 
     private getPointedItem(event: MouseEvent | undefined): ItemEventParam<TX, TY, TItem> {
@@ -526,7 +560,7 @@ export function formatDataItem(item: any): string {
     else return JSON.stringify(item);
 }
 
-function indexAlignmentShift(alignment: XAlignment | YAlignment): number {
+function indexAlignmentShift(alignment: XAlignment | YAlignment) {
     if (alignment === 'left' || alignment === 'top') return 0;
     if (alignment === 'center') return -0.5;
     return -1;

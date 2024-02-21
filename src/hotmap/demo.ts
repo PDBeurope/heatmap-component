@@ -35,7 +35,6 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
         x: d => d.col,
         y: d => d.row,
     });
-    hm.setAlignment('center', 'center');
     const colorScale = d3.scaleLinear([0, 0.5, 1], ['#eeeeee', 'gold', 'red']);
     hm.setColor(d => colorScale(d.score));
     hm.setTooltip((d, x, y, xIndex, yIndex) => `<div style="font-weight: bold; margin-bottom: 0.5em;">${formatDataItem(d)}</div>Column ${x}, Row ${y}<br>Indices [${xIndex},${yIndex}]`);
@@ -60,9 +59,13 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
         if (!e) {
             console.log('zooming nothing');
         } else {
-            console.log('zooming', e);
+            // console.log('zooming', e);
+            console.log('zooming', e.xMinIndex, e.xMaxIndex, 'values', e.xMin, e.xMax, e);
+            d3.select('#xmin').text(e.xMin);
+            d3.select('#xmax').text(e.xMax);
         }
     });
     hm.render(divElementOrId);
+    // setTimeout(() => hm.setAlignment('right', undefined), 2000)
 }
 
