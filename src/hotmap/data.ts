@@ -5,6 +5,7 @@ export interface Data<TItem> {
     nColumns: number,
     nRows: number,
     items: (TItem | undefined)[],
+    isNumeric: TItem extends number ? true : false,
 }
 
 export function makeRandomRawData(nColumns: number, nRows: number): Data<number> {
@@ -15,7 +16,7 @@ export function makeRandomRawData(nColumns: number, nRows: number): Data<number>
         // const value = Math.random()
         return value;
     });
-    return { nColumns, nRows, items };
+    return { nColumns, nRows, items, isNumeric: true };
 }
 
 export function getDataItem<TItem>(data: Data<TItem>, x: number, y: number): TItem | undefined {

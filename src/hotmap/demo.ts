@@ -8,6 +8,9 @@ export function demo(divElementOrId: HTMLDivElement | string) {
 }
 
 export function demo2(divElementOrId: HTMLDivElement | string) {
+    const x = 0.5
+    console.log(d3.interpolateNumber(100, 200)(x))
+    console.log(d3.scaleLinear([0, 1], [100, 200])(x))
     const items = [
         { col: 1, row: 'A', score: 0.0 },
         { col: 1, row: 'B', score: 0.2 },
