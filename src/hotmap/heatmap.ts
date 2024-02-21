@@ -49,10 +49,14 @@ type ItemEventParam<TX, TY, TItem> = {
 } | undefined
 
 type ZoomEventParam<TX, TY, TItem> = {
-    /** Continuous X-index corresponding to the left edge of the viewport */
+    /** Continuous X index corresponding to the left edge of the viewport */
     xMinIndex: number,
-    /** Continuous X-index corresponding to the right edge of the viewport */
+    /** Continuous X index corresponding to the right edge of the viewport */
     xMaxIndex: number,
+    /** (Only if the X domain is numeric!) Continuous X value corresponding to the left edge of the viewport.  */
+    xMinInterpolated: TX extends number ? number : undefined,
+    /** (Only if the X domain is numeric!) Continuous X value corresponding to the right edge of the viewport.  */
+    xMaxInterpolated: TX extends number ? number : undefined,
     /** X value of the first (at least partially) visible column, corresponds to index `Math.floor(xMinIndex)` */
     xFirstVisible: TX,
     /** X value of the last (at least partially) visible column, corresponds to index `Math.ceil(xMaxIndex)-1` */
@@ -101,6 +105,8 @@ export class Heatmap<TX, TY, TItem> {
     private downsampling: TItem extends number ? Downsampling<TItem> : undefined;
     private xDomain: TX[];
     private yDomain: TY[];
+    private xDomainNumeric: boolean;
+    private yDomainNumeric: boolean;
     private xDomainIndex: Map<TX, number>;
     private yDomainIndex: Map<TY, number>;
     private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
@@ -256,10 +262,13 @@ export class Heatmap<TX, TY, TItem> {
                 array[nColumns * iy + ix] = d;
             }
         }
+        const isNumeric = items.every(d => typeof d === 'number') as (TItem_ extends number ? true : false);
         self.originalData = data;
-        self.setRawData({ items: array, nRows, nColumns });
+        self.setRawData({ items: array, nRows, nColumns, isNumeric });
         self.xDomain = xDomain;
         self.yDomain = yDomain;
+        self.xDomainNumeric = xDomain.every(x => typeof x === 'number');
+        self.yDomainNumeric = yDomain.every(y => typeof y === 'number');
         self.xDomainIndex = xDomainIndex;
         self.yDomainIndex = yDomainIndex;
         return self;
@@ -365,15 +374,26 @@ export class Heatmap<TX, TY, TItem> {
     private emitZoom() {
         const xMinIndex = this.boxes.visWorld.xmin;
         const xMaxIndex = this.boxes.visWorld.xmax;
-        const xFirstVisible = this.xDomain[Math.floor(xMinIndex)];
-        const xLastVisible = this.xDomain[Math.ceil(xMaxIndex) - 1];
+        const xFirstVisibleIndex = Math.max(Math.floor(xMinIndex), 0);
+        const xLastVisibleIndex = Math.min(Math.ceil(xMaxIndex), this.data.nColumns) - 1;
+        const xFirstVisible = this.xDomain[xFirstVisibleIndex];
+        const xLastVisible = this.xDomain[xLastVisibleIndex];
 
         const yMinIndex = this.boxes.visWorld.ymin;
         const yMaxIndex = this.boxes.visWorld.ymax;
         const yFirstVisible = this.yDomain[Math.floor(yMinIndex)];
         const yLastVisible = this.yDomain[Math.ceil(yMaxIndex) - 1];
 
-        this.events.zoom.next({ xMinIndex, xMaxIndex, xFirstVisible, xLastVisible, yMinIndex, yMaxIndex, yFirstVisible, yLastVisible });
+        let xMin = undefined;
+        let xMax = undefined;
+        if (this.xDomainNumeric) {
+            xMin = d3.scaleLinear([xFirstVisibleIndex, xFirstVisibleIndex + 1], [this.xDomain[xFirstVisibleIndex], this.xDomain[xFirstVisibleIndex + 1]])(xMinIndex);
+            xMax = d3.scaleLinear([xLastVisibleIndex - 1, xLastVisibleIndex], [this.xDomain[xLastVisibleIndex - 1], this.xDomain[xLastVisibleIndex]])(xMaxIndex);
+            // TODO solve singularity cases (one column etc.)
+        }
+        console.log('data', this.data)
+
+        this.events.zoom.next({ xMinIndex, xMaxIndex, xFirstVisible, xLastVisible, yMinIndex, yMaxIndex, yFirstVisible, yLastVisible, xMinInterpolated: xMin as any, xMaxInterpolated: xMax as any });
     }
 
     private getPointedItem(event: MouseEvent | undefined): ItemEventParam<TX, TY, TItem> {
