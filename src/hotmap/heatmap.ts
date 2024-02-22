@@ -134,7 +134,7 @@ export class Heatmap<TX, TY, TItem> {
     private yAlignment: YAlignment = 'center';
 
     private colorProvider: Provider<TX, TY, TItem, string> = DefaultColorProvider;
-    private tooltipProvider: Provider<TX, TY, TItem, string> = DefaultTooltipProvider;
+    private tooltipProvider?: Provider<TX, TY, TItem, string> = DefaultTooltipProvider;
     private filter?: Provider<TX, TY, TItem, boolean> = undefined;
     private visualParams: VisualParams = DefaultVisualParams;
     public readonly events = {
@@ -293,8 +293,13 @@ export class Heatmap<TX, TY, TItem> {
         this.colorProvider = colorProvider;
         return this;
     }
-    setTooltip(tooltipProvider: (...args: ProviderParams<TX, TY, TItem>) => string): this { // TODO: type: 'text' | 'html' = 'html'?, TODO: allow resetting default tooltip and disabling it altogether
-        this.tooltipProvider = tooltipProvider;
+    setTooltip(tooltipProvider: ((...args: ProviderParams<TX, TY, TItem>) => string) | 'default' | 'none'): this {
+        if (tooltipProvider === 'default')
+            this.tooltipProvider = DefaultTooltipProvider;
+        else if (tooltipProvider === 'none')
+            this.tooltipProvider = undefined;
+        else
+            this.tooltipProvider = tooltipProvider;
         return this;
     }
     setFilter(filter: ((...args: ProviderParams<TX, TY, TItem>) => boolean) | undefined): this {
@@ -393,7 +398,6 @@ export class Heatmap<TX, TY, TItem> {
         // this.zoomBehavior.extent([[this.boxes.canvas.xmin, this.boxes.canvas.ymin], [this.boxes.canvas.xmax, this.boxes.canvas.ymax]]);
         this.zoomBehavior.translateExtent([[this.boxes.wholeWorld.xmin, -Infinity], [this.boxes.wholeWorld.xmax, Infinity]]);
         this.zoomBehavior.transform(this.svg as any, d3.zoomIdentity.scale(minZoom));
-        // TODO: limit zooming
     }
     private zoomParamFromBox(box: Box | undefined): ZoomEventParam<TX, TY, TItem> {
         if (!box) return undefined;
@@ -579,21 +583,24 @@ export class Heatmap<TX, TY, TItem> {
         });
         attrd(marker, variableAttrs);
 
-        const tooltip = this.mainDiv.selectAll('.' + Class.Tooltip).data([1]);
-        const tooltipLeft = `${(event.clientX ?? 0) + 5}px`;
-        const tooltipBottom = `${document.documentElement.clientHeight - (event.clientY ?? 0) + 5}px`;
-        const tooltipText = this.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
-        attrd(tooltip.enter().append('div'), {
-            class: Class.Tooltip,
-            style: {
-                position: 'fixed', left: tooltipLeft, bottom: tooltipBottom,
-                backgroundColor: 'white', border: 'solid black 1px', paddingBlock: '0.25em', paddingInline: '0.5em',
-            },
-        }).html(tooltipText);
-        attrd(tooltip, {
-            style: { left: tooltipLeft, bottom: tooltipBottom },
-        }).html(tooltipText);
+        if (this.tooltipProvider) {
+            const tooltip = this.mainDiv.selectAll('.' + Class.Tooltip).data([1]);
+            const tooltipLeft = `${(event.clientX ?? 0) + 5}px`;
+            const tooltipBottom = `${document.documentElement.clientHeight - (event.clientY ?? 0) + 5}px`;
+            const tooltipText = this.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
+            attrd(tooltip.enter().append('div'), {
+                class: Class.Tooltip,
+                style: {
+                    position: 'fixed', left: tooltipLeft, bottom: tooltipBottom,
+                    backgroundColor: 'white', border: 'solid black 1px', paddingBlock: '0.25em', paddingInline: '0.5em',
+                },
+            }).html(tooltipText);
+            attrd(tooltip, {
+                style: { left: tooltipLeft, bottom: tooltipBottom },
+            }).html(tooltipText);
+        }
     }
+
     private showScrollingMessage() {
         if (!this.mainDiv.selectAll(`.${Class.Overlay}`).empty()) return;
 
