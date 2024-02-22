@@ -10,10 +10,10 @@ import { attrd, getSize, minimum, nextIfChanged } from './utils';
 // TODO: pinnable tooltip with "close" button (behaves the same as clicking nothing / zooming / panning)
 // TODO: handle resize
 // TODO: check tooltips work correctly when zoomed out with filter (w and wo downsampling)
-// TODO: apply zoom from outside
 // TODO: style via CSS file, avoid inline styles
 // TODO: use OrRd color scale automatically when data are numeric?
 // TODO: think in more depth what could happen when changing data type with filters, providers, etc. already set
+
 
 const AppName = 'hotmap';
 const Class = {
@@ -31,7 +31,7 @@ const ZOOM_EVENT_ROUNDING_PRECISION = 9;
 
 
 export type DataDescription<TX, TY, TItem> = {
-    xDomain: TX[],  // TODO: | (TX extends number ? { min: TX, max: TX } : never),
+    xDomain: TX[],
     yDomain: TY[],
     /** Data items to show in the heatmap (each item is visualized as a rectangle) */
     items: TItem[],
@@ -395,23 +395,23 @@ export class Heatmap<TX, TY, TItem> {
         this.zoomBehavior.transform(this.svg as any, d3.zoomIdentity.scale(minZoom));
         // TODO: limit zooming
     }
-    private emitZoom() {
-        if (!this.boxes?.visWorld) return;
+    private zoomParamFromBox(box: Box | undefined): ZoomEventParam<TX, TY, TItem> {
+        if (!box) return undefined;
 
-        const xMinIndex_ = round(this.boxes.visWorld.xmin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
-        const xMaxIndex_ = round(this.boxes.visWorld.xmax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
+        const xMinIndex_ = round(box.xmin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
+        const xMaxIndex_ = round(box.xmax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
         const xFirstVisibleIndex = clamp(Math.floor(xMinIndex_), 0, this.data.nColumns - 1);
         const xLastVisibleIndex = clamp(Math.ceil(xMaxIndex_) - 1, 0, this.data.nColumns - 1);
 
-        const yMinIndex_ = round(this.boxes.visWorld.ymin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
-        const yMaxIndex_ = round(this.boxes.visWorld.ymax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
+        const yMinIndex_ = round(box.ymin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
+        const yMaxIndex_ = round(box.ymax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
         const yFirstVisibleIndex = clamp(Math.floor(yMinIndex_), 0, this.data.nRows - 1);
         const yLastVisibleIndex = clamp(Math.ceil(yMaxIndex_) - 1, 0, this.data.nRows - 1);
 
         const xShift = indexAlignmentShift(this.xAlignment);
         const yShift = indexAlignmentShift(this.yAlignment);
 
-        const zoomEventParam: ZoomEventParam<TX, TY, TItem> = {
+        return {
             xMinIndex: xMinIndex_ + xShift,
             xMaxIndex: xMaxIndex_ + xShift,
             xMin: Domain.interpolateValue(this.xDomain, xMinIndex_ + xShift),
@@ -430,21 +430,68 @@ export class Heatmap<TX, TY, TItem> {
             yFirstVisible: this.yDomain.values[yFirstVisibleIndex],
             yLastVisible: this.yDomain.values[yLastVisibleIndex],
         };
-        nextIfChanged(this.events.zoom, zoomEventParam);
-    }
-    zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined) {
-        const xMinIndex_ = clamp(this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.boxes.wholeWorld.xmin, this.boxes.wholeWorld.xmin, this.boxes.wholeWorld.xmax - MIN_ZOOMED_DATAPOINTS_HARD);
-        const xMaxIndex_ = clamp(this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.boxes.wholeWorld.xmax, xMinIndex_ + MIN_ZOOMED_DATAPOINTS_HARD, this.boxes.wholeWorld.xmax);
-        const yMinIndex_ = clamp(this.getZoomRequestIndexMagic('y', 'Min', z) ?? this.boxes.wholeWorld.ymin, this.boxes.wholeWorld.ymin, this.boxes.wholeWorld.ymax - MIN_ZOOMED_DATAPOINTS_HARD);
-        const yMaxIndex_ = clamp(this.getZoomRequestIndexMagic('y', 'Max', z) ?? this.boxes.wholeWorld.ymax, yMinIndex_ + MIN_ZOOMED_DATAPOINTS_HARD, this.boxes.wholeWorld.ymax);
 
-        const xScale = this.canvasDomSize.width / (xMaxIndex_ - xMinIndex_);
-        const yScale = this.canvasDomSize.height / (yMaxIndex_ - yMinIndex_);
-
-        const transform = d3.zoomIdentity.scale(xScale).translate(-xMinIndex_, 0);
-        // console.log('zoom request xMinIndex_', xMinIndex_, 'xMaxIndex_', xMaxIndex_, 'yMinIndex_', yMinIndex_, 'yMaxIndex_', yMaxIndex_, 'scale', xScale, 'transform', transform);
-        this.zoomBehavior?.transform(this.svg as any, transform);
     }
+    private emitZoom(): void {
+        if (this.boxes.visWorld) {
+            nextIfChanged(this.events.zoom, this.zoomParamFromBox(this.boxes.visWorld));
+        }
+        // if (!this.boxes?.visWorld) return;
+
+        // const xMinIndex_ = round(this.boxes.visWorld.xmin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
+        // const xMaxIndex_ = round(this.boxes.visWorld.xmax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
+        // const xFirstVisibleIndex = clamp(Math.floor(xMinIndex_), 0, this.data.nColumns - 1);
+        // const xLastVisibleIndex = clamp(Math.ceil(xMaxIndex_) - 1, 0, this.data.nColumns - 1);
+
+        // const yMinIndex_ = round(this.boxes.visWorld.ymin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
+        // const yMaxIndex_ = round(this.boxes.visWorld.ymax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
+        // const yFirstVisibleIndex = clamp(Math.floor(yMinIndex_), 0, this.data.nRows - 1);
+        // const yLastVisibleIndex = clamp(Math.ceil(yMaxIndex_) - 1, 0, this.data.nRows - 1);
+
+        // const xShift = indexAlignmentShift(this.xAlignment);
+        // const yShift = indexAlignmentShift(this.yAlignment);
+
+        // const zoomEventParam: ZoomEventParam<TX, TY, TItem> = {
+        //     xMinIndex: xMinIndex_ + xShift,
+        //     xMaxIndex: xMaxIndex_ + xShift,
+        //     xMin: Domain.interpolateValue(this.xDomain, xMinIndex_ + xShift),
+        //     xMax: Domain.interpolateValue(this.xDomain, xMaxIndex_ + xShift),
+        //     xFirstVisibleIndex,
+        //     xLastVisibleIndex,
+        //     xFirstVisible: this.xDomain.values[xFirstVisibleIndex],
+        //     xLastVisible: this.xDomain.values[xLastVisibleIndex],
+
+        //     yMinIndex: yMinIndex_ + yShift,
+        //     yMaxIndex: yMaxIndex_ + yShift,
+        //     yMin: Domain.interpolateValue(this.yDomain, yMinIndex_ + yShift),
+        //     yMax: Domain.interpolateValue(this.yDomain, yMaxIndex_ + yShift),
+        //     yFirstVisibleIndex,
+        //     yLastVisibleIndex,
+        //     yFirstVisible: this.yDomain.values[yFirstVisibleIndex],
+        //     yLastVisible: this.yDomain.values[yLastVisibleIndex],
+        // };
+        // nextIfChanged(this.events.zoom, zoomEventParam);
+    }
+    zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined): ZoomEventParam<TX, TY, TItem> {
+        if (!this.zoomBehavior) return undefined;
+
+        const xmin = clamp(this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.boxes.wholeWorld.xmin, this.boxes.wholeWorld.xmin, this.boxes.wholeWorld.xmax - MIN_ZOOMED_DATAPOINTS_HARD);
+        const xmax = clamp(this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.boxes.wholeWorld.xmax, xmin + MIN_ZOOMED_DATAPOINTS_HARD, this.boxes.wholeWorld.xmax);
+        const ymin = clamp(this.getZoomRequestIndexMagic('y', 'Min', z) ?? this.boxes.wholeWorld.ymin, this.boxes.wholeWorld.ymin, this.boxes.wholeWorld.ymax - MIN_ZOOMED_DATAPOINTS_HARD);
+        const ymax = clamp(this.getZoomRequestIndexMagic('y', 'Max', z) ?? this.boxes.wholeWorld.ymax, ymin + MIN_ZOOMED_DATAPOINTS_HARD, this.boxes.wholeWorld.ymax);
+
+        const xScale = this.canvasDomSize.width / (xmax - xmin);
+        const yScale = this.canvasDomSize.height / (ymax - ymin);
+
+        const transform = d3.zoomIdentity.scale(xScale).translate(-xmin, 0);
+        // console.log('zoom request xMinIndex_', xmin, 'xMaxIndex_', xmax, 'yMinIndex_', ymin, 'yMaxIndex_', ymax, 'scale', xScale, 'transform', transform);
+        this.zoomBehavior.transform(this.svg as any, transform);
+        return this.zoomParamFromBox({ xmin, xmax, ymin, ymax });
+    }
+    getZoom(): ZoomEventParam<TX, TY, TItem> {
+        return this.zoomParamFromBox(this.boxes.visWorld);
+    }
+
     private getZoomRequestIndexMagic(axis: 'x' | 'y', end: 'Min' | 'Max', z: Partial<ZoomEventParam<TX, TY, TItem>>): number | undefined {
         if (isNil(z)) return undefined;
 

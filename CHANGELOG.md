@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file, following t
 ## [Unreleased]
 
 - Zoom event gives more info and is customizable by `setAlignment`
+- `zoom` method to set zoom, `getZoom` to retrieve current zoom
 
 ## [0.3.0] - 2024-02-21
 
