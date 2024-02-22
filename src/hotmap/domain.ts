@@ -45,13 +45,13 @@ export const Domain = {
             return _getIndexWithInterpolation(domain as Domain<number>, value as number);
         }
     },
-}
+};
 
 
 function _getIndexWithInterpolation(domain: Domain<number>, value: number): number | undefined {
     if (domain.sortDirection === 'none') {
         console.warn('Cannot interpolate index because the domain is not sorted');
-        return undefined
+        return undefined;
     }
     let previousIndex = domain.sortDirection === 'asc' ? sortedIndex(domain.values, value) : sortedIndexBy(domain.values, value, v => -v);
     previousIndex = clamp(previousIndex, 0, domain.values.length - 2);

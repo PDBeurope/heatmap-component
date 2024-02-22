@@ -22,7 +22,7 @@ const Class = {
     Marker: `${AppName}-marker`,
     Tooltip: `${AppName}-tooltip`,
     Overlay: `${AppName}-overlay`,
-}
+};
 const MIN_ZOOMED_DATAPOINTS = 1;
 const MIN_ZOOMED_DATAPOINTS_HARD = 1;
 
@@ -184,7 +184,7 @@ export class Heatmap<TX, TY, TItem> {
             console.error(`This ${this.constructor.name} has already been rendered in element`, this.rootDiv.node());
             throw new Error(`This ${this.constructor.name} has already been rendered. Cannot render again.`);
         }
-        console.time('Hotmap render')
+        console.time('Hotmap render');
 
         this.rootDiv = (typeof divElementOrId === 'string') ? d3.select(`#${divElementOrId}`) : d3.select(divElementOrId);
         if (this.rootDiv.empty()) throw new Error('Failed to initialize, wrong div ID?');
@@ -212,7 +212,7 @@ export class Heatmap<TX, TY, TItem> {
 
         this.svg = attrd(canvasDiv.append('svg'), {
             style: { position: 'absolute', width: '100%', height: '100%' },
-        })
+        });
 
         const ctx = this.canvas.node()?.getContext('2d');
         if (ctx) this.ctx = ctx;
@@ -235,7 +235,7 @@ export class Heatmap<TX, TY, TItem> {
         this.addZoomBehavior();
         // TODO handle resize!
 
-        console.timeEnd('Hotmap render')
+        console.timeEnd('Hotmap render');
         return this;
     }
 
@@ -377,7 +377,7 @@ export class Heatmap<TX, TY, TItem> {
             } else {
                 return true;
             }
-        })
+        });
         this.zoomBehavior.on('zoom', e => {
             this.boxes.visWorld = {
                 ...this.boxes.visWorld, // preserve Y zoom
@@ -529,7 +529,7 @@ export class Heatmap<TX, TY, TItem> {
         if (!isNil(visValue)) {
             const foundIndex = domain.index.get(visValue as any);
             if (!isNil(foundIndex)) {
-                return fl === 'First' ? foundIndex : foundIndex + 1;;
+                return fl === 'First' ? foundIndex : foundIndex + 1;
             } else {
                 console.warn(`The provided value of ${axis}${fl}Visible (${visValue}) is not in the ${axis.toUpperCase()} domain.`);
 
@@ -650,7 +650,7 @@ function makeRandomData(nColumns: number, nRows: number): DataDescription<number
         y: (d, i) => Math.floor(i / nColumns),
         xDomain: d3.range(nColumns),
         yDomain: d3.range(nRows),
-    }
+    };
 }
 
 export function formatDataItem(item: any): string {

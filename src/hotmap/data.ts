@@ -13,8 +13,7 @@ export function makeRandomRawData(nColumns: number, nRows: number): Data<number>
     const items = d3.range(nColumns * nRows).map(i => {
         const x = i % nColumns;
         const y = Math.floor(i / nColumns);
-        const value = (x === 0 || x === nColumns - 1 || y === 0 || y === nRows - 1) ? 1 : Math.random()
-        // const value = Math.random()
+        const value = (x === 0 || x === nColumns - 1 || y === 0 || y === nRows - 1) ? 1 : Math.random();
         return value;
     });
     return { nColumns, nRows, items, isNumeric: true };
@@ -62,7 +61,6 @@ function halve<TItem extends number>(data: Data<TItem>): Data<TItem> {
     const oldValues = data.items;
     const newColumns = Math.ceil(oldColumns / 2);
     const newRows = data.nRows;
-    console.log('halve', oldColumns, '->', newColumns)
     const newValues = new Array<number>(newColumns * newRows).fill(0);
     for (let j = 0; j < newRows; j++) {
         // TODO: don't assert type but check
@@ -73,7 +71,7 @@ function halve<TItem extends number>(data: Data<TItem>): Data<TItem> {
             const val = (old1 + old2) / 2;
             newValues[j * newColumns + i] = val;
         }
-        if (oldColumns % 2 == 0) {
+        if (oldColumns % 2 === 0) {
             const old1 = oldValues[j * oldColumns + oldColumns - 2] as number;
             const old2 = oldValues[j * oldColumns + oldColumns - 1] as number;
             const val = (old1 + old2) / 2;

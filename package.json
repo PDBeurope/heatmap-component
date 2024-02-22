@@ -19,6 +19,7 @@
     "watch-tsc": "tsc --watch --preserveWatchOutput --incremental",
     "watch-webpack": "webpack -w --mode development --stats minimal --config ./webpack.config.js",
     "serve": "http-server -p 7000",
+    "lint": "eslint src",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -35,7 +36,10 @@
     "@types/d3": "^7.4.3",
     "@types/d3-selection-multi": "^1.0.14",
     "@types/lodash": "^4.14.202",
+    "@typescript-eslint/eslint-plugin": "^7.0.2",
+    "@typescript-eslint/parser": "^7.0.2",
     "concurrently": "^8.2.2",
+    "eslint": "^8.56.0",
     "extra-watch-webpack-plugin": "^1.0.3",
     "http-server": "^14.1.1",
     "mini-css-extract-plugin": "^2.8.0",
