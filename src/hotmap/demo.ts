@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
 import { Heatmap, formatDataItem } from './heatmap';
+import { sortDirection } from './utils';
 
 
 export function demo(divElementOrId: HTMLDivElement | string) {
@@ -8,9 +9,10 @@ export function demo(divElementOrId: HTMLDivElement | string) {
 }
 
 export function demo2(divElementOrId: HTMLDivElement | string) {
-    const x = 0.5
-    console.log(d3.interpolateNumber(100, 200)(x))
-    console.log(d3.scaleLinear([0, 1], [100, 200])(x))
+    for (const arr of [[], [1], [1, 1], [1, 2], [1, 0], [1, 1, 2], [1, 1, 0],
+    [1,2,3],[1,5,9,45,120],[1,2,3,5,4,6,7], [7,6,5,4,3,2,1]]) {
+        console.log('sort', sortDirection(arr), arr)
+    }
     const items = [
         { col: 1, row: 'A', score: 0.0 },
         { col: 1, row: 'B', score: 0.2 },
@@ -61,11 +63,15 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
         } else {
             // console.log('zooming', e);
             console.log('zooming', e.xMinIndex, e.xMaxIndex, 'values', e.xMin, e.xMax, e);
+            d3.select('#xminindex').text(e.xMinIndex);
+            d3.select('#xmaxindex').text(e.xMaxIndex);
             d3.select('#xmin').text(e.xMin);
             d3.select('#xmax').text(e.xMax);
         }
     });
     hm.render(divElementOrId);
+    (window as any).hm = hm;
     // setTimeout(() => hm.setAlignment('right', undefined), 2000)
 }
+
 

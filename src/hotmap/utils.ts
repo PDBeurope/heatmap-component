@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import { clamp, isEqual, isNil } from 'lodash';
+import { isEqual, isNil } from 'lodash';
 import { BehaviorSubject } from 'rxjs';
 import { BoxSize } from './scales';
 
@@ -44,11 +44,22 @@ export function minimum(...values: (number | null | undefined)[]): number | unde
     else return undefined;
 }
 
-/** Return `array[index]` if `index` is an integer within [0, array.length).
- * Interpolate/extrapolate if `index` is non-integer number or out of range. */
-export function getItemWithInterpolation(array: number[], index: number): number {
-    const previousIndex = clamp(Math.floor(index), 0, array.length - 2);
-    const previousValue = array[previousIndex];
-    const nextValue = array[previousIndex + 1];
-    return d3.interpolateNumber(previousValue, nextValue)(index - previousIndex);
+/** Return 'asc' if values in array are strictly ascending.
+ *  Return 'desc' if values in array are strictly descending.
+ *  Return 'none' otherwise, or if array has fewer than 2 elements. */
+export function sortDirection(array: number[]): 'asc' | 'desc' | 'none' {
+    const n = array.length;
+    if (n < 2) return 'none';
+    const direction = (array[0] < array[1]) ? 'asc' : 'desc';
+    if (direction === 'asc') {
+        for (let i = 1; i < n; i++) {
+            if (array[i - 1] >= array[i]) return 'none';
+        }
+        return 'asc';
+    } else {
+        for (let i = 1; i < n; i++) {
+            if (array[i - 1] <= array[i]) return 'none';
+        }
+        return 'desc';
+    }
 }

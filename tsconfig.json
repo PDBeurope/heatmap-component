@@ -8,6 +8,7 @@
         "sourceMap": false,
         "noUnusedLocals": false,
         "strictNullChecks": true,
+        "noImplicitReturns": true,
         "strictFunctionTypes": true,
         "module": "CommonJS",
         "esModuleInterop": true,

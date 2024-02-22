@@ -1,13 +1,15 @@
 import * as d3 from 'd3';
-import { clamp, cloneDeep, isNil, merge } from 'lodash';
+import { clamp, cloneDeep, isNil, merge, round } from 'lodash';
 import { BehaviorSubject } from 'rxjs';
 import { Data, Downsampling, getDataItem, makeRandomRawData } from './data';
+import { Domain } from './domain';
 import { Box, BoxSize, Boxes, Scales, scaleDistance } from './scales';
-import { IsNumeric, attrd, getItemWithInterpolation, getSize, minimum, nextIfChanged } from './utils';
+import { attrd, getSize, minimum, nextIfChanged } from './utils';
 
 
 // TODO: pinnable tooltip with "close" button (behaves the same as clicking nothing / zooming / panning)
 // TODO: handle resize
+// TODO: check tooltips work correctly when zoomed out with filter (w and wo downsampling)
 // TODO: apply zoom from outside
 // TODO: style via CSS file, avoid inline styles
 // TODO: use OrRd color scale automatically when data are numeric?
@@ -22,6 +24,10 @@ const Class = {
     Overlay: `${AppName}-overlay`,
 }
 const MIN_ZOOMED_DATAPOINTS = 1;
+const MIN_ZOOMED_DATAPOINTS_HARD = 1;
+
+/** Avoid zooming to things like 0.4999999999999998 */
+const ZOOM_EVENT_ROUNDING_PRECISION = 9;
 
 
 export type DataDescription<TX, TY, TItem> = {
@@ -54,9 +60,9 @@ type ZoomEventParam<TX, TY, TItem> = {
     xMinIndex: number,
     /** Continuous X index corresponding to the right edge of the viewport */
     xMaxIndex: number,
-    /** (Only if the X domain is numeric and linear!) Continuous X value corresponding to the left edge of the viewport. */
+    /** (Only if the X domain is numeric, strictly sorted (asc or desc), and linear!) Continuous X value corresponding to the left edge of the viewport. */
     xMin: TX extends number ? number : undefined,
-    /** (Only if the X domain is numeric and linear!) Continuous X value corresponding to the right edge of the viewport. */
+    /** (Only if the X domain is numeric, strictly sorted (asc or desc), and linear!) Continuous X value corresponding to the right edge of the viewport. */
     xMax: TX extends number ? number : undefined,
 
     /** X index of the first (at least partially) visible column` */
@@ -72,9 +78,9 @@ type ZoomEventParam<TX, TY, TItem> = {
     yMinIndex: number,
     /** Continuous Y-index corresponding to the bottom edge of the viewport */
     yMaxIndex: number,
-    /** (Only if the Y domain is numeric and linear!) Continuous Y value corresponding to the top edge of the viewport. */
+    /** (Only if the Y domain is numeric, strictly sorted (asc or desc), and linear!) Continuous Y value corresponding to the top edge of the viewport. */
     yMin: TY extends number ? number : undefined,
-    /** (Only if the Y domain is numeric and linear!) Continuous Y value corresponding to the bottom edge of the viewport. */
+    /** (Only if the Y domain is numeric, strictly sorted (asc or desc), and linear!) Continuous Y value corresponding to the bottom edge of the viewport. */
     yMax: TY extends number ? number : undefined,
 
     /** Y index of the first (at least partially) visible row` */
@@ -121,12 +127,8 @@ export class Heatmap<TX, TY, TItem> {
     private originalData: DataDescription<TX, TY, TItem>;
     private data: Data<TItem>;
     private downsampling: TItem extends number ? Downsampling<TItem> : undefined;
-    private xDomain: TX[];
-    private yDomain: TY[];
-    private xDomainNumeric: IsNumeric<TX>;
-    private yDomainNumeric: IsNumeric<TY>;
-    private xDomainIndex: Map<TX, number>;
-    private yDomainIndex: Map<TY, number>;
+    private xDomain: Domain<TX>;
+    private yDomain: Domain<TY>;
     private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
     private xAlignment: XAlignment = 'center';
     private yAlignment: YAlignment = 'center';
@@ -230,7 +232,7 @@ export class Heatmap<TX, TY, TItem> {
             this.svg.on(eventName, e => this.handlers[eventName as keyof typeof this.handlers](e));
             // wheel event must be subscribed before setting zoom
         }
-        this.applyZoom();
+        this.addZoomBehavior();
         // TODO handle resize!
 
         console.timeEnd('Hotmap render')
@@ -257,15 +259,15 @@ export class Heatmap<TX, TY, TItem> {
         const array = new Array<TItem_ | undefined>(nColumns * nRows).fill(undefined);
         const xs = (typeof x === 'function') ? items.map(x) : x;
         const ys = (typeof y === 'function') ? items.map(y) : y;
-        const xDomainIndex = new Map(xDomain.map((x, i) => [x, i])); // TODO avoid creating array of arrays
-        const yDomainIndex = new Map(yDomain.map((y, i) => [y, i])); // TODO avoid creating array of arrays
+        self.xDomain = Domain.create(xDomain);
+        self.yDomain = Domain.create(yDomain);
         let warned = false;
         for (let i = 0; i < items.length; i++) {
             const d = items[i];
             const x = xs[i];
             const y = ys[i];
-            const ix = xDomainIndex.get(x);
-            const iy = yDomainIndex.get(y);
+            const ix = self.xDomain.index.get(x);
+            const iy = self.yDomain.index.get(y);
             if (ix === undefined) {
                 if (!warned) {
                     console.warn('Some data items map to X values out of the X domain.'); // TODO add details
@@ -285,12 +287,6 @@ export class Heatmap<TX, TY, TItem> {
         const isNumeric = items.every(d => typeof d === 'number') as (TItem_ extends number ? true : false);
         self.originalData = data;
         self.setRawData({ items: array, nRows, nColumns, isNumeric });
-        self.xDomain = xDomain;
-        self.yDomain = yDomain;
-        self.xDomainNumeric = xDomain.every(x => typeof x === 'number') as IsNumeric<TX_>;
-        self.yDomainNumeric = yDomain.every(y => typeof y === 'number') as IsNumeric<TY_>;
-        self.xDomainIndex = xDomainIndex;
-        self.yDomainIndex = yDomainIndex;
         return self;
     }
     setColor(colorProvider: (...args: ProviderParams<TX, TY, TItem>) => string): this {
@@ -346,7 +342,7 @@ export class Heatmap<TX, TY, TItem> {
             for (let ix = colFrom; ix < colTo; ix++) {
                 const item = getDataItem(data, ix, iy);
                 if (item === undefined) continue;
-                this.ctx.fillStyle = this.colorProvider(item, this.xDomain[ix], this.yDomain[iy], ix, iy);
+                this.ctx.fillStyle = this.colorProvider(item, this.xDomain.values[ix], this.yDomain.values[iy], ix, iy);
                 const x = this.scales.worldToCanvas.x(ix * scale);
                 const y = this.scales.worldToCanvas.y(iy);
                 this.ctx.fillRect(x + xHalfGap, y + yHalfGap, width - 2 * xHalfGap, height - 2 * yHalfGap);
@@ -364,10 +360,10 @@ export class Heatmap<TX, TY, TItem> {
         return clamp(minimum(gap1, gap2) ?? 0, 0, rowHeightOnCanvas);
     }
 
-    private applyZoom() {
+    private addZoomBehavior() {
         if (this.zoomBehavior) {
             // Remove any old behavior
-            this.zoomBehavior.on("zoom", null);
+            this.zoomBehavior.on('zoom', null);
         }
         this.zoomBehavior = d3.zoom();
         this.zoomBehavior.filter(e => {
@@ -402,46 +398,94 @@ export class Heatmap<TX, TY, TItem> {
     private emitZoom() {
         if (!this.boxes?.visWorld) return;
 
-        const xMinIndex_ = this.boxes.visWorld.xmin; // This only holds for xAlignment left
-        const xMaxIndex_ = this.boxes.visWorld.xmax; // This only holds for xAlignment left
+        const xMinIndex_ = round(this.boxes.visWorld.xmin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
+        const xMaxIndex_ = round(this.boxes.visWorld.xmax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
         const xFirstVisibleIndex = clamp(Math.floor(xMinIndex_), 0, this.data.nColumns - 1);
         const xLastVisibleIndex = clamp(Math.ceil(xMaxIndex_) - 1, 0, this.data.nColumns - 1);
 
-        const yMinIndex_ = this.boxes.visWorld.ymin; // This only holds for yAlignment top
-        const yMaxIndex_ = this.boxes.visWorld.ymax; // This only holds for yAlignment top
+        const yMinIndex_ = round(this.boxes.visWorld.ymin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
+        const yMaxIndex_ = round(this.boxes.visWorld.ymax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
         const yFirstVisibleIndex = clamp(Math.floor(yMinIndex_), 0, this.data.nRows - 1);
         const yLastVisibleIndex = clamp(Math.ceil(yMaxIndex_) - 1, 0, this.data.nRows - 1);
 
         const xShift = indexAlignmentShift(this.xAlignment);
         const yShift = indexAlignmentShift(this.yAlignment);
 
-        this.events.zoom.next({
+        const zoomEventParam: ZoomEventParam<TX, TY, TItem> = {
             xMinIndex: xMinIndex_ + xShift,
             xMaxIndex: xMaxIndex_ + xShift,
-            xMin: this.interpolateX(xMinIndex_ + xShift),
-            xMax: this.interpolateX(xMaxIndex_ + xShift),
+            xMin: Domain.interpolateValue(this.xDomain, xMinIndex_ + xShift),
+            xMax: Domain.interpolateValue(this.xDomain, xMaxIndex_ + xShift),
             xFirstVisibleIndex,
             xLastVisibleIndex,
-            xFirstVisible: this.xDomain[xFirstVisibleIndex],
-            xLastVisible: this.xDomain[xLastVisibleIndex],
+            xFirstVisible: this.xDomain.values[xFirstVisibleIndex],
+            xLastVisible: this.xDomain.values[xLastVisibleIndex],
 
             yMinIndex: yMinIndex_ + yShift,
             yMaxIndex: yMaxIndex_ + yShift,
-            yMin: this.interpolateY(yMinIndex_ + yShift),
-            yMax: this.interpolateY(yMaxIndex_ + yShift),
+            yMin: Domain.interpolateValue(this.yDomain, yMinIndex_ + yShift),
+            yMax: Domain.interpolateValue(this.yDomain, yMaxIndex_ + yShift),
             yFirstVisibleIndex,
             yLastVisibleIndex,
-            yFirstVisible: this.yDomain[yFirstVisibleIndex],
-            yLastVisible: this.yDomain[yLastVisibleIndex],
-        });
+            yFirstVisible: this.yDomain.values[yFirstVisibleIndex],
+            yLastVisible: this.yDomain.values[yLastVisibleIndex],
+        };
+        nextIfChanged(this.events.zoom, zoomEventParam);
     }
-    private interpolateX(xIndex: number): TX extends number ? number : undefined {
-        if (this.xDomainNumeric) return getItemWithInterpolation(this.xDomain as number[], xIndex) as any;
-        else return undefined as any;
+    zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined) {
+        const xMinIndex_ = clamp(this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.boxes.wholeWorld.xmin, this.boxes.wholeWorld.xmin, this.boxes.wholeWorld.xmax - MIN_ZOOMED_DATAPOINTS_HARD);
+        const xMaxIndex_ = clamp(this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.boxes.wholeWorld.xmax, xMinIndex_ + MIN_ZOOMED_DATAPOINTS_HARD, this.boxes.wholeWorld.xmax);
+        const yMinIndex_ = clamp(this.getZoomRequestIndexMagic('y', 'Min', z) ?? this.boxes.wholeWorld.ymin, this.boxes.wholeWorld.ymin, this.boxes.wholeWorld.ymax - MIN_ZOOMED_DATAPOINTS_HARD);
+        const yMaxIndex_ = clamp(this.getZoomRequestIndexMagic('y', 'Max', z) ?? this.boxes.wholeWorld.ymax, yMinIndex_ + MIN_ZOOMED_DATAPOINTS_HARD, this.boxes.wholeWorld.ymax);
+
+        const xScale = this.canvasDomSize.width / (xMaxIndex_ - xMinIndex_);
+        const yScale = this.canvasDomSize.height / (yMaxIndex_ - yMinIndex_);
+
+        const transform = d3.zoomIdentity.scale(xScale).translate(-xMinIndex_, 0);
+        // console.log('zoom request xMinIndex_', xMinIndex_, 'xMaxIndex_', xMaxIndex_, 'yMinIndex_', yMinIndex_, 'yMaxIndex_', yMaxIndex_, 'scale', xScale, 'transform', transform);
+        this.zoomBehavior?.transform(this.svg as any, transform);
     }
-    private interpolateY(yIndex: number): TY extends number ? number : undefined {
-        if (this.yDomainNumeric) return getItemWithInterpolation(this.yDomain as number[], yIndex) as any;
-        else return undefined as any;
+    private getZoomRequestIndexMagic(axis: 'x' | 'y', end: 'Min' | 'Max', z: Partial<ZoomEventParam<TX, TY, TItem>>): number | undefined {
+        if (isNil(z)) return undefined;
+
+        const fl = end === 'Min' ? 'First' : 'Last';
+        const index = z[`${axis}${end}Index`];
+        const value = z[`${axis}${end}`] as TX | TY | undefined;
+        const visIndex = z[`${axis}${fl}VisibleIndex`];
+        const visValue = z[`${axis}${fl}Visible`];
+        const domain = this[`${axis}Domain`];
+        const alignment = this[`${axis}Alignment`];
+
+        if ([index, value, visIndex, visValue].filter(v => !isNil(v)).length > 1) {
+            console.warn(`You called zoom function with more that one of these conflicting options: ${axis}${end}Index, ${axis}${end}, ${axis}${fl}VisibleIndex, ${axis}${fl}Visible. Only the first one (in this order of precedence) will be considered.`);
+        }
+
+        if (!isNil(index)) {
+            return index - indexAlignmentShift(alignment);
+        }
+        if (!isNil(value)) {
+            const interpolatedIndex = Domain.interpolateIndex(domain, value);
+            if (!isNil(interpolatedIndex)) {
+                return interpolatedIndex - indexAlignmentShift(alignment);
+            } else {
+                throw new Error(`${axis}${end} option is not applicable for zoom function, because the ${axis.toUpperCase()} domain is not numeric or not sorted. Use one of these options instead: ${axis}${end}Index, ${axis}${fl}VisibleIndex, ${axis}${fl}Visible.`);
+            }
+        }
+        if (!isNil(visIndex)) {
+            if (Math.floor(visIndex) !== visIndex) throw new Error(`${axis}${fl}VisibleIndex must be an integer, not ${visIndex}`);
+            return fl === 'First' ? visIndex : visIndex + 1;
+        }
+        if (!isNil(visValue)) {
+            const foundIndex = domain.index.get(visValue as any);
+            if (!isNil(foundIndex)) {
+                return fl === 'First' ? foundIndex : foundIndex + 1;;
+            } else {
+                console.warn(`The provided value of ${axis}${fl}Visible (${visValue}) is not in the ${axis.toUpperCase()} domain.`);
+
+                return undefined;
+            }
+        }
+        return undefined;
     }
 
     private getPointedItem(event: MouseEvent | undefined): ItemEventParam<TX, TY, TItem> {
@@ -454,8 +498,8 @@ export class Heatmap<TX, TY, TItem> {
         if (!datum) {
             return undefined;
         }
-        const x = this.xDomain[xIndex];
-        const y = this.yDomain[yIndex];
+        const x = this.xDomain.values[xIndex];
+        const y = this.yDomain.values[yIndex];
         return { datum, x, y, xIndex, yIndex, sourceEvent: event };
     }
 
