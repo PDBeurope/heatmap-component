@@ -8,10 +8,10 @@ import { attrd, getSize, minimum, nextIfChanged } from './utils';
 
 
 // TODO: pinnable tooltip with "close" button (behaves the same as clicking nothing / zooming / panning)
-// TODO: check tooltips work correctly when zoomed out with filter (w and wo downsampling)
 // TODO: style via CSS file, avoid inline styles
 // TODO: use OrRd color scale automatically when data are numeric?
 // TODO: think in more depth what could happen when changing data type with filters, providers, etc. already set
+// TODO: downsample color instead of value
 
 
 const AppName = 'hotmap';
@@ -93,11 +93,11 @@ type ZoomEventParam<TX, TY, TItem> = {
 } | undefined
 
 
-const DefaultColorProvider = () => '#888888';
-const DefaultNumericColorProvider = d3.scaleSequential(d3.interpolateOrRd);
+export const DefaultColorProvider = () => '#888888';
+export const DefaultNumericColorProvider = d3.scaleSequential(d3.interpolateOrRd);
 // const DefaultColorScale = d3.scaleLinear([0, 0.5, 1], ['#2222dd', '#ffffff', '#dd2222']);
 
-function DefaultTooltipProvider(dataItem: unknown, x: unknown, y: unknown, xIndex: number, yIndex: number): string {
+export function DefaultTooltipProvider(dataItem: unknown, x: unknown, y: unknown, xIndex: number, yIndex: number): string {
     return `x index: ${xIndex}<br>y index: ${yIndex}<br>x value: ${x}<br>y value: ${y}<br>item: ${formatDataItem(dataItem)}`;
 }
 
@@ -163,12 +163,15 @@ export class Heatmap<TX, TY, TItem> {
         if (data !== undefined) {
             return new this(data);
         } else {
-            return new this(makeRandomData(100, 20)).setColor(DefaultNumericColorProvider);
+            return new this(makeRandomData(200, 20));
         }
     }
 
     private constructor(data: DataDescription<TX, TY, TItem>) {
         this.setData(data);
+        if (this.data.isNumeric) {
+            (this as unknown as Heatmap<TX, TY, number>).setColor(DefaultNumericColorProvider);
+        }
     }
 
     /** Clear all the contents of the root div. */
@@ -301,6 +304,7 @@ export class Heatmap<TX, TY, TItem> {
     }
     setColor(colorProvider: (...args: ProviderParams<TX, TY, TItem>) => string): this {
         this.colorProvider = colorProvider;
+        this.draw();
         return this;
     }
     setTooltip(tooltipProvider: ((...args: ProviderParams<TX, TY, TItem>) => string) | 'default' | 'none'): this {
@@ -339,8 +343,11 @@ export class Heatmap<TX, TY, TItem> {
         const colFrom = Math.floor(this.boxes.visWorld.xmin);
         const colTo = Math.ceil(this.boxes.visWorld.xmax); // exclusive
         const downsamplingCoefficient = Downsampling.downsamplingCoefficient(colTo - colFrom, xResolution);
-        const downsampled = this.downsampling ? Downsampling.getDownsampled(this.downsampling, downsamplingCoefficient) : this.data;
-        return this.drawTheseData(downsampled, downsamplingCoefficient);
+        if (this.downsampling && !this.filter) {
+            return this.drawTheseData(Downsampling.getDownsampled(this.downsampling, downsamplingCoefficient), downsamplingCoefficient);
+        } else {
+            return this.drawTheseData(this.data, 1);
+        }
     }
     private drawTheseData(data: Data<TItem>, scale: number) {
         if (!this.rootDiv) return;

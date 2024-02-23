@@ -1,11 +1,12 @@
 import * as d3 from 'd3';
-import { Heatmap, formatDataItem } from './heatmap';
-import { sortDirection } from './utils';
+import { DefaultNumericColorProvider, Heatmap, formatDataItem } from './heatmap';
 
 
 export function demo(divElementOrId: HTMLDivElement | string) {
     const hm = Heatmap.create(); // Heatmap<number, number, number>
     hm.render(divElementOrId);
+    hm.setFilter(d => d > 0.1);
+    // setTimeout(()=> hm.setFilter(undefined), 2000);
 }
 
 export function demo2(divElementOrId: HTMLDivElement | string) {
@@ -68,7 +69,6 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
         if (!e) {
             console.log('zooming nothing');
         } else {
-            // console.log('zooming', e);
             console.log('zooming', e.xMinIndex, e.xMaxIndex, 'values', e.xMin, e.xMax, e);
             d3.select('#xminindex').text(e.xMinIndex);
             d3.select('#xmaxindex').text(e.xMaxIndex);
@@ -78,7 +78,6 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
     });
     hm.render(divElementOrId);
     (window as any).hm = hm;
-    // setTimeout(() => hm.setAlignment('right', undefined), 2000)
 }
 
 

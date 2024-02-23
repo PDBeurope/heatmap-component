@@ -4,9 +4,13 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
-- Zoom event gives more info and is customizable by `setAlignment`
+## [0.4.0] - 2024-02-23
+
+- Zoom event gives more info
 - `zoom` method to set zoom, `getZoom` to retrieve current zoom
+- Zoom event, `zoom()`, and `getZoom()` are customizable by `setAlignment`
 - Handling window resize
+- Fixed bug with wrong data being shown when zoomed out
 
 ## [0.3.0] - 2024-02-21
 

@@ -1,4 +1,3 @@
-import * as d3 from 'd3';
 import { clamp, sortedIndex, sortedIndexBy } from 'lodash';
 import { IsNumeric, sortDirection } from './utils';
 
@@ -28,9 +27,10 @@ export const Domain = {
         if (domain.isNumeric) {
             const values = domain.values as unknown as number[];
             const previousIndex = clamp(Math.floor(index), 0, values.length - 2);
+            const nextIndex = previousIndex + 1;
             const previousValue = values[previousIndex];
-            const nextValue = values[previousIndex + 1];
-            return d3.interpolateNumber(previousValue, nextValue)(index - previousIndex) as any;
+            const nextValue = values[nextIndex];
+            return (index - previousIndex) * (nextValue - previousValue) + previousValue as any;
         } else {
             return undefined as any;
         }
@@ -58,8 +58,5 @@ function _getIndexWithInterpolation(domain: Domain<number>, value: number): numb
     const nextIndex = previousIndex + 1;
     const previousValue = domain.values[previousIndex];
     const nextValue = domain.values[nextIndex];
-    const v1 = (value - previousValue) / (nextValue - previousValue) * (nextIndex - previousIndex);
-    const v2 = d3.scaleLinear([previousValue, nextValue], [previousIndex, nextIndex])(value); // TODO: replace with formula?
-    if (v1 !== v2) throw new Error();
-    return v1;
+    return (value - previousValue) / (nextValue - previousValue) + previousIndex;
 };
