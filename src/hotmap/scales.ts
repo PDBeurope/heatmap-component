@@ -3,9 +3,17 @@ import * as d3 from 'd3';
 
 export interface Box { xmin: number, ymin: number, xmax: number, ymax: number }
 
-export function Box(xmin: number, ymin: number, xmax: number, ymax: number): Box {
-    return { xmin, ymin, xmax, ymax };
-}
+export const Box = {
+    create(xmin: number, ymin: number, xmax: number, ymax: number): Box {
+        return { xmin, ymin, xmax, ymax };
+    },
+    width(box: Box): number {
+        return box.xmax - box.xmin;
+    },
+    height(box: Box): number {
+        return box.ymax - box.ymin;
+    },
+};
 
 export interface BoxSize { width: number, height: number }
 

@@ -43,6 +43,13 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
     hm.setFilter((d, x, y, xIndex, yIndex) => d.score > 0);
     setTimeout(() => hm.setFilter(undefined), 2000);
     hm.setVisualParams({ xGapPixels: 0, yGapPixels: 0 });
+    hm.events.resize.subscribe(e => {
+        if (!e) {
+            console.log('resizing nothing');
+        } else {
+            console.log('resizing', e);
+        }
+    });
     hm.events.hover.subscribe(e => {
         if (!e) {
             console.log('hovering nothing');

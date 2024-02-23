@@ -36,6 +36,10 @@ export function nextIfChanged<T>(subject: BehaviorSubject<T>, newValue: T, key: 
         subject.next(newValue);
     }
 }
+// export function subscribeAndRun<T>(subject: BehaviorSubject<T>, action: (value: T) => any) {
+//     subject.subscribe(action);
+//     action(subject.getValue());
+// }
 
 /** Return the smallest of the given numbers. Ignore any nullish values. If all values are nullish, return `undefined`. */
 export function minimum(...values: (number | null | undefined)[]): number | undefined {

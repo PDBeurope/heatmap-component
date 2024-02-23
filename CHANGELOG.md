@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file, following t
 
 - Zoom event gives more info and is customizable by `setAlignment`
 - `zoom` method to set zoom, `getZoom` to retrieve current zoom
+- Handling window resize
 
 ## [0.3.0] - 2024-02-21
 
