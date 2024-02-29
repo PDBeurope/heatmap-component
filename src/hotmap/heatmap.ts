@@ -7,10 +7,11 @@ import { Box, BoxSize, Boxes, Scales, scaleDistance } from './scales';
 import { attrd, getSize, minimum, nextIfChanged } from './utils';
 
 
-// TODO: highlight column/row
+// TODO: Zooming without Ctrl
 // TODO: style via CSS file, avoid inline styles
 // TODO: think in more depth what could happen when changing data type with filters, providers, etc. already set
 // TODO: downsample color instead of value
+// TODO: Highlight column and row on hover - should it also be shown on empty tiles? (filtered-out)
 
 
 const AppName = 'hotmap';
@@ -18,6 +19,8 @@ const Class = {
     MainDiv: `${AppName}-main-div`,
     CanvasDiv: `${AppName}-canvas-div`,
     Marker: `${AppName}-marker`,
+    MarkerX: `${AppName}-marker-x`,
+    MarkerY: `${AppName}-marker-y`,
     Tooltip: `${AppName}-tooltip`,
     PinnedTooltipBox: `${AppName}-pinned-tooltip-box`,
     PinnedTooltipContent: `${AppName}-pinned-tooltip-content`,
@@ -584,26 +587,36 @@ export class Heatmap<TX, TY, TItem> {
 
     private updateMarker(pointed: ItemEventParam<TX, TY, TItem>) {
         if (pointed) {
-            const marker = this.svg.selectAll('.' + Class.Marker).data([1]);
-            const variableAttrs = {
-                width: scaleDistance(this.scales.worldToDom.x, 1),
-                height: scaleDistance(this.scales.worldToDom.y, 1),
-                x: this.scales.worldToDom.x(pointed.xIndex),
-                y: this.scales.worldToDom.y(pointed.yIndex),
-            };
-            attrd(marker.enter().append('rect'), {
-                class: Class.Marker,
-                stroke: 'black',
-                strokeWidth: 3,
-                rx: 1,
-                ry: 1,
-                fill: 'none',
-                ...variableAttrs,
+            const x = this.scales.worldToDom.x(pointed.xIndex);
+            const y = this.scales.worldToDom.y(pointed.yIndex);
+            const width = scaleDistance(this.scales.worldToDom.x, 1);
+            const height = scaleDistance(this.scales.worldToDom.y, 1);
+            this.makeMarker(Class.Marker, { stroke: 'black', strokeWidth: 3, rx: 1, ry: 1, fill: 'none' }, {
+                x, y, width, height
             });
-            attrd(marker, variableAttrs);
+            this.makeMarker(Class.MarkerX, { stroke: 'black', strokeWidth: 2, rx: 1, ry: 1, fill: 'none' }, {
+                x,
+                y: this.boxes.dom.ymin,
+                width,
+                height: Box.height(this.boxes.dom),
+            });
+            this.makeMarker(Class.MarkerY, { stroke: 'black', strokeWidth: 2, rx: 1, ry: 1, fill: 'none' }, {
+                x: this.boxes.dom.xmin,
+                y,
+                width: Box.width(this.boxes.dom),
+                height,
+            });
         } else {
             this.svg.selectAll('.' + Class.Marker).remove();
+            this.svg.selectAll('.' + Class.MarkerX).remove();
+            this.svg.selectAll('.' + Class.MarkerY).remove();
         }
+    }
+
+    private makeMarker(className: string, staticAttrs: Parameters<typeof attrd>[1], dynamicAttrs: Parameters<typeof attrd>[1]) {
+        const marker = this.svg.selectAll('.' + className).data([1]);
+        attrd(marker.enter().append('rect'), { class: className, ...staticAttrs, ...dynamicAttrs });
+        attrd(marker, dynamicAttrs);
     }
 
     private updateTooltip(pointed: ItemEventParam<TX, TY, TItem>) {

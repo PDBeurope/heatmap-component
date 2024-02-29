@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file, following t
 ## [Unreleased]
 
 - Pinnable tooltips
+- Highlight column and row on hover
 
 ## [0.4.0] - 2024-02-23
 
