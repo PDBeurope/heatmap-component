@@ -1,5 +1,5 @@
 import * as d3 from 'd3';
-import { DefaultNumericColorProvider, Heatmap, formatDataItem } from './heatmap';
+import { Heatmap, formatDataItem } from './heatmap';
 
 
 export function demo(divElementOrId: HTMLDivElement | string) {

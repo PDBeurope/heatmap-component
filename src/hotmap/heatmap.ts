@@ -7,7 +7,6 @@ import { Box, BoxSize, Boxes, Scales, scaleDistance } from './scales';
 import { attrd, getSize, minimum, nextIfChanged } from './utils';
 
 
-// TODO: pinnable tooltip with "close" button (behaves the same as clicking nothing / zooming / panning)
 // TODO: highlight column/row
 // TODO: style via CSS file, avoid inline styles
 // TODO: think in more depth what could happen when changing data type with filters, providers, etc. already set
@@ -120,9 +119,9 @@ export const DefaultVisualParams = {
     yGapRelative: 0.1 as number | null,
 
     /** Position of bottom-left corner of tooltip box relative to the mouse position (right) */
-    tooltipOffsetX: 5 as number, // TODO 5
+    tooltipOffsetX: 5 as number,
     /** Position of bottom-left corner of tooltip box relative to the mouse position (down) */
-    tooltipOffsetY: -8 as number, // TODO -5
+    tooltipOffsetY: -8 as number,
 
     // More config via CSS:
     // .hotmap-canvas-div { background-color: none; }
@@ -182,6 +181,7 @@ export class Heatmap<TX, TY, TItem> {
             (this as unknown as Heatmap<TX, TY, number>).setColor(DefaultNumericColorProvider);
         }
     }
+
 
     /** Clear all the contents of the root div. */
     remove(): void {
@@ -256,6 +256,7 @@ export class Heatmap<TX, TY, TItem> {
         console.timeEnd('Hotmap render');
         return this;
     }
+
     private emitResize() {
         if (!this.canvas) return;
         const size = getSize(this.canvas);
@@ -274,6 +275,7 @@ export class Heatmap<TX, TY, TItem> {
         this.draw();
         return this;
     }
+
     setData<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>): Heatmap<TX_, TY_, TItem_> {
         const self = this as unknown as Heatmap<TX_, TY_, TItem_>;
         const { items, x, y, xDomain, yDomain } = data;
@@ -284,7 +286,8 @@ export class Heatmap<TX, TY, TItem> {
         const ys = (typeof y === 'function') ? items.map(y) : y;
         self.xDomain = Domain.create(xDomain);
         self.yDomain = Domain.create(yDomain);
-        let warned = false;
+        let warnedX = false;
+        let warnedY = false;
         for (let i = 0; i < items.length; i++) {
             const d = items[i];
             const x = xs[i];
@@ -292,14 +295,14 @@ export class Heatmap<TX, TY, TItem> {
             const ix = self.xDomain.index.get(x);
             const iy = self.yDomain.index.get(y);
             if (ix === undefined) {
-                if (!warned) {
-                    console.warn('Some data items map to X values out of the X domain.'); // TODO add details
-                    warned = true;
+                if (!warnedX) {
+                    console.warn('Some data items map to X values out of the X domain:', d, 'maps to X', x);
+                    warnedX = true;
                 }
             } else if (iy === undefined) {
-                if (!warned) {
-                    console.warn('Some data items map to Y values out of the Y domain.'); // TODO add details
-                    warned = true;
+                if (!warnedY) {
+                    console.warn('Some data items map to Y values out of the Y domain:', d, 'maps to Y', y);
+                    warnedY = true;
                 }
             } else if (self.filter !== undefined && !self.filter(d, x, y, ix, iy)) {
                 // skipping this item
@@ -312,30 +315,33 @@ export class Heatmap<TX, TY, TItem> {
         self.setRawData({ items: array, nRows, nColumns, isNumeric });
         return self;
     }
+
     setColor(colorProvider: (...args: ProviderParams<TX, TY, TItem>) => string): this {
         this.colorProvider = colorProvider;
         this.draw();
         return this;
     }
-    setTooltip(tooltipProvider: ((...args: ProviderParams<TX, TY, TItem>) => string) | 'default' | 'none'): this {
+
+    setTooltip(tooltipProvider: ((...args: ProviderParams<TX, TY, TItem>) => string) | 'default' | undefined): this {
         if (tooltipProvider === 'default')
             this.tooltipProvider = DefaultTooltipProvider;
-        else if (tooltipProvider === 'none')
-            this.tooltipProvider = undefined;
         else
             this.tooltipProvider = tooltipProvider;
         return this;
     }
+
     setFilter(filter: ((...args: ProviderParams<TX, TY, TItem>) => boolean) | undefined): this {
         this.filter = filter;
         this.setData(this.originalData); // reapplies filter
         return this;
     }
+
     setVisualParams(params: Partial<VisualParams>): this {
         this.visualParams = merge(cloneDeep(this.visualParams), params);
         this.draw();
         return this;
     }
+
     /** Controls how column/row indices and names map to X and Y axes. */
     setAlignment(x: XAlignment | undefined, y: YAlignment | undefined): this {
         if (x) this.xAlignment = x;
@@ -347,6 +353,7 @@ export class Heatmap<TX, TY, TItem> {
     private getDataItem(x: number, y: number): TItem | undefined {
         return getDataItem(this.data, x, y);
     }
+
     private draw() {
         if (!this.rootDiv) return;
         const xResolution = Box.width(this.boxes.dom) / this.downsamplingPixelsPerRect;
@@ -359,6 +366,7 @@ export class Heatmap<TX, TY, TItem> {
             return this.drawTheseData(this.data, 1);
         }
     }
+
     private drawTheseData(data: Data<TItem>, scale: number) {
         if (!this.rootDiv) return;
         // this.ctx.resetTransform(); this.ctx.scale(scale, 1);
@@ -381,6 +389,7 @@ export class Heatmap<TX, TY, TItem> {
             }
         }
     }
+
     private getXGap(colWidthOnCanvas: number): number {
         const gap1 = isNil(this.visualParams.xGapPixels) ? undefined : scaleDistance(this.scales.domToCanvas.x, this.visualParams.xGapPixels);
         const gap2 = isNil(this.visualParams.xGapRelative) ? undefined : this.visualParams.xGapRelative * colWidthOnCanvas;
@@ -427,6 +436,7 @@ export class Heatmap<TX, TY, TItem> {
             this.zoomBehavior.transform(this.svg as any, currentZoom);
         });
     }
+
     private zoomTransformToVisWorld(transform: { k: number, x: number, y: number }): Box {
         return {
             ...this.boxes.visWorld, // preserve Y zoom
@@ -434,12 +444,14 @@ export class Heatmap<TX, TY, TItem> {
             xmax: (this.boxes.dom.xmax - transform.x) / transform.k,
         };
     }
+
     private visWorldToZoomTransform(visWorld: Box): d3.ZoomTransform {
         const k = (this.boxes.dom.xmax - this.boxes.dom.xmin) / (visWorld.xmax - visWorld.xmin);
         const x = this.boxes.dom.xmin - k * visWorld.xmin;
         const y = 0;
         return new d3.ZoomTransform(k, x, y);
     }
+
     private zoomParamFromVisWorld(box: Box | undefined): ZoomEventParam<TX, TY, TItem> {
         if (!box) return undefined;
 
@@ -477,11 +489,13 @@ export class Heatmap<TX, TY, TItem> {
         };
 
     }
+
     private emitZoom(): void {
         if (this.boxes.visWorld) {
             nextIfChanged(this.events.zoom, this.zoomParamFromVisWorld(this.boxes.visWorld));
         }
     }
+
     zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined): ZoomEventParam<TX, TY, TItem> {
         if (!this.zoomBehavior) return undefined;
 
@@ -498,6 +512,7 @@ export class Heatmap<TX, TY, TItem> {
         this.zoomBehavior.transform(this.svg as any, transform);
         return this.zoomParamFromVisWorld(visWorldBox);
     }
+
     getZoom(): ZoomEventParam<TX, TY, TItem> {
         return this.zoomParamFromVisWorld(this.boxes.visWorld);
     }
@@ -559,12 +574,14 @@ export class Heatmap<TX, TY, TItem> {
         const y = this.yDomain.values[yIndex];
         return { datum, x, y, xIndex, yIndex, sourceEvent: event };
     }
+
     private handleHover(event: MouseEvent | undefined) {
         const pointed = this.getPointedItem(event);
         nextIfChanged(this.events.hover, pointed, v => ({ ...v, sourceEvent: undefined }));
         this.updateMarker(pointed);
         this.updateTooltip(pointed);
     }
+
     private updateMarker(pointed: ItemEventParam<TX, TY, TItem>) {
         if (pointed) {
             const marker = this.svg.selectAll('.' + Class.Marker).data([1]);
@@ -588,6 +605,7 @@ export class Heatmap<TX, TY, TItem> {
             this.svg.selectAll('.' + Class.Marker).remove();
         }
     }
+
     private updateTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
         const thisTooltipPinned = pointed && this.pinnedTooltip && pointed.xIndex === this.pinnedTooltip[0] && pointed.yIndex === this.pinnedTooltip[1];
         if (pointed && !thisTooltipPinned && this.tooltipProvider) {
@@ -614,16 +632,19 @@ export class Heatmap<TX, TY, TItem> {
             this.mainDiv.selectAll('.' + Class.Tooltip).remove();
         }
     }
+
     private updatePinnedTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
         this.mainDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
         if (pointed && this.tooltipProvider) {
             this.pinnedTooltip = [pointed.xIndex, pointed.yIndex];
             const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
             const tooltipText = this.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
+
             const tooltip = attrd(this.mainDiv.append('div'), {
                 class: Class.PinnedTooltipBox,
                 style: { position: 'fixed', ...tooltipPosition },
             });
+            // Tooltip content
             attrd(tooltip.append('div'), {
                 class: Class.PinnedTooltipContent,
                 style: {
@@ -633,6 +654,7 @@ export class Heatmap<TX, TY, TItem> {
 
                 },
             }).html(tooltipText);
+            // Tooltip close button
             const closeButton = attrd(tooltip.append('div'), {
                 class: Class.PinnedTooltipClose,
                 style: {
@@ -651,28 +673,44 @@ export class Heatmap<TX, TY, TItem> {
             })
                 .attr('viewBox', '0 0 24 24')
                 .attr('preserveAspectRatio', 'none')
-                .append('path').attr('fill', 'white').attr('stroke', 'white').attr('d', 'M19,6.41 L17.59,5 L12,10.59 L6.41,5 L5,6.41 L10.59,12 L5,17.59 L6.41,19 L12,13.41 L17.59,19 L19,17.59 L13.41,12 L19,6.41 Z');
+                .append('path').attr('d', 'M19,6.41 L17.59,5 L12,10.59 L6.41,5 L5,6.41 L10.59,12 L5,17.59 L6.41,19 L12,13.41 L17.59,19 L19,17.59 L13.41,12 L19,6.41 Z')
+                .style('fill', 'white').style('stroke', 'white');
 
+            // Tooltip pin
             attrd(tooltip.append('svg'), {
                 style: {
                     position: 'absolute',
                     left: `${-this.visualParams.tooltipOffsetX}px`, bottom: `${this.visualParams.tooltipOffsetY}px`,
-                    width: `${Math.abs(this.visualParams.tooltipOffsetX) / 0.60}px`, height: `${Math.abs(this.visualParams.tooltipOffsetY) / 0.60}px`,
+                    width: `${Math.abs(this.visualParams.tooltipOffsetX) / 0.6}px`, height: `${Math.abs(this.visualParams.tooltipOffsetY) / 0.6}px`,
                     zIndex: -1,
                 },
             })
                 .attr('viewBox', '0 0 100 100')
                 .attr('preserveAspectRatio', 'none')
-                .append('path').attr('fill', 'black').attr('d', 'M0 100 L100 40 L60 0 Z');
+                .append('path').attr('d', 'M0,100 L100,40 L60,0 Z')
+                .style('fill', 'black');
 
+            // Remove any non-pinned tooltip
+            this.updateTooltip(undefined);
         } else {
             this.pinnedTooltip = undefined;
         }
-        this.updateTooltip(undefined);
     }
+
     private addPinnedTooltipBehavior() {
         this.events.click.subscribe(pointed => this.updatePinnedTooltip(pointed));
+        this.events.zoom.subscribe(() => {
+            if (!this.mainDiv.selectAll('.' + Class.PinnedTooltipBox).empty()) {
+                this.events.click.next(undefined);
+            }
+        });
+        this.events.resize.subscribe(() => {
+            if (!this.mainDiv.selectAll('.' + Class.PinnedTooltipBox).empty()) {
+                this.events.click.next(undefined);
+            }
+        });
     }
+
     private getTooltipPosition(e: MouseEvent) {
         const left = `${(e.clientX ?? 0) + this.visualParams.tooltipOffsetX}px`;
         const bottom = `${document.documentElement.clientHeight - (e.clientY ?? 0) - this.visualParams.tooltipOffsetY}px`;

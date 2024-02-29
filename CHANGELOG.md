@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+- Pinnable tooltips
+
 ## [0.4.0] - 2024-02-23
 
 - Zoom event gives more info
