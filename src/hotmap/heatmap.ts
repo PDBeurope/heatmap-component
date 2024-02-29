@@ -8,8 +8,8 @@ import { attrd, getSize, minimum, nextIfChanged } from './utils';
 
 
 // TODO: pinnable tooltip with "close" button (behaves the same as clicking nothing / zooming / panning)
+// TODO: highlight column/row
 // TODO: style via CSS file, avoid inline styles
-// TODO: use OrRd color scale automatically when data are numeric?
 // TODO: think in more depth what could happen when changing data type with filters, providers, etc. already set
 // TODO: downsample color instead of value
 
@@ -20,6 +20,9 @@ const Class = {
     CanvasDiv: `${AppName}-canvas-div`,
     Marker: `${AppName}-marker`,
     Tooltip: `${AppName}-tooltip`,
+    PinnedTooltipBox: `${AppName}-pinned-tooltip-box`,
+    PinnedTooltipContent: `${AppName}-pinned-tooltip-content`,
+    PinnedTooltipClose: `${AppName}-pinned-tooltip-close`,
     Overlay: `${AppName}-overlay`,
 };
 const MIN_ZOOMED_DATAPOINTS = 1;
@@ -116,6 +119,11 @@ export const DefaultVisualParams = {
     /** Vertical gap between neighboring rows relative to (row height + gap). If both `yGapPixels` and `yGapRelative` are non-null, the smaller final gap value will be used. The margin before the first and after the last row is half of the gap between rows. */
     yGapRelative: 0.1 as number | null,
 
+    /** Position of bottom-left corner of tooltip box relative to the mouse position (right) */
+    tooltipOffsetX: 5 as number, // TODO 5
+    /** Position of bottom-left corner of tooltip box relative to the mouse position (down) */
+    tooltipOffsetY: -8 as number, // TODO -5
+
     // More config via CSS:
     // .hotmap-canvas-div { background-color: none; }
 };
@@ -155,6 +163,7 @@ export class Heatmap<TX, TY, TItem> {
      * (higher value means more responsive but shittier visualization)
      * TODO try setting this dynamically, based on rendering times */
     private downsamplingPixelsPerRect = 4;
+    private pinnedTooltip?: [number, number] = [1, 1];
 
 
     static create(): Heatmap<number, number, number>
@@ -242,6 +251,7 @@ export class Heatmap<TX, TY, TItem> {
         d3.select(window).on('resize.resizehotmapcanvas', () => this.emitResize());
 
         this.addZoomBehavior();
+        this.addPinnedTooltipBehavior();
 
         console.timeEnd('Hotmap render');
         return this;
@@ -549,52 +559,124 @@ export class Heatmap<TX, TY, TItem> {
         const y = this.yDomain.values[yIndex];
         return { datum, x, y, xIndex, yIndex, sourceEvent: event };
     }
-
     private handleHover(event: MouseEvent | undefined) {
         const pointed = this.getPointedItem(event);
         nextIfChanged(this.events.hover, pointed, v => ({ ...v, sourceEvent: undefined }));
-
-        if (!event || !pointed) {
-            // on mouseleave or when cursor is not at any data point
+        this.updateMarker(pointed);
+        this.updateTooltip(pointed);
+    }
+    private updateMarker(pointed: ItemEventParam<TX, TY, TItem>) {
+        if (pointed) {
+            const marker = this.svg.selectAll('.' + Class.Marker).data([1]);
+            const variableAttrs = {
+                width: scaleDistance(this.scales.worldToDom.x, 1),
+                height: scaleDistance(this.scales.worldToDom.y, 1),
+                x: this.scales.worldToDom.x(pointed.xIndex),
+                y: this.scales.worldToDom.y(pointed.yIndex),
+            };
+            attrd(marker.enter().append('rect'), {
+                class: Class.Marker,
+                stroke: 'black',
+                strokeWidth: 3,
+                rx: 1,
+                ry: 1,
+                fill: 'none',
+                ...variableAttrs,
+            });
+            attrd(marker, variableAttrs);
+        } else {
             this.svg.selectAll('.' + Class.Marker).remove();
-            this.mainDiv.selectAll('.' + Class.Tooltip).remove();
-            return;
         }
-
-        const marker = this.svg.selectAll('.' + Class.Marker).data([1]);
-        const variableAttrs = {
-            width: scaleDistance(this.scales.worldToDom.x, 1),
-            height: scaleDistance(this.scales.worldToDom.y, 1),
-            x: this.scales.worldToDom.x(pointed.xIndex),
-            y: this.scales.worldToDom.y(pointed.yIndex),
-        };
-        attrd(marker.enter().append('rect'), {
-            class: Class.Marker,
-            stroke: 'black',
-            strokeWidth: 3,
-            rx: 1,
-            ry: 1,
-            fill: 'none',
-            ...variableAttrs,
-        });
-        attrd(marker, variableAttrs);
-
-        if (this.tooltipProvider) {
+    }
+    private updateTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
+        const thisTooltipPinned = pointed && this.pinnedTooltip && pointed.xIndex === this.pinnedTooltip[0] && pointed.yIndex === this.pinnedTooltip[1];
+        if (pointed && !thisTooltipPinned && this.tooltipProvider) {
             const tooltip = this.mainDiv.selectAll('.' + Class.Tooltip).data([1]);
-            const tooltipLeft = `${(event.clientX ?? 0) + 5}px`;
-            const tooltipBottom = `${document.documentElement.clientHeight - (event.clientY ?? 0) + 5}px`;
+            const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
             const tooltipText = this.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
+            // Create tooltip if doesn't exist
             attrd(tooltip.enter().append('div'), {
                 class: Class.Tooltip,
                 style: {
-                    position: 'fixed', left: tooltipLeft, bottom: tooltipBottom,
-                    backgroundColor: 'white', border: 'solid black 1px', paddingBlock: '0.25em', paddingInline: '0.5em',
+                    position: 'fixed',
+                    ...tooltipPosition,
+                    backgroundColor: 'white',
+                    border: 'solid black 1px',
+                    paddingBlock: '0.35em', paddingInline: '0.7em',
+                    boxShadow: '0px 5px 15px rgba(0,0,0,0.75)',
                 },
             }).html(tooltipText);
+            // Update tooltip position and content if exists
             attrd(tooltip, {
-                style: { left: tooltipLeft, bottom: tooltipBottom },
+                style: { ...tooltipPosition },
             }).html(tooltipText);
+        } else {
+            this.mainDiv.selectAll('.' + Class.Tooltip).remove();
         }
+    }
+    private updatePinnedTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
+        this.mainDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
+        if (pointed && this.tooltipProvider) {
+            this.pinnedTooltip = [pointed.xIndex, pointed.yIndex];
+            const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
+            const tooltipText = this.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
+            const tooltip = attrd(this.mainDiv.append('div'), {
+                class: Class.PinnedTooltipBox,
+                style: { position: 'fixed', ...tooltipPosition },
+            });
+            attrd(tooltip.append('div'), {
+                class: Class.PinnedTooltipContent,
+                style: {
+                    backgroundColor: 'white', border: 'solid black 1px',
+                    paddingBlock: '0.35em', paddingInline: '0.7em',
+                    boxShadow: '0px 5px 15px rgba(0,0,0,0.75)',
+
+                },
+            }).html(tooltipText);
+            const closeButton = attrd(tooltip.append('div'), {
+                class: Class.PinnedTooltipClose,
+                style: {
+                    position: 'absolute', top: '-8px', right: '-8px',
+                    width: '16px', height: '16px', borderRadius: '1000px',
+                    backgroundColor: 'black',
+                    border: 'solid black 1px',
+                },
+            })
+                .on('click', () => this.events.click.next(undefined));
+            attrd(closeButton.append('svg'), {
+                style: {
+                    position: 'absolute',
+                    width: '100%', height: '100%',
+                },
+            })
+                .attr('viewBox', '0 0 24 24')
+                .attr('preserveAspectRatio', 'none')
+                .append('path').attr('fill', 'white').attr('stroke', 'white').attr('d', 'M19,6.41 L17.59,5 L12,10.59 L6.41,5 L5,6.41 L10.59,12 L5,17.59 L6.41,19 L12,13.41 L17.59,19 L19,17.59 L13.41,12 L19,6.41 Z');
+
+            attrd(tooltip.append('svg'), {
+                style: {
+                    position: 'absolute',
+                    left: `${-this.visualParams.tooltipOffsetX}px`, bottom: `${this.visualParams.tooltipOffsetY}px`,
+                    width: `${Math.abs(this.visualParams.tooltipOffsetX) / 0.60}px`, height: `${Math.abs(this.visualParams.tooltipOffsetY) / 0.60}px`,
+                    zIndex: -1,
+                },
+            })
+                .attr('viewBox', '0 0 100 100')
+                .attr('preserveAspectRatio', 'none')
+                .append('path').attr('fill', 'black').attr('d', 'M0 100 L100 40 L60 0 Z');
+
+        } else {
+            this.pinnedTooltip = undefined;
+        }
+        this.updateTooltip(undefined);
+    }
+    private addPinnedTooltipBehavior() {
+        this.events.click.subscribe(pointed => this.updatePinnedTooltip(pointed));
+    }
+    private getTooltipPosition(e: MouseEvent) {
+        const left = `${(e.clientX ?? 0) + this.visualParams.tooltipOffsetX}px`;
+        const bottom = `${document.documentElement.clientHeight - (e.clientY ?? 0) - this.visualParams.tooltipOffsetY}px`;
+        return { left, bottom };
     }
 
     private showScrollingMessage() {
