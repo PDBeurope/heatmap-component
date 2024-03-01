@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+## [0.5.0] - 2024-03-01
+
 - Pinnable tooltips
 - Highlight column and row on hover
 - Zooming does not require Ctrl
