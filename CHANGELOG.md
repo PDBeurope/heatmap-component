@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file, following t
 ## [Unreleased]
 
 - Fixed tooltip placement bug (not moving when scrolling page)
+- Pinned tooltip moves on zoom/pan/resize
 
 ## [0.5.0] - 2024-03-01
 

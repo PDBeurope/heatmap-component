@@ -1,6 +1,8 @@
 import * as d3 from 'd3';
 
 
+export interface XY { x: number, y: number }
+
 export interface Box { xmin: number, ymin: number, xmax: number, ymax: number }
 
 export const Box = {
@@ -12,6 +14,9 @@ export const Box = {
     },
     height(box: Box): number {
         return box.ymax - box.ymin;
+    },
+    containsPoint(box: Box, point: XY): boolean {
+        return point.x >= box.xmin && point.x <= box.xmax && point.y >= box.ymin && point.y <= box.ymax;
     },
 };
 

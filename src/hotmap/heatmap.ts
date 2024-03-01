@@ -3,11 +3,11 @@ import { clamp, cloneDeep, isNil, merge, round } from 'lodash';
 import { BehaviorSubject } from 'rxjs';
 import { Data, Downsampling, getDataItem, makeRandomRawData } from './data';
 import { Domain } from './domain';
-import { Box, BoxSize, Boxes, Scales, scaleDistance } from './scales';
+import { Box, BoxSize, Boxes, Scales, XY, scaleDistance } from './scales';
 import { attrd, getSize, minimum, nextIfChanged } from './utils';
 
 
-// TODO: pinned tooltip must move with page when scrolling
+// TODO: click event should distinguish initial state and real click
 // TODO: style via CSS file, avoid inline styles
 // TODO: think in more depth what could happen when changing data type with filters, providers, etc. already set
 // TODO: downsample color instead of value
@@ -174,7 +174,8 @@ export class Heatmap<TX, TY, TItem> {
      * (higher value means more responsive but shittier visualization)
      * TODO try setting this dynamically, based on rendering times */
     private downsamplingPixelsPerRect = 4;
-    private pinnedTooltip?: [number, number] = [1, 1];
+    /** Position of the pinned tooltip, if any. In world coordinates, continuous. Use `Math.floor` to get column/row index. */
+    private pinnedTooltip?: XY = undefined;
     private readonly lastWheelEvent = { timestamp: 0, absDelta: 0, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false };
 
 
@@ -591,26 +592,26 @@ export class Heatmap<TX, TY, TItem> {
     private handleHover(event: MouseEvent | undefined) {
         const pointed = this.getPointedItem(event);
         nextIfChanged(this.events.hover, pointed, v => ({ ...v, sourceEvent: undefined }));
-        this.updateMarker(pointed);
-        this.updateTooltip(pointed);
+        this.drawMarkers(pointed);
+        this.drawTooltip(pointed);
     }
 
-    private updateMarker(pointed: ItemEventParam<TX, TY, TItem>) {
+    private drawMarkers(pointed: ItemEventParam<TX, TY, TItem>) {
         if (pointed) {
             const x = this.scales.worldToDom.x(pointed.xIndex);
             const y = this.scales.worldToDom.y(pointed.yIndex);
             const width = scaleDistance(this.scales.worldToDom.x, 1);
             const height = scaleDistance(this.scales.worldToDom.y, 1);
-            this.makeMarker(Class.Marker, { stroke: 'black', strokeWidth: 3, rx: 1, ry: 1, fill: 'none' }, {
+            this.addOrUpdateMarker(Class.Marker, { stroke: 'black', strokeWidth: 3, rx: 1, ry: 1, fill: 'none' }, {
                 x, y, width, height
             });
-            this.makeMarker(Class.MarkerX, { stroke: 'black', strokeWidth: 2, rx: 1, ry: 1, fill: 'none' }, {
+            this.addOrUpdateMarker(Class.MarkerX, { stroke: 'black', strokeWidth: 2, rx: 1, ry: 1, fill: 'none' }, {
                 x,
                 y: this.boxes.dom.ymin,
                 width,
                 height: Box.height(this.boxes.dom),
             });
-            this.makeMarker(Class.MarkerY, { stroke: 'black', strokeWidth: 2, rx: 1, ry: 1, fill: 'none' }, {
+            this.addOrUpdateMarker(Class.MarkerY, { stroke: 'black', strokeWidth: 2, rx: 1, ry: 1, fill: 'none' }, {
                 x: this.boxes.dom.xmin,
                 y,
                 width: Box.width(this.boxes.dom),
@@ -623,14 +624,14 @@ export class Heatmap<TX, TY, TItem> {
         }
     }
 
-    private makeMarker(className: string, staticAttrs: Parameters<typeof attrd>[1], dynamicAttrs: Parameters<typeof attrd>[1]) {
+    private addOrUpdateMarker(className: string, staticAttrs: Parameters<typeof attrd>[1], dynamicAttrs: Parameters<typeof attrd>[1]) {
         const marker = this.svg.selectAll('.' + className).data([1]);
         attrd(marker.enter().append('rect'), { class: className, ...staticAttrs, ...dynamicAttrs });
         attrd(marker, dynamicAttrs);
     }
 
-    private updateTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
-        const thisTooltipPinned = pointed && this.pinnedTooltip && pointed.xIndex === this.pinnedTooltip[0] && pointed.yIndex === this.pinnedTooltip[1];
+    private drawTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
+        const thisTooltipPinned = pointed && this.pinnedTooltip && pointed.xIndex === Math.floor(this.pinnedTooltip.x) && pointed.yIndex === Math.floor(this.pinnedTooltip.y);
         if (pointed && !thisTooltipPinned && this.tooltipProvider) {
             const tooltip = this.canvasDiv.selectAll('.' + Class.Tooltip).data([1]);
             const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
@@ -656,10 +657,10 @@ export class Heatmap<TX, TY, TItem> {
         }
     }
 
-    private updatePinnedTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
+    private drawPinnedTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
         this.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
         if (pointed && this.tooltipProvider) {
-            this.pinnedTooltip = [pointed.xIndex, pointed.yIndex];
+            this.pinnedTooltip = { x: this.scales.domToWorld.x(pointed.sourceEvent.offsetX), y: this.scales.domToWorld.y(pointed.sourceEvent.offsetY) };
             const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
             const tooltipText = this.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
 
@@ -716,31 +717,33 @@ export class Heatmap<TX, TY, TItem> {
                 .style('fill', 'black');
 
             // Remove any non-pinned tooltip
-            this.updateTooltip(undefined);
+            this.drawTooltip(undefined);
         } else {
             this.pinnedTooltip = undefined;
         }
     }
 
     private addPinnedTooltipBehavior() {
-        this.events.click.subscribe(pointed => this.updatePinnedTooltip(pointed));
-        this.events.zoom.subscribe(() => {
-            if (!this.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).empty()) {
-                this.events.click.next(undefined);
+        this.events.click.subscribe(pointed => this.drawPinnedTooltip(pointed));
+        const updatePinnedTooltipPosition = () => {
+            if (this.pinnedTooltip) {
+                const domPosition = {
+                    offsetX: this.scales.worldToDom.x(this.pinnedTooltip.x),
+                    offsetY: this.scales.worldToDom.y(this.pinnedTooltip.y),
+                };
+                attrd(this.canvasDiv.selectAll('.' + Class.PinnedTooltipBox), { style: this.getTooltipPosition(domPosition) });
             }
-        });
-        this.events.resize.subscribe(() => {
-            if (!this.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).empty()) {
-                this.events.click.next(undefined);
-            }
-        });
+        };
+        this.events.zoom.subscribe(updatePinnedTooltipPosition);
+        this.events.resize.subscribe(updatePinnedTooltipPosition);
     }
 
     /** Return tooltip position as CSS style parameters (for position:absolute within this.canvasDiv) for mouse event `e` triggered on this.svg.  */
-    private getTooltipPosition(e: MouseEvent) {
+    private getTooltipPosition(e: MouseEvent | { offsetX: number, offsetY: number }) {
         const left = `${(e.offsetX ?? 0) + this.visualParams.tooltipOffsetX}px`;
         const bottom = `${Box.height(this.boxes.dom) - (e.offsetY ?? 0) - this.visualParams.tooltipOffsetY}px`;
-        return { left, bottom };
+        const display = Box.containsPoint(this.boxes.dom, { x: e.offsetX, y: e.offsetY }) ? 'unset' : 'none';
+        return { left, bottom, display };
     }
 
     private showScrollingMessage() {
