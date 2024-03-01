@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file, following t
 
 - Pinnable tooltips
 - Highlight column and row on hover
+- Zooming does not require Ctrl
 
 ## [0.4.0] - 2024-02-23
 
