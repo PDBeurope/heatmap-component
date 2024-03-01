@@ -7,6 +7,7 @@ import { Box, BoxSize, Boxes, Scales, scaleDistance } from './scales';
 import { attrd, getSize, minimum, nextIfChanged } from './utils';
 
 
+// TODO: pinned tooltip must move with page when scrolling
 // TODO: style via CSS file, avoid inline styles
 // TODO: think in more depth what could happen when changing data type with filters, providers, etc. already set
 // TODO: downsample color instead of value
@@ -162,6 +163,7 @@ export class Heatmap<TX, TY, TItem> {
 
     private rootDiv: d3.Selection<HTMLDivElement, any, any, any>;
     private mainDiv: d3.Selection<HTMLDivElement, any, any, any>;
+    private canvasDiv: d3.Selection<HTMLDivElement, any, any, any>;
     private canvas: d3.Selection<HTMLCanvasElement, any, any, any>;
     private svg: d3.Selection<SVGSVGElement, any, any, any>;
     private readonly canvasInnerSize: BoxSize = { width: window.screen.width, height: window.screen.height }; // setting canvas size to screen size to avoid upscaling at any window size
@@ -217,15 +219,15 @@ export class Heatmap<TX, TY, TItem> {
             style: { position: 'relative', width: '100%', height: '100%' },
         });
 
-        const canvasDiv = attrd(this.mainDiv.append('div'), {
+        this.canvasDiv = attrd(this.mainDiv.append('div'), {
             class: Class.CanvasDiv,
             style: {
                 position: 'absolute',
-                left: '0px', right: '0px', top: '0px', bottom: '0px',
+                left: '20px', right: '20px', top: '20px', bottom: '20px', // debug TODO all 0px
             },
         });
 
-        this.canvas = attrd(canvasDiv.append('canvas'), {
+        this.canvas = attrd(this.canvasDiv.append('canvas'), {
             width: this.canvasInnerSize.width,
             height: this.canvasInnerSize.height,
             style: { position: 'absolute', width: '100%', height: '100%' },
@@ -249,7 +251,7 @@ export class Heatmap<TX, TY, TItem> {
             this.draw();
         });
 
-        this.svg = attrd(canvasDiv.append('svg'), {
+        this.svg = attrd(this.canvasDiv.append('svg'), {
             style: { position: 'absolute', width: '100%', height: '100%' },
         });
 
@@ -630,14 +632,14 @@ export class Heatmap<TX, TY, TItem> {
     private updateTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
         const thisTooltipPinned = pointed && this.pinnedTooltip && pointed.xIndex === this.pinnedTooltip[0] && pointed.yIndex === this.pinnedTooltip[1];
         if (pointed && !thisTooltipPinned && this.tooltipProvider) {
-            const tooltip = this.mainDiv.selectAll('.' + Class.Tooltip).data([1]);
+            const tooltip = this.canvasDiv.selectAll('.' + Class.Tooltip).data([1]);
             const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
             const tooltipText = this.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
             // Create tooltip if doesn't exist
             attrd(tooltip.enter().append('div'), {
                 class: Class.Tooltip,
                 style: {
-                    position: 'fixed',
+                    position: 'absolute',
                     ...tooltipPosition,
                     backgroundColor: 'white',
                     border: 'solid black 1px',
@@ -650,21 +652,22 @@ export class Heatmap<TX, TY, TItem> {
                 style: { ...tooltipPosition },
             }).html(tooltipText);
         } else {
-            this.mainDiv.selectAll('.' + Class.Tooltip).remove();
+            this.canvasDiv.selectAll('.' + Class.Tooltip).remove();
         }
     }
 
     private updatePinnedTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
-        this.mainDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
+        this.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
         if (pointed && this.tooltipProvider) {
             this.pinnedTooltip = [pointed.xIndex, pointed.yIndex];
             const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
             const tooltipText = this.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
 
-            const tooltip = attrd(this.mainDiv.append('div'), {
+            const tooltip = attrd(this.canvasDiv.append('div'), {
                 class: Class.PinnedTooltipBox,
-                style: { position: 'fixed', ...tooltipPosition },
+                style: { position: 'absolute', ...tooltipPosition, zIndex: 0 },
             });
+
             // Tooltip content
             attrd(tooltip.append('div'), {
                 class: Class.PinnedTooltipContent,
@@ -672,9 +675,9 @@ export class Heatmap<TX, TY, TItem> {
                     backgroundColor: 'white', border: 'solid black 1px',
                     paddingBlock: '0.35em', paddingInline: '0.7em',
                     boxShadow: '0px 5px 15px rgba(0,0,0,0.75)',
-
                 },
             }).html(tooltipText);
+
             // Tooltip close button
             const closeButton = attrd(tooltip.append('div'), {
                 class: Class.PinnedTooltipClose,
@@ -704,6 +707,7 @@ export class Heatmap<TX, TY, TItem> {
                     left: `${-this.visualParams.tooltipOffsetX}px`, bottom: `${this.visualParams.tooltipOffsetY}px`,
                     width: `${Math.abs(this.visualParams.tooltipOffsetX) / 0.6}px`, height: `${Math.abs(this.visualParams.tooltipOffsetY) / 0.6}px`,
                     zIndex: -1,
+                    pointerEvents: 'none',
                 },
             })
                 .attr('viewBox', '0 0 100 100')
@@ -721,20 +725,21 @@ export class Heatmap<TX, TY, TItem> {
     private addPinnedTooltipBehavior() {
         this.events.click.subscribe(pointed => this.updatePinnedTooltip(pointed));
         this.events.zoom.subscribe(() => {
-            if (!this.mainDiv.selectAll('.' + Class.PinnedTooltipBox).empty()) {
+            if (!this.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).empty()) {
                 this.events.click.next(undefined);
             }
         });
         this.events.resize.subscribe(() => {
-            if (!this.mainDiv.selectAll('.' + Class.PinnedTooltipBox).empty()) {
+            if (!this.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).empty()) {
                 this.events.click.next(undefined);
             }
         });
     }
 
+    /** Return tooltip position as CSS style parameters (for position:absolute within this.canvasDiv) for mouse event `e` triggered on this.svg.  */
     private getTooltipPosition(e: MouseEvent) {
-        const left = `${(e.clientX ?? 0) + this.visualParams.tooltipOffsetX}px`;
-        const bottom = `${document.documentElement.clientHeight - (e.clientY ?? 0) - this.visualParams.tooltipOffsetY}px`;
+        const left = `${(e.offsetX ?? 0) + this.visualParams.tooltipOffsetX}px`;
+        const bottom = `${Box.height(this.boxes.dom) - (e.offsetY ?? 0) - this.visualParams.tooltipOffsetY}px`;
         return { left, bottom };
     }
 
