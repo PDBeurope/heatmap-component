@@ -33,6 +33,10 @@ const MIN_ZOOMED_DATAPOINTS_HARD = 1;
 /** Avoid zooming to things like 0.4999999999999998 */
 const ZOOM_EVENT_ROUNDING_PRECISION = 9;
 
+const ZOOM_REQUIRE_CTRL = false;
+const ZOOM_SENSITIVITY = 1;
+const PAN_SENSITIVITY = 0.6;
+
 
 export type DataDescription<TX, TY, TItem> = {
     xDomain: TX[],
@@ -166,6 +170,7 @@ export class Heatmap<TX, TY, TItem> {
      * TODO try setting this dynamically, based on rendering times */
     private downsamplingPixelsPerRect = 4;
     private pinnedTooltip?: [number, number] = [1, 1];
+    private readonly lastWheelEvent = { timestamp: 0, absDelta: 0, ctrlKey: false, shiftKey: false };
 
 
     static create(): Heatmap<number, number, number>
@@ -174,7 +179,7 @@ export class Heatmap<TX, TY, TItem> {
         if (data !== undefined) {
             return new this(data);
         } else {
-            return new this(makeRandomData(200, 20));
+            return new this(makeRandomData(2000, 20));
         }
     }
 
@@ -412,10 +417,18 @@ export class Heatmap<TX, TY, TItem> {
         this.zoomBehavior = d3.zoom();
         this.zoomBehavior.filter(e => {
             if (e instanceof WheelEvent) {
-                return e.ctrlKey && !e.shiftKey && Math.abs(e.deltaY) > Math.abs(e.deltaX);
-            } else {
-                return true;
+                if (ZOOM_REQUIRE_CTRL && !this.lastWheelEvent.ctrlKey) return false;
+                if (this.lastWheelEvent.shiftKey) return false; // Pan instead
+                if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return false; // Not a predominanly-vertical scroll (-> pan or ignore)
             }
+            return true;
+        });
+        // const defaultWheelDelta = this.zoomBehavior.wheelDelta() as any;
+        // this.zoomBehavior.wheelDelta(e => ZOOM_SENSITIVITY * defaultWheelDelta(e));
+        this.zoomBehavior.wheelDelta(event => {
+            // Default function is: -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002) * (event.ctrlKey ? 10 : 1)
+            const speedup = ZOOM_REQUIRE_CTRL ? 1 : (event.ctrlKey ? 10 : 1);
+            return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002) * speedup * ZOOM_SENSITIVITY;
         });
         this.zoomBehavior.on('zoom', e => {
             this.boxes.visWorld = this.zoomTransformToVisWorld(e.transform);
@@ -745,27 +758,37 @@ export class Heatmap<TX, TY, TItem> {
         }).text('Press Ctrl and scroll to apply zoom');
         setTimeout(() => overlay.remove(), 750);
     }
-
     private readonly handlers = {
         mousemove: (e: MouseEvent) => this.handleHover(e),
         mouseleave: (e: MouseEvent) => this.handleHover(undefined),
         click: (e: MouseEvent) => this.events.click.next(this.getPointedItem(e)),
         wheel: (e: WheelEvent) => {
-            e.preventDefault();
+            console.log(e.deltaMode, 'wheel', e.deltaX, e.deltaY)
+            e.preventDefault(); // TODO ???
+
+            // Magic to handle touchpad scrolling on Mac (when user lifts fingers from touchpad, but the browser is still getting wheel events)
+            const now = Date.now();
+            const absDelta = Math.max(Math.abs(e.deltaX), Math.abs(e.deltaY));
+            if (now > this.lastWheelEvent.timestamp + 150 || absDelta > this.lastWheelEvent.absDelta + 1) {
+                // Starting a new gesture
+                this.lastWheelEvent.ctrlKey = e.ctrlKey;
+                this.lastWheelEvent.shiftKey = e.shiftKey;
+            }
+            this.lastWheelEvent.timestamp = now;
+            this.lastWheelEvent.absDelta = absDelta;
+
             // Interpret horizontal scroll (and vertical with Shift key) as panning
             if (!this.zoomBehavior) return;
             const isHorizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
-            const isVertical = Math.abs(e.deltaX) < Math.abs(e.deltaY);
-            // ignoring cases when Math.abs(e.deltaX) === Math.abs(e.deltaY)
-            const translation = isHorizontal ? e.deltaX : (e.shiftKey && isVertical) ? e.deltaY : 0;
+            const isVertical = Math.abs(e.deltaX) < Math.abs(e.deltaY); // ignoring cases when Math.abs(e.deltaX) === Math.abs(e.deltaY)
+            const translation = isHorizontal ? e.deltaX : (this.lastWheelEvent.shiftKey && isVertical) ? e.deltaY : 0;
             if (translation !== 0) {
-                const shift = scaleDistance(this.scales.domToWorld.x, -translation);
-                this.zoomBehavior.translateBy(this.svg as any, shift, 0);
-            } else if (isVertical && !e.ctrlKey && Math.abs(e.deltaY) >= 10) {
+                const shift = PAN_SENSITIVITY * scaleDistance(this.scales.domToWorld.x, -translation);
+                this.zoomBehavior.duration(1000).translateBy(this.svg as any, shift, 0);
+            } else if (isVertical && (ZOOM_REQUIRE_CTRL && !this.lastWheelEvent.ctrlKey) && Math.abs(e.deltaY) >= 10) {
                 this.showScrollingMessage();
             }
-            // TODO: relatively scale events from touchpad and wheel
-            // TODO: use e.shiftKey and e.ctrlKey from the beginning of the gesture
+            // TODO: relatively scale events from touchpad and wheel (that might be not worth it, according to https://github.com/w3c/uievents/issues/337)
         },
     } satisfies Record<string, (e: any) => any>;
 }

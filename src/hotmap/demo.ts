@@ -5,7 +5,7 @@ import { Heatmap, formatDataItem } from './heatmap';
 export function demo(divElementOrId: HTMLDivElement | string) {
     const hm = Heatmap.create(); // Heatmap<number, number, number>
     hm.render(divElementOrId);
-    hm.setFilter(d => d > 0.1);
+    // hm.setFilter(d => d > 0.1);
     // setTimeout(()=> hm.setFilter(undefined), 2000);
 }
 
