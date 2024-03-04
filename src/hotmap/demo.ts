@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
 import { Heatmap, formatDataItem } from './heatmap';
+import { downsamplingGoal, debugPrintDownscalingRoute2D } from './downscaling2d';
 
 
 export function demo(divElementOrId: HTMLDivElement | string) {
@@ -10,6 +11,9 @@ export function demo(divElementOrId: HTMLDivElement | string) {
 }
 
 export function demo2(divElementOrId: HTMLDivElement | string) {
+    // foo({ x: 8, y: 8 }, { x: 8, y: 3e6 });
+    const nData = 1000, nPixels = 200;
+    console.log(nData, nPixels, '->', downsamplingGoal(nData, nPixels));
     // for (const arr of [[], [1], [1, 1], [1, 2], [1, 0], [1, 1, 2], [1, 1, 0],
     // [1,2,3],[1,5,9,45,120],[1,2,3,5,4,6,7], [7,6,5,4,3,2,1]]) {
     //     console.log('sort', sortDirection(arr), arr)

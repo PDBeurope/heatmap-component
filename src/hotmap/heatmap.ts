@@ -224,7 +224,7 @@ export class Heatmap<TX, TY, TItem> {
             class: Class.CanvasDiv,
             style: {
                 position: 'absolute',
-                left: '20px', right: '20px', top: '20px', bottom: '20px', // debug TODO all 0px
+                left: '0px', right: '0px', top: '0px', bottom: '0px',
             },
         });
 
