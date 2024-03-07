@@ -38,7 +38,17 @@ export function debugPrintDownscalingRoute2D(wanted: XY, original: XY) {
 
 type ResolutionString = `${number}x${number}`
 
+
+export interface Image {
+    nColumns: number,
+    nRows: number,
+    /** Pixels saved in 4-tuples (alpha, red*alpha, green*alpha, blue*alpha) */
+    items: Float32Array,
+}
+
 type DownsamplingMode = 'number' | 'color'
+type DataType<M extends DownsamplingMode> = M extends 'color' ? Image : Data<number>
+
 export type Downsampling2D<TMode extends DownsamplingMode = DownsamplingMode> = {
     mode: TMode,
     /** Column count of the original data */
@@ -46,7 +56,7 @@ export type Downsampling2D<TMode extends DownsamplingMode = DownsamplingMode> = 
     /** Rows count of the original data */
     nRows: number,
     /** Downsampled version of the original data (index {nColumn}x{nRows} holds the original data) */
-    downsampled: { [resolution: ResolutionString]: Data<number> }
+    downsampled: { [resolution: ResolutionString]: DataType<TMode> }
 }
 
 function resolutionString(resolution: XY): ResolutionString {
@@ -59,17 +69,17 @@ export function createNumberDownsampling(data: Data<number>): Downsampling2D<'nu
     set(result, { x: data.nColumns, y: data.nRows }, data);
     return result;
 }
-export function createColorDownsampling(data: Data<number>): Downsampling2D<'color'> {
+export function createColorDownsampling(data: Image): Downsampling2D<'color'> {
     const result: Downsampling2D<'color'> = { mode: 'color', nColumns: data.nColumns, nRows: data.nRows, downsampled: {} };
     // TODO convert data to Float32Array here?
     set(result, { x: data.nColumns, y: data.nRows }, data);
     return result;
 }
 
-function get(downsampling: Downsampling2D, resolution: XY): Data<number> | undefined {
+function get<M extends DownsamplingMode>(downsampling: Downsampling2D<M>, resolution: XY): DataType<M> | undefined {
     return downsampling.downsampled[resolutionString(resolution)];
 }
-function set(downsampling: Downsampling2D, resolution: XY, value: Data<number>): undefined {
+function set<M extends DownsamplingMode>(downsampling: Downsampling2D<M>, resolution: XY, value: DataType<M>): undefined {
     downsampling.downsampled[resolutionString(resolution)] = value;
 }
 
@@ -85,7 +95,7 @@ export function downsamplingTarget(nDatapoints: number, nPixels: number): number
 }
 
 
-export function getDownsampledData(downsampling: Downsampling2D, minResolution: XY): Data<number> {
+export function getDownsampledData<M extends DownsamplingMode>(downsampling: Downsampling2D<M>, minResolution: XY): DataType<M> {
     // console.log('getDownsampledData', resolutionString(minResolution))
     const targetResolution: XY = {
         x: downsamplingTarget(downsampling.nColumns, minResolution.x),
@@ -95,27 +105,25 @@ export function getDownsampledData(downsampling: Downsampling2D, minResolution: 
 
 }
 
-function getOrCompute(downsampling: Downsampling2D, resolution: XY): Data<number> {
+function getOrCompute<M extends DownsamplingMode>(downsampling: Downsampling2D<M>, resolution: XY): DataType<M> {
     // console.log('getOrCompute', resolutionString(resolution))
+    type TM = (typeof downsampling)['mode']
     const cached = get(downsampling, resolution);
     if (cached) {
         return cached;
     } else {
         const srcResolution = downscaleSource2D(resolution, { x: downsampling.nColumns, y: downsampling.nRows });
         if (!srcResolution || srcResolution.x > downsampling.nColumns || srcResolution.y > downsampling.nRows) throw new Error('AssertionError');
-        const srcData = getOrCompute(downsampling, srcResolution);
+        const srcData: DataType<M> = getOrCompute(downsampling, srcResolution);
         // console.time(`step ${srcResolution.x} -> ${resolution.x}`)
-        const result = downsample(downsampling.mode, srcData, resolution);
+        const result = (downsampling.mode === 'color' ? downsampleXY_RGBA(srcData as DataType<'color'>, resolution) : downsample(srcData as DataType<'number'>, resolution)) as DataType<M>;
         // console.timeEnd(`step ${srcResolution.x} -> ${resolution.x}`)
         set(downsampling, resolution, result);
         return result;
     }
 }
 
-function downsample(mode: DownsamplingMode, data: Data<number>, targetResolution: XY): Data<number> {
-    if (mode==='color'){
-        return downsampleXY_RGBA(data, targetResolution);
-    }
+function downsample(data: Data<number>, targetResolution: XY): Data<number> {
     // return downsampleXY(data, targetResolution);
     const x = data.nColumns;
     const y = data.nRows;
@@ -242,31 +250,33 @@ function toArray(arr: ArrayLike<number>): number[] {
 }
 
 /** Up- or down-sample image to a new size. */
-function downsampleXY_RGBA(input: Data<number>, newSize: { x: number, y: number }): Data<number> {
+function downsampleXY_RGBA(input: Image, newSize: { x: number, y: number }): Image {
     console.time('downsampleXY_RGBA')
     const w0 = input.nColumns;
     const h0 = input.nRows;
     const w1 = newSize.x;
     const h1 = newSize.y;
-    console.log('input', input)
     const nChannels = Math.floor(input.items.length / (h0 * w0));
-    console.log('nChannels', nChannels)
-    // if (nChannels !== 1) throw new Error('NotImplementedError: multiple channels');
+    if (nChannels !== 4) throw new Error('AssertionError: number of channels must be 4');
     const y = resamplingCoefficients(h0, h1);
     const x = resamplingCoefficients(w0, w1);
     const out = new Float32Array(h1 * w1 * nChannels); // Use better precision here to avoid rounding errors when summing many small numbers
     for (let i = 0; i < y.from.length; i++) { // row index
         for (let j = 0; j < x.from.length; j++) { // column index
-            for (let c = 0; c < nChannels; c++) { // channel index
-                const inputValue = input.items[(y.from[i] * w0 + x.from[j]) * nChannels + c];
-                if (inputValue === undefined) throw new Error('NotImplementedError: undefined values in data'); // TODO also treat NaN and Infs specially
-                out[(y.to[i] * w1 + x.to[j]) * nChannels + c] += inputValue * y.weight[i] * x.weight[j];
-                // TODO alpha-channel must be treated in a special way
-            }
+            const fromOffset = (y.from[i] * w0 + x.from[j]) * nChannels;
+            const toOffset = (y.to[i] * w1 + x.to[j]) * nChannels;
+            const weight = y.weight[i] * x.weight[j];
+            const a = input.items[fromOffset] as number;
+            const ra = input.items[fromOffset + 1] as number;
+            const ga = input.items[fromOffset + 2] as number;
+            const ba = input.items[fromOffset + 3] as number;
+            out[toOffset] += a * weight;
+            out[toOffset + 1] += ra * weight;
+            out[toOffset + 2] += ga * weight;
+            out[toOffset + 3] += ba * weight;
         }
     }
-    const result: Data<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true }; // TODO: do not force conversion to Array, keep Float32Array or whatever 
-    console.log('result', result)
+    const result: Image = { nColumns: w1, nRows: h1, items: out }; // TODO: do not force conversion to Array, keep Float32Array or whatever 
     console.timeEnd('downsampleXY_RGBA')
     return result; // TODO: do not force conversion to Array, keep Float32Array or whatever 
 }
@@ -301,7 +311,7 @@ function downsampleXY_multichannel(input: Data<number>, newSize: { x: number, y:
  * Sum of weights contributed to each new pixel must be equal to 1.
  * To use for 2D images, calculate row-wise and column-wise weights and multiply them. */
 function resamplingCoefficients(nOld: number, nNew: number) {
-    console.time(`resamplingCoefficients ${nOld}->${nNew}`)
+    // console.time(`resamplingCoefficients ${nOld}->${nNew}`)
     const scale = nNew / nOld;
     let i = 0;
     let j = 0;
@@ -329,7 +339,7 @@ function resamplingCoefficients(nOld: number, nNew: number) {
             j += 1;
         }
     }
-    console.timeEnd(`resamplingCoefficients ${nOld}->${nNew}`)
+    // console.timeEnd(`resamplingCoefficients ${nOld}->${nNew}`)
     return {
         /** Index of a pixel in the old image */
         from,

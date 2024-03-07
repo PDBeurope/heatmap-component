@@ -5,7 +5,7 @@ import { Data, Downsampling, getDataItem, makeRandomRawData } from './data';
 import { Domain } from './domain';
 import { Box, BoxSize, Boxes, Scales, XY, scaleDistance } from './scales';
 import { attrd, getSize, minimum, nextIfChanged } from './utils';
-import { Downsampling2D, createNumberDownsampling, createColorDownsampling, getDownsampledData } from './downscaling2d';
+import { Downsampling2D, createNumberDownsampling, createColorDownsampling, getDownsampledData, Image } from './downscaling2d';
 
 
 // TODO: click event should distinguish initial state and real click
@@ -187,8 +187,8 @@ export class Heatmap<TX, TY, TItem> {
         if (data !== undefined) {
             return new this(data);
         } else {
-            return new this(makeRandomData(2000, 20));
-            // return new this(makeRandomData(2e5, 20));
+            // return new this(makeRandomData(2000, 20));
+            return new this(makeRandomData(2e5, 20));
         }
     }
 
@@ -208,10 +208,10 @@ export class Heatmap<TX, TY, TItem> {
 
     /** Render this heatmap in the given DIV element */
     render(divElementOrId: HTMLDivElement | string): this {
-        console.time('Get all colors')
-        const colorArray = this.getColorArray();
-        console.timeEnd('Get all colors')
-        console.log('color:', d3.color('rgba(500,50,50,0.5)')?.formatHex());
+        // console.time('Get all colors')
+        // const colorArray = this.getColorArray();
+        // console.timeEnd('Get all colors')
+        // console.log('color:', d3.color('rgba(500,50,50,0.5)')?.formatHex());
 
         if (this.rootDiv) {
             console.error(`This ${this.constructor.name} has already been rendered in element`, this.rootDiv.node());
@@ -279,7 +279,7 @@ export class Heatmap<TX, TY, TItem> {
         return this;
     }
 
-    private getColorArray(): Data<number> {
+    private getColorArray(): Image {
         console.time('get all colors')
         const colArr = new Float32Array(this.data.nRows * this.data.nColumns * 4);
         for (let iy = 0; iy < this.data.nRows; iy++) {
@@ -291,13 +291,13 @@ export class Heatmap<TX, TY, TItem> {
                 // if (ix===0) console.log(color)
                 const offset = (iy * this.data.nColumns + ix) * 4;
                 colArr[offset] = color.opacity;
-                colArr[offset + 1] = color.r;
-                colArr[offset + 2] = color.g;
-                colArr[offset + 3] = color.b;
+                colArr[offset + 1] = color.r * color.opacity;
+                colArr[offset + 2] = color.g * color.opacity;
+                colArr[offset + 3] = color.b * color.opacity;
             }
         }
         console.timeEnd('get all colors')
-        return { nColumns: this.data.nColumns, nRows: this.data.nRows, items: colArr, isNumeric: true };
+        return { nColumns: this.data.nColumns, nRows: this.data.nRows, items: colArr };
     }
     private emitResize() {
         if (!this.canvas) return;
@@ -405,7 +405,9 @@ export class Heatmap<TX, TY, TItem> {
         const colTo = Math.ceil(this.boxes.visWorld.xmax); // exclusive
         const downsamplingCoefficient = Downsampling.downsamplingCoefficient(colTo - colFrom, xResolution);
         this.downsampling2dColor ??= createColorDownsampling(this.getColorArray());
+        console.time('downsample')
         const downsampledColors = getDownsampledData(this.downsampling2dColor, { x: xResolution * Box.width(this.boxes.wholeWorld) / (Box.width(this.boxes.visWorld)), y: this.data.nRows });
+        console.timeEnd('downsample')
         return this.drawTheseColors(downsampledColors, this.data.nColumns / downsampledColors.nColumns);
         // if (this.downsampling2d && !this.filter) {
         //     // return this.drawTheseData(Downsampling.getDownsampled(this.downsampling, downsamplingCoefficient), downsamplingCoefficient);
@@ -443,7 +445,7 @@ export class Heatmap<TX, TY, TItem> {
         }
     }
 
-    private drawTheseColors(colors: Data<number>, xScale: number) {
+    private drawTheseColors(colors: Image, xScale: number) {
         console.log('drawTheseColors')
         if (!this.rootDiv) return;
         // this.ctx.resetTransform(); this.ctx.scale(scale, 1);
@@ -455,17 +457,21 @@ export class Heatmap<TX, TY, TItem> {
         const colFrom = Math.floor(this.boxes.visWorld.xmin / xScale);
         const colTo = Math.ceil(this.boxes.visWorld.xmax / xScale); // exclusive
 
-        const { nRows, nColumns, items } = colors;
-        console.log('colors', colors)
+        const { nRows, nColumns } = colors;
+        const items = colors.items as ArrayLike<number>;
 
         for (let iy = 0; iy < nRows; iy++) {
             for (let ix = colFrom; ix < colTo; ix++) {
                 if (ix < 0 || ix >= nColumns || iy < 0 || iy >= nRows) continue;
                 const offset = (nColumns * iy + ix) * 4;
-                // const col = [items[offset + 1], items[offset + 2], items[offset + 3], items[offset]]
-                // if (ix===0) console.log('col', ...col)
-                this.ctx.fillStyle = `rgba(${items[offset + 1]},${items[offset + 2]},${items[offset + 3]},${items[offset]})`;
-                // this.ctx.fillStyle = `rgba(255,50,50,0.5)`;
+                const a = items[offset];
+                const invA = a > 0 ? 1 / a : 0;
+                const r = invA * items[offset + 1];
+                const g = invA * items[offset + 2];
+                const b = invA * items[offset + 3];
+                const rgba = `rgba(${r},${g},${b},${a})`;
+                this.ctx.fillStyle = rgba;
+                // if (ix === 0) console.log('col', a, r, g, b, rgba, this.ctx.fillStyle)
                 const x = this.scales.worldToCanvas.x(ix * xScale);
                 const y = this.scales.worldToCanvas.y(iy);
                 this.ctx.fillRect(x + xHalfGap, y + yHalfGap, width - 2 * xHalfGap, height - 2 * yHalfGap);
