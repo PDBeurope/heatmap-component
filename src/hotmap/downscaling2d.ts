@@ -77,7 +77,7 @@ export function downsamplingTarget(nDatapoints: number, nPixels: number): number
 
 
 export function getDownsampledData<TItem extends number>(downsampling: Downsampling2D<TItem>, minResolution: XY): Data<TItem> {
-    console.log('getDownsampledData', resolutionString(minResolution))
+    // console.log('getDownsampledData', resolutionString(minResolution))
     const targetResolution: XY = {
         x: downsamplingTarget(downsampling.nColumns, minResolution.x),
         y: downsamplingTarget(downsampling.nRows, minResolution.y),

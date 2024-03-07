@@ -6,6 +6,7 @@ import { makeRandomRawData } from './data';
 
 export function demo(divElementOrId: HTMLDivElement | string) {
     const hm = Heatmap.create(); // Heatmap<number, number, number>
+    hm.setVisualParams({ xGapPixels: 0, yGapPixels: 0 });
     hm.render(divElementOrId);
     // hm.setFilter(d => d > 0.1);
     // setTimeout(()=> hm.setFilter(undefined), 2000);

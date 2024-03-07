@@ -5,6 +5,7 @@ import { Data, Downsampling, getDataItem, makeRandomRawData } from './data';
 import { Domain } from './domain';
 import { Box, BoxSize, Boxes, Scales, XY, scaleDistance } from './scales';
 import { attrd, getSize, minimum, nextIfChanged } from './utils';
+import { Downsampling2D, create, getDownsampledData } from './downscaling2d';
 
 
 // TODO: click event should distinguish initial state and real click
@@ -143,7 +144,8 @@ export const DefaultVisualParams = {
 export class Heatmap<TX, TY, TItem> {
     private originalData: DataDescription<TX, TY, TItem>;
     private data: Data<TItem>;
-    private downsampling: TItem extends number ? Downsampling<TItem> : undefined;
+    // private downsampling: TItem extends number ? Downsampling<TItem> : undefined;
+    private downsampling2d: TItem extends number ? Downsampling2D<TItem> : undefined;
     private xDomain: Domain<TX>;
     private yDomain: Domain<TY>;
     private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
@@ -173,7 +175,7 @@ export class Heatmap<TX, TY, TItem> {
     /** Approximate width of a rectangle in pixels, when showing downsampled data.
      * (higher value means more responsive but shittier visualization)
      * TODO try setting this dynamically, based on rendering times */
-    private downsamplingPixelsPerRect = 4;
+    private downsamplingPixelsPerRect = 10;
     /** Position of the pinned tooltip, if any. In world coordinates, continuous. Use `Math.floor` to get column/row index. */
     private pinnedTooltip?: XY = undefined;
     private readonly lastWheelEvent = { timestamp: 0, absDelta: 0, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false };
@@ -185,7 +187,8 @@ export class Heatmap<TX, TY, TItem> {
         if (data !== undefined) {
             return new this(data);
         } else {
-            return new this(makeRandomData(2000, 20));
+            // return new this(makeRandomData(2000, 20));
+            return new this(makeRandomData(2e5, 20));
         }
     }
 
@@ -281,9 +284,9 @@ export class Heatmap<TX, TY, TItem> {
     private setRawData(data: Data<TItem>): this {
         this.data = data;
         if (typeof data.items[0] === 'number') {
-            (this as unknown as Heatmap<any, any, number>).downsampling = Downsampling.create(data as Data<number>);
+            (this as unknown as Heatmap<any, any, number>).downsampling2d = create(data as Data<number>);
         } else {
-            (this as Heatmap<any, any, Exclude<any, number>>).downsampling = undefined;
+            (this as Heatmap<any, any, Exclude<any, number>>).downsampling2d = undefined;
         }
         // TODO update world and visWorld
         this.draw();
@@ -374,30 +377,32 @@ export class Heatmap<TX, TY, TItem> {
         const colFrom = Math.floor(this.boxes.visWorld.xmin);
         const colTo = Math.ceil(this.boxes.visWorld.xmax); // exclusive
         const downsamplingCoefficient = Downsampling.downsamplingCoefficient(colTo - colFrom, xResolution);
-        if (this.downsampling && !this.filter) {
-            return this.drawTheseData(Downsampling.getDownsampled(this.downsampling, downsamplingCoefficient), downsamplingCoefficient);
+        if (this.downsampling2d && !this.filter) {
+            // return this.drawTheseData(Downsampling.getDownsampled(this.downsampling, downsamplingCoefficient), downsamplingCoefficient);
+            const downsampled = getDownsampledData(this.downsampling2d, { x: xResolution * Box.width(this.boxes.wholeWorld) / (Box.width(this.boxes.visWorld)), y: this.data.nRows });
+            return this.drawTheseData(downsampled, this.data.nColumns / downsampled.nColumns);
         } else {
             return this.drawTheseData(this.data, 1);
         }
     }
 
-    private drawTheseData(data: Data<TItem>, scale: number) {
+    private drawTheseData(data: Data<TItem>, xScale: number) {
         if (!this.rootDiv) return;
         // this.ctx.resetTransform(); this.ctx.scale(scale, 1);
         this.ctx.clearRect(0, 0, this.canvasInnerSize.width, this.canvasInnerSize.height);
-        const width = scaleDistance(this.scales.worldToCanvas.x, 1) * scale;
+        const width = scaleDistance(this.scales.worldToCanvas.x, 1) * xScale;
         const height = scaleDistance(this.scales.worldToCanvas.y, 1);
-        const xHalfGap = scale === 1 ? 0.5 * this.getXGap(width) : 0;
+        const xHalfGap = xScale === 1 ? 0.5 * this.getXGap(width) : 0;
         const yHalfGap = 0.5 * this.getYGap(height);
-        const colFrom = Math.floor(this.boxes.visWorld.xmin / scale);
-        const colTo = Math.ceil(this.boxes.visWorld.xmax / scale); // exclusive
+        const colFrom = Math.floor(this.boxes.visWorld.xmin / xScale);
+        const colTo = Math.ceil(this.boxes.visWorld.xmax / xScale); // exclusive
 
         for (let iy = 0; iy < data.nRows; iy++) {
             for (let ix = colFrom; ix < colTo; ix++) {
                 const item = getDataItem(data, ix, iy);
                 if (item === undefined) continue;
                 this.ctx.fillStyle = this.colorProvider(item, this.xDomain.values[ix], this.yDomain.values[iy], ix, iy);
-                const x = this.scales.worldToCanvas.x(ix * scale);
+                const x = this.scales.worldToCanvas.x(ix * xScale);
                 const y = this.scales.worldToCanvas.y(iy);
                 this.ctx.fillRect(x + xHalfGap, y + yHalfGap, width - 2 * xHalfGap, height - 2 * yHalfGap);
             }
@@ -428,7 +433,6 @@ export class Heatmap<TX, TY, TItem> {
             return action.kind === 'zoom' ? ZOOM_SENSITIVITY * action.delta : 0;
         });
         this.zoomBehavior.on('zoom', e => {
-            console.log('zoom')
             this.boxes.visWorld = this.zoomTransformToVisWorld(e.transform);
             this.scales = Scales(this.boxes);
             this.handleHover(e.sourceEvent);
