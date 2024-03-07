@@ -1,15 +1,17 @@
 import * as d3 from 'd3';
 import { Heatmap, formatDataItem } from './heatmap';
-import { downsamplingTarget, debugPrintDownscalingRoute2D, getDownsampledData, create } from './downscaling2d';
+import { downsamplingTarget, debugPrintDownscalingRoute2D, getDownsampledData, createNumberDownsampling } from './downscaling2d';
 import { makeRandomRawData } from './data';
 
 
 export function demo(divElementOrId: HTMLDivElement | string) {
     const hm = Heatmap.create(); // Heatmap<number, number, number>
     hm.setVisualParams({ xGapPixels: 0, yGapPixels: 0 });
+    // hm.setColor(d=>'red')
     hm.render(divElementOrId);
     // hm.setFilter(d => d > 0.1);
     // setTimeout(()=> hm.setFilter(undefined), 2000);
+    (window as any).hm = hm;
 }
 
 export function demo2(divElementOrId: HTMLDivElement | string) {
@@ -17,7 +19,7 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
     const nData = 1000, nPixels = 200;
     console.log(nData, nPixels, '->', downsamplingTarget(nData, nPixels));
     const data = makeRandomRawData(1000, 1000);
-    const cache = create(data);
+    const cache = createNumberDownsampling(data);
     const downsampled = getDownsampledData(cache, { x: 20, y: 1000 });
     console.log('result:', downsampled.nColumns, 'x', downsampled.nRows)
     // for (const arr of [[], [1], [1, 1], [1, 2], [1, 0], [1, 1, 2], [1, 1, 0],
