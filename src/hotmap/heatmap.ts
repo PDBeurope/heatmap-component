@@ -208,6 +208,23 @@ export class Heatmap<TX, TY, TItem> {
 
     /** Render this heatmap in the given DIV element */
     render(divElementOrId: HTMLDivElement | string): this {
+        // console.time('get all colors')
+        // const colArr = new Uint8ClampedArray(this.data.nRows * this.data.nColumns * 4);
+        // for (let iy = 0; iy < this.data.nRows; iy++) {
+        //     for (let ix = 0; ix < this.data.nColumns; ix++) {
+        //         const item = getDataItem(this.data, ix, iy);
+        //         if (item === undefined) continue;
+        //         const color = d3.color(this.colorProvider(item, this.xDomain.values[ix], this.yDomain.values[iy], ix, iy)) as d3.RGBColor;
+        //         const offset = (iy * this.data.nColumns + ix) * 4;
+        //         colArr[offset] = color.opacity * 255;
+        //         colArr[offset + 1] = color.r;
+        //         colArr[offset + 2] = color.g;
+        //         colArr[offset + 3] = color.b;
+        //     }
+        // }
+        // console.timeEnd('get all colors')
+        // console.log('color:', d3.color('rgba(500,50,50,0.5)')?.formatHex());
+
         if (this.rootDiv) {
             console.error(`This ${this.constructor.name} has already been rendered in element`, this.rootDiv.node());
             throw new Error(`This ${this.constructor.name} has already been rendered. Cannot render again.`);
@@ -379,7 +396,10 @@ export class Heatmap<TX, TY, TItem> {
         const downsamplingCoefficient = Downsampling.downsamplingCoefficient(colTo - colFrom, xResolution);
         if (this.downsampling2d && !this.filter) {
             // return this.drawTheseData(Downsampling.getDownsampled(this.downsampling, downsamplingCoefficient), downsamplingCoefficient);
+            console.log('draw')
+            console.time('downsample')
             const downsampled = getDownsampledData(this.downsampling2d, { x: xResolution * Box.width(this.boxes.wholeWorld) / (Box.width(this.boxes.visWorld)), y: this.data.nRows });
+            console.timeEnd('downsample')
             return this.drawTheseData(downsampled, this.data.nColumns / downsampled.nColumns);
         } else {
             return this.drawTheseData(this.data, 1);

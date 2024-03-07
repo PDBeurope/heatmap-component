@@ -5,7 +5,7 @@ import { IsNumeric } from './utils';
 export interface Data<TItem> {
     nColumns: number,
     nRows: number,
-    items: (TItem | undefined)[],
+    items: ArrayLike<TItem | undefined>,
     isNumeric: IsNumeric<TItem>,
 }
 
@@ -82,6 +82,6 @@ function halve<TItem extends number>(data: Data<TItem>): Data<TItem> {
             newValues[j * newColumns + newColumns - 1] = val;
         }
     }
-    return { nColumns: newColumns, nRows: newRows, items: newValues } as Data<TItem>;
+    return { nColumns: newColumns, nRows: newRows, items: newValues as unknown as ArrayLike<TItem>, isNumeric: true } as Data<TItem>;
 }
 
