@@ -24,7 +24,7 @@ function downscaleSource2D(wanted: XY, original: XY): XY | undefined {
         return {
             x: Math.min(2 * wanted.x, original.x),
             y: wanted.y,
-        }
+        };
     }
 }
 
@@ -65,13 +65,11 @@ function resolutionString(resolution: XY): ResolutionString {
 
 export function createNumberDownsampling(data: Data<number>): Downsampling2D<'number'> {
     const result: Downsampling2D<'number'> = { mode: 'number', nColumns: data.nColumns, nRows: data.nRows, downsampled: {} };
-    // TODO convert data to Float32Array here?
     set(result, { x: data.nColumns, y: data.nRows }, data);
     return result;
 }
 export function createColorDownsampling(data: Image): Downsampling2D<'color'> {
     const result: Downsampling2D<'color'> = { mode: 'color', nColumns: data.nColumns, nRows: data.nRows, downsampled: {} };
-    // TODO convert data to Float32Array here?
     set(result, { x: data.nColumns, y: data.nRows }, data);
     return result;
 }
@@ -107,7 +105,6 @@ export function getDownsampledData<M extends DownsamplingMode>(downsampling: Dow
 
 function getOrCompute<M extends DownsamplingMode>(downsampling: Downsampling2D<M>, resolution: XY): DataType<M> {
     // console.log('getOrCompute', resolutionString(resolution))
-    type TM = (typeof downsampling)['mode']
     const cached = get(downsampling, resolution);
     if (cached) {
         return cached;
@@ -189,7 +186,7 @@ function downsampleX(input: Data<number>, newSize: { x: number, y: number }): Da
     const w1 = newSize.x;
     const h1 = newSize.y;
     const { from: x_from, to: x_to, weight: x_weight } = resamplingCoefficients(w0, w1);
-    const x_len = x_from.length
+    const x_len = x_from.length;
     const input_items = input.items;
     const out = new Float32Array(h1 * w1); // Use better precision here to avoid rounding errors when summing many small numbers
     for (let i = 0; i < h0; i++) { // row index
@@ -217,7 +214,6 @@ function halveX(data: Data<number>): Data<number> {
     const newValues = new Float32Array(newColumns * newRows); // Use better precision here to avoid rounding errors when summing many small numbers
 
     for (let j = 0; j < newRows; j++) {
-        // TODO: don't assert type but check
         // TODO: could avoid so many repeated multiplications here
         for (let i = 0; i < newColumns; i++) {
             const old1 = oldValues[j * oldColumns + 2 * i];
@@ -229,13 +225,6 @@ function halveX(data: Data<number>): Data<number> {
     }
     const result: Data<number> = { nColumns: newColumns, nRows: newRows, items: newValues, isNumeric: true };
     console.timeEnd('halveX')
-    return result;
-}
-
-function toArray(arr: ArrayLike<number>): number[] {
-    const n = arr.length;
-    const result = new Array<number>(n);
-    for (let i = 0; i < n; i++) result[i] = arr[i];
     return result;
 }
 
@@ -271,37 +260,12 @@ function downsampleXY_RGBA(input: Image, newSize: { x: number, y: number }): Ima
     return result;
 }
 
-/** Up- or down-sample image to a new size. */
-function downsampleXY_multichannel(input: Data<number>, newSize: { x: number, y: number }): Data<number> {
-    const w0 = input.nColumns;
-    const h0 = input.nRows;
-    const w1 = newSize.x;
-    const h1 = newSize.y;
-    const nChannels = Math.floor(input.items.length / (h0 * w0));
-    if (nChannels !== 1) throw new Error('NotImplementedError: multiple channels');
-    const y = resamplingCoefficients(h0, h1);
-    const x = resamplingCoefficients(w0, w1);
-    const out = new Float32Array(h1 * w1 * nChannels); // Use better precision here to avoid rounding errors when summing many small numbers
-    for (let i = 0; i < y.from.length; i++) { // row index
-        for (let j = 0; j < x.from.length; j++) { // column index
-            for (let c = 0; c < nChannels; c++) { // channel index
-                const inputValue = input.items[(y.from[i] * w0 + x.from[j]) * nChannels + c];
-                if (inputValue === undefined) throw new Error('NotImplementedError: undefined values in data'); // TODO also treat NaN and Infs specially
-                out[(y.to[i] * w1 + x.to[j]) * nChannels + c] += inputValue * y.weight[i] * x.weight[j];
-                // TODO alpha-channel must be treated in a special way
-            }
-        }
-    }
-    return { nColumns: w1, nRows: h1, items: out, isNumeric: true };
-}
-
 /** Calculate the weights of how much each pixel in the old image contributes to pixels in the new image, for 1D images
  * (pixel `from[i]` contributes to pixel `to[i]` with weight `weight[i]`).
  * Typically one old pixel will contribute to more new pixels and vice versa.
  * Sum of weights contributed to each new pixel must be equal to 1.
  * To use for 2D images, calculate row-wise and column-wise weights and multiply them. */
 function resamplingCoefficients(nOld: number, nNew: number) {
-    // console.time(`resamplingCoefficients ${nOld}->${nNew}`)
     const scale = nNew / nOld;
     let i = 0;
     let j = 0;
@@ -329,7 +293,6 @@ function resamplingCoefficients(nOld: number, nNew: number) {
             j += 1;
         }
     }
-    // console.timeEnd(`resamplingCoefficients ${nOld}->${nNew}`)
     return {
         /** Index of a pixel in the old image */
         from,

@@ -1,14 +1,12 @@
 import * as d3 from 'd3';
 import { Heatmap, formatDataItem } from './heatmap';
-import { getDownsampledData, createNumberDownsampling } from './downscaling2d';
-import { makeRandomRawData } from './data';
-import { benchmarkColor } from './color';
 
 
 export function demo(divElementOrId: HTMLDivElement | string) {
     const hm = Heatmap.create(); // Heatmap<number, number, number>
-    hm.setVisualParams({ xGapPixels: 0, yGapPixels: 0 });
-    // hm.setColor(d=>'red')
+    hm.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
+    // hm.setColor(Color.createScale([0, 0.5, 1], ['#00d', '#ddd', '#d00']));
+    // hm.setColor(d3.scaleLinear([0, 0.5, 1], ['#00d', '#ddd', '#d00']));
     hm.render(divElementOrId);
     // hm.setFilter(d => d > 0.1);
     // setTimeout(()=> hm.setFilter(undefined), 2000);
@@ -17,12 +15,6 @@ export function demo(divElementOrId: HTMLDivElement | string) {
 }
 
 export function demo2(divElementOrId: HTMLDivElement | string) {
-    // foo({ x: 8, y: 8 }, { x: 8, y: 3e6 });
-    const nData = 1000, nPixels = 200;
-    const data = makeRandomRawData(1000, 1000);
-    const cache = createNumberDownsampling(data);
-    const downsampled = getDownsampledData(cache, { x: 20, y: 1000 });
-    console.log('result:', downsampled.nColumns, 'x', downsampled.nRows)
     // for (const arr of [[], [1], [1, 1], [1, 2], [1, 0], [1, 1, 2], [1, 1, 0],
     // [1,2,3],[1,5,9,45,120],[1,2,3,5,4,6,7], [7,6,5,4,3,2,1]]) {
     //     console.log('sort', sortDirection(arr), arr)

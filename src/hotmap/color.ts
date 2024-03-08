@@ -1,4 +1,6 @@
 import * as d3 from 'd3';
+import { clamp } from 'lodash';
+import { Domain } from './domain';
 
 
 /** Like ArrayLike<T> but allows writing (includes T[], Float32Array, etc.) */
@@ -15,7 +17,7 @@ const INV_ALPHA_SCALE = 1 / ALPHA_SCALE;
 
 export const Color = {
     /** Cast Int32 into Int32-encoded color */
-    fromNumber(hex: number) {
+    fromNumber(hex: number): Color {
         return hex as Color;
     },
     /** Create Int32-encoded color from R (0-255), G (0-255), B (0-255), and opacity (0-1) */
@@ -131,10 +133,28 @@ export const Color = {
         const b = invA * array[offset + 3];
         return (a255 << 24 | r << 16 | g << 8 | b) as Color;
     },
+    /** Create a color scale, e.g. `Color.createScale('Magma', [0, 1], [0, 1])` or `Color.createScale([0, 0.5, 1], ['white', 'orange', 'brown'])` */
+    createScale,
+
+    mix(color0: Color, color1: Color, q: number): Color {
+        const a0 = color0 >>> 24 & 255;
+        const r0 = color0 >>> 16 & 255;
+        const g0 = color0 >>> 8 & 255;
+        const b0 = color0 & 255;
+        const a1 = color1 >>> 24 & 255;
+        const r1 = color1 >>> 16 & 255;
+        const g1 = color1 >>> 8 & 255;
+        const b1 = color1 & 255;
+        const a = (1 - q) * a0 + q * a1;
+        const r = (1 - q) * r0 + q * r1;
+        const g = (1 - q) * g0 + q * g1;
+        const b = (1 - q) * b0 + q * b1;
+        return (a << 24 | r << 16 | g << 8 | b) as Color;
+    },
 };
 
 
-/** Get hexadecimal value of a character with code `charCode`, 
+/** Get hexadecimal value of a character with code `charCode`,
  * e.g. 48 ('0') -> 0, 65 ('A') -> 10, 97 ('a') -> 10. */
 function hexValue(charCode: number): number {
     if (charCode < 65) return charCode - 48;
@@ -315,7 +335,7 @@ export const ColorNames: { [name: string]: Color } = {
 export function benchmarkColor(str: string, n: number, m: number = 3) {
     const c1 = Color.fromString(str);
     const c3 = d3.rgb(str);
-    console.log(str, c1, Color.toString(c1), c3, c3.formatHex8())
+    console.log(str, c1, Color.toString(c1), c3, c3.formatHex8());
 
     for (let k = 0; k < m; k++) {
         console.time('fromString');
@@ -358,4 +378,43 @@ export function benchmarkColor(str: string, n: number, m: number = 3) {
         }
         console.timeEnd('toString');
     }
+}
+
+
+type KeysWith<T, V> = { [key in keyof T]: T[key] extends V ? key : never }[keyof T]
+type RemovePrefix<P extends string, T> = T extends `${P}${infer S}` ? S : never
+type D3ColorSchemeName = RemovePrefix<'interpolate', KeysWith<typeof d3, (t: number) => string>>
+
+
+function createScaleFromColors(domain: number[], colors: (Color | string)[]) {
+    if (domain.length !== colors.length) throw new Error('Domain and colors must have the same length');
+    const n = domain.length;
+    const theDomain = Domain.create(domain);
+    const theColors = colors.map(c => typeof c === 'string' ? Color.fromString(c) : c);
+    if (!theDomain.isNumeric || theDomain.sortDirection === 'none') {
+        throw new Error('Provided domain is not numeric and monotonous');
+    }
+    return (x: number) => {
+        const contIndex = clamp(Domain.interpolateIndex(theDomain, x)!, 0, n - 1);
+        const index = Math.floor(contIndex);
+        if (index === n) return theColors[n];
+        else return Color.mix(theColors[index], theColors[index + 1], contIndex - index);
+    };
+}
+
+function createScaleFromScheme(schemeName: D3ColorSchemeName, domain: [number, number] = [0, 1], range: [number, number] = [0, 1]): ((x: number) => Color) {
+    const colorInterpolator = d3[`interpolate${schemeName}`];
+    const n = 100;
+    const domSc = d3.scaleLinear([0, n], domain);
+    const ranSc = d3.scaleLinear([0, n], range);
+    const dom = d3.range(n + 1).map(i => domSc(i));
+    const cols = d3.range(n + 1).map(i => Color.fromString(colorInterpolator(ranSc(i))));
+    return createScaleFromColors(dom, cols);
+}
+
+function createScale(schemeName: D3ColorSchemeName, domain?: [number, number], range?: [number, number]): ((x: number) => Color);
+function createScale(domain: number[], colors: (Color | string)[]): ((x: number) => Color);
+function createScale(a: D3ColorSchemeName | number[], b?: any, c?: any): ((x: number) => Color) {
+    if (typeof a === 'string') return createScaleFromScheme(a, b, c);
+    else return createScaleFromColors(a, b);
 }

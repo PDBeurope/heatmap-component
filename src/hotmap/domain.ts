@@ -53,9 +53,9 @@ function _getIndexWithInterpolation(domain: Domain<number>, value: number): numb
         console.warn('Cannot interpolate index because the domain is not sorted');
         return undefined;
     }
-    let previousIndex = domain.sortDirection === 'asc' ? sortedIndex(domain.values, value) : sortedIndexBy(domain.values, value, v => -v);
-    previousIndex = clamp(previousIndex, 0, domain.values.length - 2);
-    const nextIndex = previousIndex + 1;
+    let nextIndex = domain.sortDirection === 'asc' ? sortedIndex(domain.values, value) : sortedIndexBy(domain.values, value, v => -v);
+    nextIndex = clamp(nextIndex, 1, domain.values.length - 1);
+    const previousIndex = nextIndex - 1;
     const previousValue = domain.values[previousIndex];
     const nextValue = domain.values[nextIndex];
     return (value - previousValue) / (nextValue - previousValue) + previousIndex;
