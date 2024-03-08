@@ -1,3 +1,4 @@
+import { ALPHA_SCALE } from './color';
 import { Data } from './data';
 import { XY } from './scales';
 
@@ -43,7 +44,7 @@ export interface Image {
     nColumns: number,
     nRows: number,
     /** Pixels saved in 4-tuples (alpha, red*alpha, green*alpha, blue*alpha) */
-    items: Float32Array,
+    items: Uint8ClampedArray,
 }
 
 type DownsamplingMode = 'number' | 'color'
@@ -260,22 +261,27 @@ function downsampleXY_RGBA(input: Image, newSize: { x: number, y: number }): Ima
     if (nChannels !== 4) throw new Error('AssertionError: number of channels must be 4');
     const y = resamplingCoefficients(h0, h1);
     const x = resamplingCoefficients(w0, w1);
-    const out = new Float32Array(h1 * w1 * nChannels); // Use better precision here to avoid rounding errors when summing many small numbers
+    const out = new Uint8ClampedArray(h1 * w1 * nChannels); // Use better precision here to avoid rounding errors when summing many small numbers
     for (let i = 0; i < y.from.length; i++) { // row index
         for (let j = 0; j < x.from.length; j++) { // column index
             const fromOffset = (y.from[i] * w0 + x.from[j]) * nChannels;
             const toOffset = (y.to[i] * w1 + x.to[j]) * nChannels;
             const weight = y.weight[i] * x.weight[j];
-            const a = input.items[fromOffset] as number;
-            const ra = input.items[fromOffset + 1] as number;
-            const ga = input.items[fromOffset + 2] as number;
-            const ba = input.items[fromOffset + 3] as number;
+            const a = input.items[fromOffset];
+            const ra = input.items[fromOffset + 1];
+            const ga = input.items[fromOffset + 2];
+            const ba = input.items[fromOffset + 3];
             out[toOffset] += a * weight;
             out[toOffset + 1] += ra * weight;
             out[toOffset + 2] += ga * weight;
             out[toOffset + 3] += ba * weight;
         }
     }
+    for (let i = 0; i < out.length; i += 4) {
+        if (out[i] > ALPHA_SCALE) {
+            out[i] = ALPHA_SCALE;
+        }
+    } // TODO: avoid this, use ALPHA_SCALE = 255 instead
     const result: Image = { nColumns: w1, nRows: h1, items: out }; // TODO: do not force conversion to Array, keep Float32Array or whatever 
     console.timeEnd('downsampleXY_RGBA')
     return result; // TODO: do not force conversion to Array, keep Float32Array or whatever 

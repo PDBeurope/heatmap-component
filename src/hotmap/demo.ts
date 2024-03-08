@@ -2,6 +2,7 @@ import * as d3 from 'd3';
 import { Heatmap, formatDataItem } from './heatmap';
 import { downsamplingTarget, debugPrintDownscalingRoute2D, getDownsampledData, createNumberDownsampling } from './downscaling2d';
 import { makeRandomRawData } from './data';
+import { Color, benchmarkColor } from './color';
 
 
 export function demo(divElementOrId: HTMLDivElement | string) {
@@ -12,6 +13,7 @@ export function demo(divElementOrId: HTMLDivElement | string) {
     // hm.setFilter(d => d > 0.1);
     // setTimeout(()=> hm.setFilter(undefined), 2000);
     (window as any).hm = hm;
+    // benchmarkColor('#caffeeee', 1e7)
 }
 
 export function demo2(divElementOrId: HTMLDivElement | string) {

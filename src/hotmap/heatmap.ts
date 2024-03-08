@@ -6,6 +6,7 @@ import { Domain } from './domain';
 import { Box, BoxSize, Boxes, Scales, XY, scaleDistance } from './scales';
 import { attrd, getSize, minimum, nextIfChanged } from './utils';
 import { Downsampling2D, createNumberDownsampling, createColorDownsampling, getDownsampledData, Image } from './downscaling2d';
+import { ALPHA_SCALE, Color } from './color';
 
 
 // TODO: click event should distinguish initial state and real click
@@ -281,19 +282,23 @@ export class Heatmap<TX, TY, TItem> {
 
     private getColorArray(): Image {
         console.time('get all colors')
-        const colArr = new Float32Array(this.data.nRows * this.data.nColumns * 4);
+        const colArr = new Uint8ClampedArray(this.data.nRows * this.data.nColumns * 4);
         for (let iy = 0; iy < this.data.nRows; iy++) {
             for (let ix = 0; ix < this.data.nColumns; ix++) {
                 const item = getDataItem(this.data, ix, iy);
                 if (item === undefined) continue; // keep transparent black
-                const color = d3.rgb(this.colorProvider(item, this.xDomain.values[ix], this.yDomain.values[iy], ix, iy));
-                // TODO try resolving color without converting to an object (with fallback to d3.rgb?) or allow passing Uint32-encoded color
-                // if (ix===0) console.log(color)
-                const offset = (iy * this.data.nColumns + ix) * 4;
-                colArr[offset] = color.opacity;
-                colArr[offset + 1] = color.r * color.opacity;
-                colArr[offset + 2] = color.g * color.opacity;
-                colArr[offset + 3] = color.b * color.opacity;
+
+                const c = Color.fromString(this.colorProvider(item, this.xDomain.values[ix], this.yDomain.values[iy], ix, iy));
+                Color.toAragabaArray(c, colArr, (iy * this.data.nColumns + ix) * 4);
+
+                // const color = d3.rgb(this.colorProvider(item, this.xDomain.values[ix], this.yDomain.values[iy], ix, iy));
+                // // TODO try resolving color without converting to an object (with fallback to d3.rgb?) or allow passing Uint32-encoded color
+                // // if (ix===0) console.log(this.colorProvider(item, this.xDomain.values[ix], this.yDomain.values[iy], ix, iy))
+                // const offset = (iy * this.data.nColumns + ix) * 4;
+                // colArr[offset] = ALPHA_SCALE * color.opacity;
+                // colArr[offset + 1] = color.r * color.opacity;
+                // colArr[offset + 2] = color.g * color.opacity;
+                // colArr[offset + 3] = color.b * color.opacity;
             }
         }
         console.timeEnd('get all colors')
@@ -457,26 +462,21 @@ export class Heatmap<TX, TY, TItem> {
         const colFrom = Math.floor(this.boxes.visWorld.xmin / xScale);
         const colTo = Math.ceil(this.boxes.visWorld.xmax / xScale); // exclusive
 
-        const { nRows, nColumns } = colors;
-        const items = colors.items as ArrayLike<number>;
+        const { nRows, nColumns, items } = colors;
 
+        console.time('drawTheseColors')
         for (let iy = 0; iy < nRows; iy++) {
             for (let ix = colFrom; ix < colTo; ix++) {
                 if (ix < 0 || ix >= nColumns || iy < 0 || iy >= nRows) continue;
                 const offset = (nColumns * iy + ix) * 4;
-                const a = items[offset];
-                const invA = a > 0 ? 1 / a : 0;
-                const r = invA * items[offset + 1];
-                const g = invA * items[offset + 2];
-                const b = invA * items[offset + 3];
-                const rgba = `rgba(${r},${g},${b},${a})`;
-                this.ctx.fillStyle = rgba;
-                // if (ix === 0) console.log('col', a, r, g, b, rgba, this.ctx.fillStyle)
+                const color = Color.fromAragabaArray(items, offset);
+                this.ctx.fillStyle = Color.toString(color);
                 const x = this.scales.worldToCanvas.x(ix * xScale);
                 const y = this.scales.worldToCanvas.y(iy);
                 this.ctx.fillRect(x + xHalfGap, y + yHalfGap, width - 2 * xHalfGap, height - 2 * yHalfGap);
             }
         }
+        console.timeEnd('drawTheseColors')
     }
 
     private getXGap(colWidthOnCanvas: number): number {
