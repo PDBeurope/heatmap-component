@@ -9,15 +9,11 @@ export type WritableArrayLike<T> = { [i: number]: T, length: number }
 export type Color = { readonly '@type': 'color' } & number
 
 
-export const ALPHA_SCALE = 128;
-export const INV_ALPHA_SCALE = 1 / ALPHA_SCALE;
-const INV_255 = 1 / 255;
-
+const ALPHA_SCALE = 255;
+const INV_ALPHA_SCALE = 1 / ALPHA_SCALE;
 
 
 export const Color = {
-    /** Special value identifying an omitted or invalid color (e.g. parsed from an invalid color string). Represented in string as 'none'. */
-    None: -1 as Color,
     /** Cast Int32 into Int32-encoded color */
     fromNumber(hex: number) {
         return hex as Color;
@@ -26,7 +22,7 @@ export const Color = {
     fromRgba(r: number, g: number, b: number, a: number): Color {
         return ((ALPHA_SCALE * a) << 24 | r << 16 | g << 8 | b) as Color;
     },
-    /** Create Int32-encoded color from R (0-255), G (0-255), B (0-255) */
+    /** Create Int32-encoded color from R (0-255), G (0-255), B (0-255), assuming full opacity */
     fromRgb(r: number, g: number, b: number): Color {
         return (ALPHA_SCALE << 24 | r << 16 | g << 8 | b) as Color;
     },
@@ -44,8 +40,7 @@ export const Color = {
             }
             if (str.length === 9) { // #RRGGBBAA
                 const a255 = hexValue(str.charCodeAt(7)) << 4 | hexValue(str.charCodeAt(8));
-                const a128 = a255 * ALPHA_SCALE * INV_255;
-                return (a128 << 24
+                return (a255 << 24
                     | hexValue(str.charCodeAt(1)) << 20 | hexValue(str.charCodeAt(2)) << 16
                     | hexValue(str.charCodeAt(3)) << 12 | hexValue(str.charCodeAt(4)) << 8
                     | hexValue(str.charCodeAt(5)) << 4 | hexValue(str.charCodeAt(6))
@@ -60,8 +55,7 @@ export const Color = {
             }
             if (str.length === 5) { // #RGBA
                 const a255 = 17 * hexValue(str.charCodeAt(4));
-                const a128 = a255 * ALPHA_SCALE * INV_255;
-                return (a128 << 24
+                return (a255 << 24
                     | 17 * hexValue(str.charCodeAt(1)) << 16
                     | 17 * hexValue(str.charCodeAt(2)) << 8
                     | 17 * hexValue(str.charCodeAt(3))
@@ -69,20 +63,18 @@ export const Color = {
             }
         }
         const { r, g, b, opacity } = d3.rgb(str);
-        if (isNaN(r) || isNaN(g) || isNaN(b) || isNaN(opacity)) return Color.None;
+        if (isNaN(r) || isNaN(g) || isNaN(b) || isNaN(opacity)) return Color.fromRgba(0, 0, 0, 0);
         return Color.fromRgba(r, g, b, opacity);
     },
     /** Convert Int32-encoded color to a CSS-style hex string (#RRGGBB if full opacity, #RRGGBBAA otherwise) */
     toString(color: Color): string {
-        if (color === Color.None) return 'none';
-        const a128 = color >>> 24 & 255;
-        if (a128 === ALPHA_SCALE) {
+        const a255 = color >>> 24 & 255;
+        if (a255 === ALPHA_SCALE) {
             return String.fromCharCode(35,
                 hexDigitCode(color >>> 20 & 15), hexDigitCode(color >>> 16 & 15),
                 hexDigitCode(color >>> 12 & 15), hexDigitCode(color >>> 8 & 15),
                 hexDigitCode(color >>> 4 & 15), hexDigitCode(color & 15));
         } else {
-            const a255 = a128 * 255 * INV_ALPHA_SCALE >>> 0;
             return String.fromCharCode(35,
                 hexDigitCode(color >>> 20 & 15), hexDigitCode(color >>> 16 & 15),
                 hexDigitCode(color >>> 12 & 15), hexDigitCode(color >>> 8 & 15),
@@ -92,7 +84,6 @@ export const Color = {
     },
     /** Return object with R, G, B (0-255), and opacity (0-1) values. */
     toRgba(color: Color): { r: number, g: number, b: number, opacity: number } | undefined {
-        if (color === Color.None) return undefined;
         const a = INV_ALPHA_SCALE * (color >>> 24 & 255);
         const r = color >>> 16 & 255;
         const g = color >>> 8 & 255;
@@ -101,7 +92,6 @@ export const Color = {
     },
     /** Save `color` in an array represented as RGBA (i.e. quadruplet [r, g, b, a]). */
     toRgbaArray(color: Color, out: WritableArrayLike<number>, offset: number) {
-        if (color === Color.None) return;
         const a = INV_ALPHA_SCALE * (color >>> 24 & 255);
         const r = color >>> 16 & 255;
         const g = color >>> 8 & 255;
@@ -113,7 +103,6 @@ export const Color = {
     },
     /** Save `color` in an array represented as RGB (i.e. triplet [r, g, b]), ignoring the opacity channel. */
     toRgbArray(color: Color, out: WritableArrayLike<number>, offset: number) {
-        if (color === Color.None) return;
         const r = color >>> 16 & 255;
         const g = color >>> 8 & 255;
         const b = color & 255;
@@ -121,27 +110,26 @@ export const Color = {
         out[offset + 1] = g;
         out[offset + 2] = b;
     },
-    /** Save `color` in an array represented as "ARaGaBa" (i.e. quadruplet [a*128, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. */
+    /** Save `color` in an array represented as "ARaGaBa" (i.e. quadruplet [a*255, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. */
     toAragabaArray(color: Color, out: WritableArrayLike<number>, offset: number) {
-        if (color === Color.None) return;
-        const a128 = (color >>> 24 & 255);
-        const a = INV_ALPHA_SCALE * a128;
+        const a255 = (color >>> 24 & 255);
+        const a = INV_ALPHA_SCALE * a255;
         const r = color >>> 16 & 255;
         const g = color >>> 8 & 255;
         const b = color & 255;
-        out[offset] = a128;
+        out[offset] = a255;
         out[offset + 1] = r * a;
         out[offset + 2] = g * a;
         out[offset + 3] = b * a;
     },
-    /** Load color from an array represented as "ARaGaBa" (i.e. quadruplet [a*128, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. */
+    /** Load color from an array represented as "ARaGaBa" (i.e. quadruplet [a*255, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. */
     fromAragabaArray(array: ArrayLike<number>, offset: number): Color {
-        const a128 = array[offset];
-        const invA = (a128 > 0) ? (ALPHA_SCALE / a128) : 0;
+        const a255 = array[offset];
+        const invA = (a255 > 0) ? (ALPHA_SCALE / a255) : 0;
         const r = invA * array[offset + 1];
         const g = invA * array[offset + 2];
         const b = invA * array[offset + 3];
-        return (a128 << 24 | r << 16 | g << 8 | b) as Color;
+        return (a255 << 24 | r << 16 | g << 8 | b) as Color;
     },
 };
 
@@ -163,8 +151,6 @@ function hexDigitCode(num: number) {
 /** Use `| OPAQUE` to add full opacity to pure RGB */
 const OPAQUE = ALPHA_SCALE << 24;
 
-/** Use `& RGB_MASK` to remove opacity and get pure RGB */
-const RGB_MASK = (1 << 24) - 1;
 
 /** X11 color names http://www.w3.org/TR/css3-color/#svg-color */
 export const ColorNames: { [name: string]: Color } = {
@@ -323,8 +309,6 @@ export const ColorNames: { [name: string]: Color } = {
     whitesmoke: 0xf5f5f5 | OPAQUE,
     yellow: 0xffff00 | OPAQUE,
     yellowgreen: 0x9acd32 | OPAQUE,
-
-    none: Color.None,
 } as any;
 
 

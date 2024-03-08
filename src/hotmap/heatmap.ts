@@ -6,7 +6,7 @@ import { Domain } from './domain';
 import { Box, BoxSize, Boxes, Scales, XY, scaleDistance } from './scales';
 import { attrd, getSize, minimum, nextIfChanged } from './utils';
 import { Downsampling2D, createNumberDownsampling, createColorDownsampling, getDownsampledData, Image } from './downscaling2d';
-import { ALPHA_SCALE, Color } from './color';
+import { Color } from './color';
 
 
 // TODO: click event should distinguish initial state and real click

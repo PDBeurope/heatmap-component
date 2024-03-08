@@ -1,4 +1,3 @@
-import { ALPHA_SCALE } from './color';
 import { Data } from './data';
 import { XY } from './scales';
 
@@ -87,7 +86,7 @@ function set<M extends DownsamplingMode>(downsampling: Downsampling2D<M>, resolu
 
 /** Return `m`, a power of 2 or equal to `nDatapoints`, such that:
  * `nPixels <= m < 2*nPixels`  or  `m === nDatapoints < nPixels` */
-export function downsamplingTarget(nDatapoints: number, nPixels: number): number { // TODO private
+function downsamplingTarget(nDatapoints: number, nPixels: number): number {
     let result = 1;
     while (result < nPixels && result < nDatapoints) {
         result = Math.min(2 * result, nDatapoints);
@@ -141,13 +140,10 @@ function downsample(data: Data<number>, targetResolution: XY): Data<number> {
         // downsample along X
         if (x === 2 * targetResolution.x) {
             // halve
-            return halveX(data); // debug TODO uncomment
-            // return downsampleX(data, targetResolution);
-            // return downsampleXY(data, targetResolution);
+            return halveX(data);
         } else {
             // general downsample
             return downsampleX(data, targetResolution);
-            // return downsampleXY(data, targetResolution);
         }
     } else {
         throw new Error('ValueError: Cannot downsample along X and Y axis at the same time');
@@ -177,10 +173,9 @@ function downsampleXY(input: Data<number>, newSize: { x: number, y: number }): D
             const inputValue = input.items[y_from_offset + x.from[j]];
             if (inputValue === undefined) throw new Error('NotImplementedError: undefined values in data'); // TODO also treat NaN and Infs specially
             out[y_to_offset + x.to[j]] += inputValue * y_weight * x.weight[j];
-            // TODO alpha-channel must be treated in a special way
         }
     }
-    const result: Data<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true }; // TODO: do not force conversion to Array, keep Float32Array or whatever 
+    const result: Data<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true };
     console.timeEnd('downsampleXY')
     return result;
 }
@@ -197,21 +192,16 @@ function downsampleX(input: Data<number>, newSize: { x: number, y: number }): Da
     const x_len = x_from.length
     const input_items = input.items;
     const out = new Float32Array(h1 * w1); // Use better precision here to avoid rounding errors when summing many small numbers
-    // const out = new Array<number>(h1 * w1).fill(0); // Use better precision here to avoid rounding errors when summing many small numbers
     for (let i = 0; i < h0; i++) { // row index
         const y_from_offset = i * w0;
         const y_to_offset = i * w1;
         for (let j = 0; j < x_len; j++) { // column index
-            // for (let j = 0; j < w1; j++) { // column index
             const inputValue = input_items[y_from_offset + x_from[j]];
-            // const inputValue = input_items[y_from_offset + j];
             if (inputValue === undefined) throw new Error('NotImplementedError: undefined values in data'); // TODO also treat NaN and Infs specially
             out[y_to_offset + x_to[j]] += inputValue * x_weight[j];
-            // out[y_to_offset + j] += inputValue * 1;
-            // TODO alpha-channel must be treated in a special way
         }
     }
-    const result: Data<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true }; // TODO: do not force conversion to Array, keep Float32Array or whatever 
+    const result: Data<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true };
     console.timeEnd('downsampleX')
     return result;
 }
@@ -224,7 +214,6 @@ function halveX(data: Data<number>): Data<number> {
     if (oldColumns % 2 !== 0) throw new Error('ValueError: odd number of columns');
     const newColumns = Math.floor(oldColumns / 2);
     const newRows = data.nRows;
-    // const newValues = new Array<number>(newColumns * newRows).fill(0);
     const newValues = new Float32Array(newColumns * newRows); // Use better precision here to avoid rounding errors when summing many small numbers
 
     for (let j = 0; j < newRows; j++) {
@@ -277,14 +266,9 @@ function downsampleXY_RGBA(input: Image, newSize: { x: number, y: number }): Ima
             out[toOffset + 3] += ba * weight;
         }
     }
-    for (let i = 0; i < out.length; i += 4) {
-        if (out[i] > ALPHA_SCALE) {
-            out[i] = ALPHA_SCALE;
-        }
-    } // TODO: avoid this, use ALPHA_SCALE = 255 instead
-    const result: Image = { nColumns: w1, nRows: h1, items: out }; // TODO: do not force conversion to Array, keep Float32Array or whatever 
+    const result: Image = { nColumns: w1, nRows: h1, items: out };
     console.timeEnd('downsampleXY_RGBA')
-    return result; // TODO: do not force conversion to Array, keep Float32Array or whatever 
+    return result;
 }
 
 /** Up- or down-sample image to a new size. */
@@ -308,7 +292,7 @@ function downsampleXY_multichannel(input: Data<number>, newSize: { x: number, y:
             }
         }
     }
-    return { nColumns: w1, nRows: h1, items: out, isNumeric: true }; // TODO: do not force conversion to Array, keep Float32Array or whatever 
+    return { nColumns: w1, nRows: h1, items: out, isNumeric: true };
 }
 
 /** Calculate the weights of how much each pixel in the old image contributes to pixels in the new image, for 1D images

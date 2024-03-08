@@ -1,8 +1,8 @@
 import * as d3 from 'd3';
 import { Heatmap, formatDataItem } from './heatmap';
-import { downsamplingTarget, debugPrintDownscalingRoute2D, getDownsampledData, createNumberDownsampling } from './downscaling2d';
+import { getDownsampledData, createNumberDownsampling } from './downscaling2d';
 import { makeRandomRawData } from './data';
-import { Color, benchmarkColor } from './color';
+import { benchmarkColor } from './color';
 
 
 export function demo(divElementOrId: HTMLDivElement | string) {
@@ -19,7 +19,6 @@ export function demo(divElementOrId: HTMLDivElement | string) {
 export function demo2(divElementOrId: HTMLDivElement | string) {
     // foo({ x: 8, y: 8 }, { x: 8, y: 3e6 });
     const nData = 1000, nPixels = 200;
-    console.log(nData, nPixels, '->', downsamplingTarget(nData, nPixels));
     const data = makeRandomRawData(1000, 1000);
     const cache = createNumberDownsampling(data);
     const downsampled = getDownsampledData(cache, { x: 20, y: 1000 });
