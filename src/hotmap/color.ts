@@ -151,6 +151,11 @@ export const Color = {
         const b = (1 - q) * b0 + q * b1;
         return (a << 24 | r << 16 | g << 8 | b) as Color;
     },
+    scaleAlpha(color: Color, scale: number): Color {
+        const oldA = color >>> 24 & 255;
+        const newA = scale * oldA;
+        return ((newA << 24) | (color & RGB_MASK)) as Color;
+    },
 };
 
 
@@ -170,6 +175,8 @@ function hexDigitCode(num: number) {
 
 /** Use `| OPAQUE` to add full opacity to pure RGB */
 const OPAQUE = ALPHA_SCALE << 24;
+
+const RGB_MASK = (1 << 24) - 1;
 
 
 /** X11 color names http://www.w3.org/TR/css3-color/#svg-color */

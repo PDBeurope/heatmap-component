@@ -230,7 +230,7 @@ function halveX(data: Data<number>): Data<number> {
 
 /** Up- or down-sample image to a new size. */
 function downsampleXY_RGBA(input: Image, newSize: { x: number, y: number }): Image {
-    console.time('downsampleXY_RGBA')
+    console.time(`downsampleXY_RGBA ${input.nColumns}x${input.nRows} -> ${newSize.x}x${newSize.y}`)
     const w0 = input.nColumns;
     const h0 = input.nRows;
     const w1 = newSize.x;
@@ -256,7 +256,7 @@ function downsampleXY_RGBA(input: Image, newSize: { x: number, y: number }): Ima
         }
     }
     const result: Image = { nColumns: w1, nRows: h1, items: out };
-    console.timeEnd('downsampleXY_RGBA')
+    console.timeEnd(`downsampleXY_RGBA ${input.nColumns}x${input.nRows} -> ${newSize.x}x${newSize.y}`)
     return result;
 }
 

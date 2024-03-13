@@ -15,7 +15,8 @@ import { Color } from './color';
 // TODO: downsample color instead of value - properly implement (halveX, halveY etc.)
 // TODO: Highlight column and row on hover - should it also be shown on empty tiles? (filtered-out)
 // TODO: Smoothen zooming and panning with mouse wheel?
-// TODO: avoid Moire patterns
+// TODO: avoid Moire patterns and waves (perhaps needs downscaling to exact canvas size?)
+// TODO: drop boxes.dom or boxes.canvas as they are now equal
 
 
 const AppName = 'hotmap';
@@ -171,7 +172,7 @@ export class Heatmap<TX, TY, TItem> {
     private canvasDiv: d3.Selection<HTMLDivElement, any, any, any>;
     private canvas: d3.Selection<HTMLCanvasElement, any, any, any>;
     private svg: d3.Selection<SVGSVGElement, any, any, any>;
-    private readonly canvasInnerSize: BoxSize = { width: window.screen.width, height: window.screen.height }; // setting canvas size to screen size to avoid upscaling at any window size
+    private canvasInnerSize: BoxSize = { width: window.screen.width, height: window.screen.height }; // setting canvas size to screen size to avoid upscaling at any window size
     private ctx: CanvasRenderingContext2D;
     private boxes: Boxes;
     private scales: Scales;
@@ -190,8 +191,8 @@ export class Heatmap<TX, TY, TItem> {
         if (data !== undefined) {
             return new this(data);
         } else {
-            // return new this(makeRandomData2(2000, 20));
-            return new this(makeRandomData2(2e5, 20));
+            return new this(makeRandomData2(2000, 20));
+            // return new this(makeRandomData2(2e5, 20));
         }
     }
 
@@ -259,6 +260,9 @@ export class Heatmap<TX, TY, TItem> {
         this.events.resize.subscribe(box => {
             if (!box) return;
             this.boxes.dom = box;
+            this.boxes.canvas = box;
+            this.ctx.canvas.width = Box.width(box);
+            this.ctx.canvas.height = Box.height(box);
             this.scales = Scales(this.boxes);
             this.draw();
         });
@@ -403,7 +407,7 @@ export class Heatmap<TX, TY, TItem> {
         console.time('downsample')
         const downsampledColors = getDownsampledData(this.downsampling2dColor, { x: xResolution * Box.width(this.boxes.wholeWorld) / (Box.width(this.boxes.visWorld)), y: this.data.nRows });
         console.timeEnd('downsample')
-        return this.drawTheseColors(downsampledColors, this.data.nColumns / downsampledColors.nColumns);
+        return this.drawTheseColors(downsampledColors, this.data.nColumns / downsampledColors.nColumns, 1);
         // const colFrom = Math.floor(this.boxes.visWorld.xmin);
         // const colTo = Math.ceil(this.boxes.visWorld.xmax); // exclusive
         // const downsamplingCoefficient = Downsampling.downsamplingCoefficient(colTo - colFrom, xResolution);
@@ -443,14 +447,19 @@ export class Heatmap<TX, TY, TItem> {
         }
     }
 
-    private drawTheseColors(colors: Image, xScale: number) {
+    private drawTheseColors(colors: Image, xScale: number, yScale: number) {
+        console.log('xScale', xScale)
+        console.time('drawTheseColors')
         if (!this.rootDiv) return;
         // this.ctx.resetTransform(); this.ctx.scale(scale, 1);
         this.ctx.clearRect(0, 0, this.canvasInnerSize.width, this.canvasInnerSize.height);
         const width = scaleDistance(this.scales.worldToCanvas.x, 1) * xScale;
         const height = scaleDistance(this.scales.worldToCanvas.y, 1);
-        const xHalfGap = xScale === 1 ? 0.5 * this.getXGap(width) : 0;
+        const xHalfGap = 0.5 * this.getXGap(width);
         const yHalfGap = 0.5 * this.getYGap(height);
+        const opacityRatio =
+            (xScale === 1 ? 1 : (1 - this.getXGap(width) / width))
+            * (yScale === 1 ? 1 : (1 - this.getYGap(height) / height)); // This compensates omitting gaps by lowering opacity (when scaled)
         const colFrom = Math.floor(this.boxes.visWorld.xmin / xScale);
         const colTo = Math.ceil(this.boxes.visWorld.xmax / xScale); // exclusive
 
@@ -460,14 +469,32 @@ export class Heatmap<TX, TY, TItem> {
             for (let ix = colFrom; ix < colTo; ix++) {
                 if (ix < 0 || ix >= nColumns || iy < 0 || iy >= nRows) continue;
                 const offset = (nColumns * iy + ix) * 4;
-                const color = Color.fromAragabaArray(items, offset);
+                let color = Color.fromAragabaArray(items, offset);
+                if (opacityRatio !== 1) color = Color.scaleAlpha(color, opacityRatio);
                 this.ctx.fillStyle = Color.toString(color);
                 const x = this.scales.worldToCanvas.x(ix * xScale);
                 const y = this.scales.worldToCanvas.y(iy);
-                this.ctx.fillRect(x + xHalfGap, y + yHalfGap, width - 2 * xHalfGap, height - 2 * yHalfGap);
-                // this.ctx.fillRect(Math.floor(x + xHalfGap), Math.floor(y + yHalfGap), Math.ceil(width - 2 * xHalfGap), Math.ceil(height - 2 * yHalfGap));
+                let xFrom = x, xTo = x + width;
+                let yFrom = y, yTo = y + height;
+                if (xScale === 1) {
+                    xFrom += xHalfGap;
+                    xTo -= xHalfGap;
+                } else {
+                    // This magic is to fight Moire patterns
+                    xFrom = Math.floor(xFrom);
+                    xTo = Math.floor(xTo);
+                }
+                if (yScale === 1) {
+                    yFrom += yHalfGap;
+                    yTo -= yHalfGap;
+                } else {
+                    yFrom = Math.floor(yFrom);
+                    yTo = Math.floor(yTo);
+                }
+                this.ctx.fillRect(xFrom, yFrom, xTo - xFrom, yTo - yFrom);
             }
         }
+        console.timeEnd('drawTheseColors')
     }
 
     private getXGap(colWidthOnCanvas: number): number {
