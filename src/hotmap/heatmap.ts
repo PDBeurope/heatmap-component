@@ -5,14 +5,14 @@ import { Data, getDataItem, makeRandomRawData } from './data';
 import { Domain } from './domain';
 import { Box, BoxSize, Boxes, Scales, XY, scaleDistance } from './scales';
 import { attrd, getSize, minimum, nextIfChanged } from './utils';
-import { Downsampling2D, createColorDownsampling, getDownsampledData, Image } from './downscaling2d';
+import { Downsampling2D, createImageDownsampling, getDownsampledData, Image, createNumberDownsampling } from './downscaling2d';
 import { Color } from './color';
 
 
-// TODO: click event should distinguish initial state and real click?
+// TODO: downsample color instead of value - properly implement (halveX, halveY etc.)
+// TODO: publish on npm before we move this to production, serve via jsdelivr
 // TODO: style via CSS file, avoid inline styles
 // TODO: think in more depth what could happen when changing data type with filters, providers, etc. already set
-// TODO: downsample color instead of value - properly implement (halveX, halveY etc.)
 // TODO: Highlight column and row on hover - should it also be shown on empty tiles? (filtered-out)
 // TODO: Smoothen zooming and panning with mouse wheel?
 // TODO: avoid Moire patterns and waves (perhaps needs downscaling to exact canvas size?)
@@ -148,8 +148,7 @@ export const DefaultVisualParams = {
 export class Heatmap<TX, TY, TItem> {
     private originalData: DataDescription<TX, TY, TItem>;
     private data: Data<TItem>;
-    // private downsampling2d: TItem extends number ? Downsampling2D<'number'> : undefined;
-    private downsampling2dColor?: Downsampling2D<'color'>;
+    private downsampling2dColor?: Downsampling2D<'image'>;
     private xDomain: Domain<TX>;
     private yDomain: Domain<TY>;
     private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
@@ -191,14 +190,15 @@ export class Heatmap<TX, TY, TItem> {
         if (data !== undefined) {
             return new this(data);
         } else {
-            return new this(makeRandomData2(2000, 20));
-            // return new this(makeRandomData2(2e5, 20));
+            // return new this(makeRandomData2(2000, 20));
+            return new this(makeRandomData2(2e5, 20));
         }
     }
 
     private constructor(data: DataDescription<TX, TY, TItem>) {
         this.setData(data);
         if (this.data.isNumeric) {
+            createNumberDownsampling(this.data as Data<number>);
             (this as unknown as Heatmap<TX, TY, number>).setColor(DefaultNumericColorProvider);
         }
     }
@@ -403,7 +403,7 @@ export class Heatmap<TX, TY, TItem> {
     private draw() {
         if (!this.rootDiv) return;
         const xResolution = Box.width(this.boxes.dom) / this.downsamplingPixelsPerRect;
-        this.downsampling2dColor ??= createColorDownsampling(this.getColorArray());
+        this.downsampling2dColor ??= createImageDownsampling(this.getColorArray());
         console.time('downsample')
         const downsampledColors = getDownsampledData(this.downsampling2dColor, { x: xResolution * Box.width(this.boxes.wholeWorld) / (Box.width(this.boxes.visWorld)), y: this.data.nRows });
         console.timeEnd('downsample')
