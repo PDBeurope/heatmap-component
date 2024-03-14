@@ -1,14 +1,97 @@
-import { WritableArrayLike } from './color';
-import { Data } from './data';
+import { Data, Image } from './data';
 import { XY } from './scales';
 
 
-/** Return resolution from which `wanted` resolution should be obtained by downscaling.
- * (This will have either X length or Y length doubled (or same as in `original` if doubled would be more that original)).
+type DownsamplingMode = 'number' | 'image'
+
+type DataType<M extends DownsamplingMode> = M extends 'image' ? Image : M extends 'number' ? Data<number> : never
+
+type ResolutionString = `${number}x${number}`
+
+function resolutionString(resolution: XY): ResolutionString {
+    return `${resolution.x}x${resolution.y}`;
+}
+
+
+/** Helper object for downsampling images and 2D number arrays, with caching */
+export type Downsampler<TMode extends DownsamplingMode = DownsamplingMode> = {
+    /** Downsampling mode ('number' or 'image') */
+    mode: TMode,
+    /** Column count of the original data */
+    nColumns: number,
+    /** Rows count of the original data */
+    nRows: number,
+    /** Downsampled version of the original data (index {nColumn}x{nRows} holds the original data) */
+    downsampled: { [resolution: ResolutionString]: DataType<TMode> }
+}
+
+export const Downsampler = {
+    /** Create a new downsampler for a 2D number array */
+    fromNumbers(data: Data<number>): Downsampler<'number'> {
+        const result: Downsampler<'number'> = { mode: 'number', nColumns: data.nColumns, nRows: data.nRows, downsampled: {} };
+        set(result, { x: data.nColumns, y: data.nRows }, data);
+        return result;
+    },
+
+    /** Create a new downsampler for an image */
+    fromImage(data: Image): Downsampler<'image'> {
+        const result: Downsampler<'image'> = { mode: 'image', nColumns: data.nColumns, nRows: data.nRows, downsampled: {} };
+        set(result, { x: data.nColumns, y: data.nRows }, data);
+        return result;
+    },
+
+    /** Get data downsampled approximately to `minResolution`.
+     * The returned resolution will be at least `minResolution` but less then double that, in each dimension.
+     * The returned data will be equal to the original data if `minResolution` is big enough. */
+    getDownsampled<M extends DownsamplingMode>(downsampler: Downsampler<M>, minResolution: XY): DataType<M> {
+        const targetResolution: XY = {
+            x: downsamplingTarget(downsampler.nColumns, minResolution.x),
+            y: downsamplingTarget(downsampler.nRows, minResolution.y),
+        };
+        return getOrCompute(downsampler, targetResolution);
+    },
+};
+
+
+
+/** Return `m`, a power of 2 or equal to `nDatapoints`, such that:
+ * `nPixels <= m < 2*nPixels`  or  `m === nDatapoints < nPixels` */
+function downsamplingTarget(nDatapoints: number, nPixels: number): number {
+    let result = 1;
+    while (result < nPixels && result < nDatapoints) {
+        result = Math.min(2 * result, nDatapoints);
+    }
+    return result;
+}
+
+function get<M extends DownsamplingMode>(downsampler: Downsampler<M>, resolution: XY): DataType<M> | undefined {
+    return downsampler.downsampled[resolutionString(resolution)];
+}
+function set<M extends DownsamplingMode>(downsampler: Downsampler<M>, resolution: XY, value: DataType<M>): undefined {
+    downsampler.downsampled[resolutionString(resolution)] = value;
+}
+
+/** Get data downsampled to `resolution` (exactly).  */
+function getOrCompute<M extends DownsamplingMode>(downsampler: Downsampler<M>, resolution: XY): DataType<M> {
+    const cached = get(downsampler, resolution);
+    if (cached) {
+        return cached;
+    } else {
+        const srcResolution = downsamplingSource2D(resolution, { x: downsampler.nColumns, y: downsampler.nRows });
+        if (!srcResolution || srcResolution.x > downsampler.nColumns || srcResolution.y > downsampler.nRows) throw new Error('AssertionError');
+        const srcData: DataType<M> = getOrCompute(downsampler, srcResolution);
+        const result = (downsampler.mode === 'image' ? downsampleImage(srcData as DataType<'image'>, resolution) : downsampleNumbers(srcData as DataType<'number'>, resolution)) as DataType<M>;
+        set(downsampler, resolution, result);
+        return result;
+    }
+}
+
+/** Return resolution from which `wanted` resolution should be obtained by downsampling.
+ * This will have either X length or Y length doubled (or same as in `original` if doubled would be more that original) and the other length kept the same.
  * Return `undefined` if `wanted` is already equal to `original`. */
-function downscaleSource2D(wanted: XY, original: XY): XY | undefined {
+function downsamplingSource2D(wanted: XY, original: XY): XY | undefined {
     if (wanted.x > original.x || wanted.y > original.y) {
-        throw new Error('ArgumentError: Cannot downscale to higher resolution than original');
+        throw new Error('ArgumentError: Cannot downsample to higher resolution than original');
     }
     if (wanted.x === original.x && wanted.y === original.y) {
         // We already have it
@@ -30,90 +113,6 @@ function downscaleSource2D(wanted: XY, original: XY): XY | undefined {
 }
 
 
-type ResolutionString = `${number}x${number}`
-
-function resolutionString(resolution: XY): ResolutionString {
-    return `${resolution.x}x${resolution.y}`;
-}
-
-export interface Image {
-    nColumns: number,
-    nRows: number,
-    /** Pixels saved in 4-tuples (alpha, red*alpha, green*alpha, blue*alpha) */
-    items: Uint8ClampedArray,
-}
-
-
-type DownsamplingMode = 'number' | 'image'
-type DataType<M extends DownsamplingMode> = M extends 'image' ? Image : Data<number>
-
-export type Downsampling2D<TMode extends DownsamplingMode = DownsamplingMode> = {
-    mode: TMode,
-    /** Column count of the original data */
-    nColumns: number,
-    /** Rows count of the original data */
-    nRows: number,
-    /** Downsampled version of the original data (index {nColumn}x{nRows} holds the original data) */
-    downsampled: { [resolution: ResolutionString]: DataType<TMode> }
-}
-
-export function createNumberDownsampling(data: Data<number>): Downsampling2D<'number'> {
-    const result: Downsampling2D<'number'> = { mode: 'number', nColumns: data.nColumns, nRows: data.nRows, downsampled: {} };
-    set(result, { x: data.nColumns, y: data.nRows }, data);
-    console.time('createNumberDownsampling get 1x1')
-    getOrCompute(result, { x: 1, y: 1 });
-    console.timeEnd('createNumberDownsampling get 1x1')
-    return result;
-}
-export function createImageDownsampling(data: Image): Downsampling2D<'image'> {
-    const result: Downsampling2D<'image'> = { mode: 'image', nColumns: data.nColumns, nRows: data.nRows, downsampled: {} };
-    set(result, { x: data.nColumns, y: data.nRows }, data);
-    return result;
-}
-
-function get<M extends DownsamplingMode>(downsampling: Downsampling2D<M>, resolution: XY): DataType<M> | undefined {
-    return downsampling.downsampled[resolutionString(resolution)];
-}
-function set<M extends DownsamplingMode>(downsampling: Downsampling2D<M>, resolution: XY, value: DataType<M>): undefined {
-    downsampling.downsampled[resolutionString(resolution)] = value;
-}
-
-
-/** Return `m`, a power of 2 or equal to `nDatapoints`, such that:
- * `nPixels <= m < 2*nPixels`  or  `m === nDatapoints < nPixels` */
-function downsamplingTarget(nDatapoints: number, nPixels: number): number {
-    let result = 1;
-    while (result < nPixels && result < nDatapoints) {
-        result = Math.min(2 * result, nDatapoints);
-    }
-    return result;
-}
-
-
-export function getDownsampledData<M extends DownsamplingMode>(downsampling: Downsampling2D<M>, minResolution: XY): DataType<M> {
-    const targetResolution: XY = {
-        x: downsamplingTarget(downsampling.nColumns, minResolution.x),
-        y: downsamplingTarget(downsampling.nRows, minResolution.y),
-    };
-    return getOrCompute(downsampling, targetResolution);
-
-}
-
-function getOrCompute<M extends DownsamplingMode>(downsampling: Downsampling2D<M>, resolution: XY): DataType<M> {
-    const cached = get(downsampling, resolution);
-    if (cached) {
-        return cached;
-    } else {
-        const srcResolution = downscaleSource2D(resolution, { x: downsampling.nColumns, y: downsampling.nRows });
-        if (!srcResolution || srcResolution.x > downsampling.nColumns || srcResolution.y > downsampling.nRows) throw new Error('AssertionError');
-        const srcData: DataType<M> = getOrCompute(downsampling, srcResolution);
-        const result = (downsampling.mode === 'image' ? downsampleImage(srcData as DataType<'image'>, resolution) : downsampleNumbers(srcData as DataType<'number'>, resolution)) as DataType<M>;
-        set(downsampling, resolution, result);
-        return result;
-    }
-}
-
-
 /** Downsample 2D array of numbers to a new size. */
 function downsampleNumbers(input: Data<number>, newSize: XY): Data<number> {
     if (input.nColumns === 2 * newSize.x && input.nRows === newSize.y) {
@@ -127,7 +126,6 @@ function downsampleNumbers(input: Data<number>, newSize: XY): Data<number> {
 
 /** Downsample 2D array of numbers to a new size - implementation for general sizes. */
 function downsampleNumbers_general(input: Data<number>, newSize: { x: number, y: number }): Data<number> {
-    console.time('downsampleNumbers_general')
     const w0 = input.nColumns;
     const h0 = input.nRows;
     const w1 = newSize.x;
@@ -142,18 +140,16 @@ function downsampleNumbers_general(input: Data<number>, newSize: { x: number, y:
         const y_weight = y.weight[i];
         for (let j = 0; j < x.from.length; j++) { // column index
             const inputValue = input.items[y_from_offset + x.from[j]];
-            if (inputValue === undefined) throw new Error('NotImplementedError: undefined values in data'); // TODO also treat NaN and Infs specially
+            if (inputValue === undefined) throw new Error('NotImplementedError: undefined values in data');
             out[y_to_offset + x.to[j]] += inputValue * y_weight * x.weight[j];
         }
     }
     const result: Data<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true };
-    console.timeEnd('downsampleNumbers_general')
     return result;
 }
 
 /** Downsample 2D array of numbers to a new size - simplified implementation for special cases when newX===oldX/2, newY===oldY. */
 function downsampleNumbers_halveX(input: Data<number>): Data<number> {
-    console.time('downsampleNumbers_halveX')
     const w0 = input.nColumns;
     const h0 = input.nRows;
     const w1 = Math.floor(w0 / 2);
@@ -164,13 +160,12 @@ function downsampleNumbers_halveX(input: Data<number>): Data<number> {
         for (let j = 0; j < w1; j++) { // column index
             const old1 = input.items[i * w0 + 2 * j];
             const old2 = input.items[i * w0 + 2 * j + 1];
-            if (old1 === undefined || old2 === undefined) throw new Error('NotImplementedError: undefined values in data'); // TODO also treat NaN and Infs specially
+            if (old1 === undefined || old2 === undefined) throw new Error('NotImplementedError: undefined values in data');
             const val = 0.5 * (old1 + old2);
             out[i * w1 + j] = val;
         }
     }
     const result: Data<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true };
-    console.timeEnd('downsampleNumbers_halveX')
     return result;
 }
 /** Downsample 2D array of numbers to a new size - simplified implementation for special cases when newX===oldX, newY===oldY/2. */
@@ -179,20 +174,18 @@ function downsampleNumbers_halveY(input: Data<number>): Data<number> {
     const h0 = input.nRows;
     const w1 = w0;
     const h1 = Math.floor(h0 / 2);
-    console.time('downsampleNumbers_halveY')
     if (input.items.length !== h0 * w0) throw new Error('ValueError: length of input.items must be input.nColumns * input.nRows');
     const out = new Float32Array(w1 * h1);
     for (let i = 0; i < h1; i++) { // row index
         for (let j = 0; j < w1; j++) { // column index
             const old1 = input.items[2 * i * w0 + j];
             const old2 = input.items[(2 * i + 1) * w0 + j];
-            if (old1 === undefined || old2 === undefined) throw new Error('NotImplementedError: undefined values in data'); // TODO also treat NaN and Infs specially
+            if (old1 === undefined || old2 === undefined) throw new Error('NotImplementedError: undefined values in data');
             const val = 0.5 * (old1 + old2);
             out[i * w1 + j] = val;
         }
     }
     const result: Data<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true };
-    console.timeEnd('downsampleNumbers_halveY')
     return result;
 }
 
@@ -215,7 +208,6 @@ function downsampleImage_general(input: Image, newSize: XY): Image {
     const h0 = input.nRows;
     const w1 = newSize.x;
     const h1 = newSize.y;
-    console.time(`downsampleImage_general ${w0}x${h0} -> ${w1}x${h1}`)
     if (input.items.length !== N_CHANNELS * h0 * w0) throw new Error('ValueError: length of Image.items must be 4 * Image.nColumns * Image.nRows');
     const y = resamplingCoefficients(h0, h1);
     const x = resamplingCoefficients(w0, w1);
@@ -236,7 +228,6 @@ function downsampleImage_general(input: Image, newSize: XY): Image {
         }
     }
     const result: Image = { nColumns: w1, nRows: h1, items: out };
-    console.timeEnd(`downsampleImage_general ${w0}x${h0} -> ${w1}x${h1}`)
     return result;
 }
 
@@ -247,8 +238,7 @@ function downsampleImage_halveX(input: Image): Image {
     const h0 = input.nRows;
     const w1 = Math.floor(w0 / 2);
     const h1 = h0;
-    console.time(`downsampleImage_halveX ${w0}x${h0} -> ${w1}x${h1}`)
-    if (input.items.length != N_CHANNELS * h0 * w0) throw new Error('ValueError: length of Image.items must be 4 * Image.nColumns * Image.nRows');
+    if (input.items.length !== N_CHANNELS * h0 * w0) throw new Error('ValueError: length of Image.items must be 4 * Image.nColumns * Image.nRows');
     const out = new Uint8ClampedArray(h1 * w1 * N_CHANNELS);
     for (let i = 0; i < h1; i++) { // row index
         for (let j = 0; j < w1; j++) { // column index
@@ -262,7 +252,6 @@ function downsampleImage_halveX(input: Image): Image {
         }
     }
     const result: Image = { nColumns: w1, nRows: h1, items: out };
-    console.timeEnd(`downsampleImage_halveX ${w0}x${h0} -> ${w1}x${h1}`)
     return result;
 }
 
@@ -273,8 +262,7 @@ function downsampleImage_halveY(input: Image): Image {
     const h0 = input.nRows;
     const w1 = w0;
     const h1 = Math.floor(h0 / 2);
-    console.time(`downsampleImage_y ${w0}x${h0} -> ${w1}x${h1}`)
-    if (input.items.length != N_CHANNELS * h0 * w0) throw new Error('ValueError: length of Image.items must be 4 * Image.nColumns * Image.nRows');
+    if (input.items.length !== N_CHANNELS * h0 * w0) throw new Error('ValueError: length of Image.items must be 4 * Image.nColumns * Image.nRows');
     const out = new Uint8ClampedArray(h1 * w1 * N_CHANNELS);
     for (let i = 0; i < h1; i++) { // row index
         for (let j = 0; j < w1; j++) { // column index
@@ -288,7 +276,6 @@ function downsampleImage_halveY(input: Image): Image {
         }
     }
     const result: Image = { nColumns: w1, nRows: h1, items: out };
-    console.timeEnd(`downsampleImage_y ${w0}x${h0} -> ${w1}x${h1}`)
     return result;
 }
 

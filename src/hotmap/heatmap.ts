@@ -1,15 +1,14 @@
 import * as d3 from 'd3';
 import { clamp, cloneDeep, isNil, merge, round } from 'lodash';
 import { BehaviorSubject } from 'rxjs';
-import { Data, getDataItem, makeRandomRawData } from './data';
+import { Color } from './color';
+import { Data, Image, getDataItem, makeRandomRawData } from './data';
 import { Domain } from './domain';
+import { Downsampler } from './downsampling';
 import { Box, BoxSize, Boxes, Scales, XY, scaleDistance } from './scales';
 import { attrd, getSize, minimum, nextIfChanged } from './utils';
-import { Downsampling2D, createImageDownsampling, getDownsampledData, Image, createNumberDownsampling } from './downscaling2d';
-import { Color } from './color';
 
 
-// TODO: downsample color instead of value - properly implement (halveX, halveY etc.)
 // TODO: publish on npm before we move this to production, serve via jsdelivr
 // TODO: style via CSS file, avoid inline styles
 // TODO: think in more depth what could happen when changing data type with filters, providers, etc. already set
@@ -148,7 +147,7 @@ export const DefaultVisualParams = {
 export class Heatmap<TX, TY, TItem> {
     private originalData: DataDescription<TX, TY, TItem>;
     private data: Data<TItem>;
-    private downsampling2dColor?: Downsampling2D<'image'>;
+    private downsampler?: Downsampler<'image'>;
     private xDomain: Domain<TX>;
     private yDomain: Domain<TY>;
     private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
@@ -198,7 +197,7 @@ export class Heatmap<TX, TY, TItem> {
     private constructor(data: DataDescription<TX, TY, TItem>) {
         this.setData(data);
         if (this.data.isNumeric) {
-            createNumberDownsampling(this.data as Data<number>);
+            Downsampler.fromNumbers(this.data as Data<number>);
             (this as unknown as Heatmap<TX, TY, number>).setColor(DefaultNumericColorProvider);
         }
     }
@@ -287,19 +286,19 @@ export class Heatmap<TX, TY, TItem> {
     }
 
     private getColorArray(): Image {
-        console.time('get all colors')
-        const colArr = new Uint8ClampedArray(this.data.nRows * this.data.nColumns * 4);
+        // console.time('get all colors')
+        const image = Image.create(this.data.nColumns, this.data.nRows);
         for (let iy = 0; iy < this.data.nRows; iy++) {
             for (let ix = 0; ix < this.data.nColumns; ix++) {
                 const item = getDataItem(this.data, ix, iy);
                 if (item === undefined) continue; // keep transparent black
                 const color = this.colorProvider(item, this.xDomain.values[ix], this.yDomain.values[iy], ix, iy);
                 const c = (typeof color === 'string') ? Color.fromString(color) : color;
-                Color.toAragabaArray(c, colArr, (iy * this.data.nColumns + ix) * 4);
+                Color.toImage(c, image, ix, iy);
             }
         }
-        console.timeEnd('get all colors')
-        return { nColumns: this.data.nColumns, nRows: this.data.nRows, items: colArr };
+        // console.timeEnd('get all colors')
+        return image;
     }
     private emitResize() {
         if (!this.canvas) return;
@@ -310,12 +309,7 @@ export class Heatmap<TX, TY, TItem> {
 
     private setRawData(data: Data<TItem>): this {
         this.data = data;
-        // if (typeof data.items[0] === 'number') {
-        //     (this as unknown as Heatmap<any, any, number>).downsampling2d = createNumberDownsampling(data as Data<number>);
-        // } else {
-        //     (this as Heatmap<any, any, Exclude<any, number>>).downsampling2d = undefined;
-        // }
-        this.downsampling2dColor = undefined;
+        this.downsampler = undefined;
         // TODO update world and visWorld
         this.draw();
         return this;
@@ -363,7 +357,7 @@ export class Heatmap<TX, TY, TItem> {
 
     setColor(colorProvider: (...args: ProviderParams<TX, TY, TItem>) => string | Color): this {
         this.colorProvider = colorProvider;
-        this.downsampling2dColor = undefined;
+        this.downsampler = undefined;
         this.draw();
         return this;
     }
@@ -403,24 +397,11 @@ export class Heatmap<TX, TY, TItem> {
     private draw() {
         if (!this.rootDiv) return;
         const xResolution = Box.width(this.boxes.dom) / this.downsamplingPixelsPerRect;
-        this.downsampling2dColor ??= createImageDownsampling(this.getColorArray());
-        console.time('downsample')
-        const downsampledColors = getDownsampledData(this.downsampling2dColor, { x: xResolution * Box.width(this.boxes.wholeWorld) / (Box.width(this.boxes.visWorld)), y: this.data.nRows });
-        console.timeEnd('downsample')
-        return this.drawTheseColors(downsampledColors, this.data.nColumns / downsampledColors.nColumns, 1);
-        // const colFrom = Math.floor(this.boxes.visWorld.xmin);
-        // const colTo = Math.ceil(this.boxes.visWorld.xmax); // exclusive
-        // const downsamplingCoefficient = Downsampling.downsamplingCoefficient(colTo - colFrom, xResolution);
-        // if (this.downsampling2d && !this.filter) {
-        //     // return this.drawTheseData(Downsampling.getDownsampled(this.downsampling, downsamplingCoefficient), downsamplingCoefficient);
-        //     console.log('draw')
-        //     console.time('downsample')
-        //     const downsampled = getDownsampledData(this.downsampling2d, { x: xResolution * Box.width(this.boxes.wholeWorld) / (Box.width(this.boxes.visWorld)), y: this.data.nRows });
-        //     console.timeEnd('downsample')
-        //     return this.drawTheseData(downsampled as Data<TItem>, this.data.nColumns / downsampled.nColumns);
-        // } else {
-        //     return this.drawTheseData(this.data, 1);
-        // }
+        this.downsampler ??= Downsampler.fromImage(this.getColorArray());
+        // console.time('downsample')
+        const downsampledImage = Downsampler.getDownsampled(this.downsampler, { x: xResolution * Box.width(this.boxes.wholeWorld) / (Box.width(this.boxes.visWorld)), y: this.data.nRows });
+        // console.timeEnd('downsample')
+        return this.drawThisImage(downsampledImage, this.data.nColumns / downsampledImage.nColumns, 1);
     }
 
     private drawTheseData(data: Data<TItem>, xScale: number) {
@@ -447,9 +428,7 @@ export class Heatmap<TX, TY, TItem> {
         }
     }
 
-    private drawTheseColors(colors: Image, xScale: number, yScale: number) {
-        console.log('xScale', xScale)
-        console.time('drawTheseColors')
+    private drawThisImage(image: Image, xScale: number, yScale: number) {
         if (!this.rootDiv) return;
         // this.ctx.resetTransform(); this.ctx.scale(scale, 1);
         this.ctx.clearRect(0, 0, this.canvasInnerSize.width, this.canvasInnerSize.height);
@@ -463,13 +442,11 @@ export class Heatmap<TX, TY, TItem> {
         const colFrom = Math.floor(this.boxes.visWorld.xmin / xScale);
         const colTo = Math.ceil(this.boxes.visWorld.xmax / xScale); // exclusive
 
-        const { nRows, nColumns, items } = colors;
-
+        const { nRows, nColumns } = image;
         for (let iy = 0; iy < nRows; iy++) {
             for (let ix = colFrom; ix < colTo; ix++) {
                 if (ix < 0 || ix >= nColumns || iy < 0 || iy >= nRows) continue;
-                const offset = (nColumns * iy + ix) * 4;
-                let color = Color.fromAragabaArray(items, offset);
+                let color = Color.fromImage(image, ix, iy);
                 if (opacityRatio !== 1) color = Color.scaleAlpha(color, opacityRatio);
                 this.ctx.fillStyle = Color.toString(color);
                 const x = this.scales.worldToCanvas.x(ix * xScale);
@@ -494,7 +471,6 @@ export class Heatmap<TX, TY, TItem> {
                 this.ctx.fillRect(xFrom, yFrom, xTo - xFrom, yTo - yFrom);
             }
         }
-        console.timeEnd('drawTheseColors')
     }
 
     private getXGap(colWidthOnCanvas: number): number {

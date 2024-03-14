@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
 import { clamp } from 'lodash';
+import { Image } from './data';
 import { Domain } from './domain';
 
 
@@ -124,6 +125,10 @@ export const Color = {
         out[offset + 2] = g * a;
         out[offset + 3] = b * a;
     },
+    /** Set pixel `x,y` in `image` to `color` */
+    toImage(color: Color, image: Image, x: number, y: number) {
+        return this.toAragabaArray(color, image.items, 4 * (y * image.nColumns + x));
+    },
     /** Load color from an array represented as "ARaGaBa" (i.e. quadruplet [a*255, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. */
     fromAragabaArray(array: ArrayLike<number>, offset: number): Color {
         const a255 = array[offset];
@@ -132,6 +137,10 @@ export const Color = {
         const g = invA * array[offset + 2];
         const b = invA * array[offset + 3];
         return (a255 << 24 | r << 16 | g << 8 | b) as Color;
+    },
+    /** Load color from `Image`. */
+    fromImage(image: Image, x: number, y: number): Color {
+        return this.fromAragabaArray(image.items, 4 * (y * image.nColumns + x));
     },
     /** Create a color scale, e.g. `Color.createScale('Magma', [0, 1], [0, 1])` or `Color.createScale([0, 0.5, 1], ['white', 'orange', 'brown'])` */
     createScale,
