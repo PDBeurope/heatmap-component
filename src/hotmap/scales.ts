@@ -1,4 +1,5 @@
 import * as d3 from 'd3';
+import { clamp } from 'lodash';
 
 
 export interface XY { x: number, y: number }
@@ -17,6 +18,13 @@ export const Box = {
     },
     containsPoint(box: Box, point: XY): boolean {
         return point.x >= box.xmin && point.x <= box.xmax && point.y >= box.ymin && point.y <= box.ymax;
+    },
+    clamp(box: Box, constraint: Box, minWidth: number = 0, minHeight: number = 0) {
+        const xmin = clamp(box.xmin, constraint.xmin, constraint.xmax - minWidth);
+        const xmax = clamp(box.xmax, xmin + minWidth, constraint.xmax);
+        const ymin = clamp(box.ymin, constraint.ymin, constraint.ymax - minHeight);
+        const ymax = clamp(box.ymax, ymin + minHeight, constraint.ymax);
+        return Box.create(xmin, ymin, xmax, ymax);
     },
 };
 

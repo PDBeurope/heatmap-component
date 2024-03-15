@@ -49,6 +49,13 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
     hm.setTooltip((d, x, y, xIndex, yIndex) => `<div style="font-weight: bold; margin-bottom: 0.5em;">${formatDataItem(d)}</div>Column ${x}, Row ${y}<br>Indices [${xIndex},${yIndex}]`);
     hm.setFilter((d, x, y, xIndex, yIndex) => d.score > 0);
     setTimeout(() => hm.setFilter(undefined), 2000);
+    // setTimeout(() => hm.setData({
+    //     xDomain: [1, 2, 0, 3, 4],
+    //     yDomain: ['C', 'B', 'A'],
+    //     items: items,
+    //     x: d => d.col,
+    //     y: d => d.row,
+    // }), 3000);
     hm.setVisualParams({ xGapPixels: 0, yGapPixels: 0 });
     hm.events.resize.subscribe(e => {
         if (!e) {

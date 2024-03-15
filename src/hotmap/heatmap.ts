@@ -326,7 +326,20 @@ export class Heatmap<TX, TY, TItem> {
     private setRawData(data: Data<TItem>): this {
         this.data = data;
         this.downsampler = undefined;
-        // TODO update world and visWorld
+        if (this.boxes) {
+            const newWholeWorld = Box.create(0, 0, data.nColumns, data.nRows);
+            const xScale = Box.width(newWholeWorld) / Box.width(this.boxes.wholeWorld);
+            const yScale = Box.height(newWholeWorld) / Box.height(this.boxes.wholeWorld);
+            this.boxes.wholeWorld = newWholeWorld;
+            this.boxes.visWorld = Box.clamp({
+                xmin: this.boxes.visWorld.xmin * xScale,
+                xmax: this.boxes.visWorld.xmax * xScale,
+                ymin: this.boxes.visWorld.ymin * yScale,
+                ymax: this.boxes.visWorld.ymax * yScale
+            }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
+            this.scales = Scales(this.boxes);
+        }
+        this.adjustZoomExtent();
         this.draw();
         return this;
     }
@@ -369,6 +382,16 @@ export class Heatmap<TX, TY, TItem> {
         self.originalData = data;
         self.setRawData({ items: array, nRows, nColumns, isNumeric });
         return self;
+    }
+
+    /** Change X and Y domain without changing the data (can be used for reordering or hiding columns/rows). */
+    setDomains(xDomain: TX[] | undefined, yDomain: TY[] | undefined): this {
+        this.setData({
+            ...this.originalData,
+            xDomain: xDomain ?? this.originalData.xDomain,
+            yDomain: yDomain ?? this.originalData.yDomain,
+        });
+        return this;
     }
 
     /** Set a color provider function (takes data item and position and returns color).
@@ -531,18 +554,19 @@ export class Heatmap<TX, TY, TItem> {
         });
         this.dom.svg.call(this.zoomBehavior as any);
         // .on('wheel', e => e.preventDefault()); // Prevent fallback to normal scroll when on min/max zoom
+        this.events.resize.subscribe(() => this.adjustZoomExtent());
+    }
+    private adjustZoomExtent() {
+        if (!this.zoomBehavior) return;
         this.zoomBehavior.translateExtent([[this.boxes.wholeWorld.xmin, -Infinity], [this.boxes.wholeWorld.xmax, Infinity]]);
-        this.events.resize.subscribe(box => {
-            if (!this.zoomBehavior) return;
-            const canvasWidth = Box.width(this.boxes.canvas);
-            const wholeWorldWidth = Box.width(this.boxes.wholeWorld);
-            const minZoom = canvasWidth / wholeWorldWidth; // zoom-out
-            const maxZoom = Math.max(canvasWidth / MIN_ZOOMED_DATAPOINTS, minZoom); // zoom-in
-            this.zoomBehavior.scaleExtent([minZoom, maxZoom]);
-            this.zoomBehavior.extent([[this.boxes.canvas.xmin, this.boxes.canvas.ymin], [this.boxes.canvas.xmax, this.boxes.canvas.ymax]]);
-            const currentZoom = this.visWorldToZoomTransform(this.boxes.visWorld);
-            this.zoomBehavior.transform(this.dom?.svg as any, currentZoom);
-        });
+        const canvasWidth = Box.width(this.boxes.canvas);
+        const wholeWorldWidth = Box.width(this.boxes.wholeWorld);
+        const minZoom = canvasWidth / wholeWorldWidth; // zoom-out
+        const maxZoom = Math.max(canvasWidth / MIN_ZOOMED_DATAPOINTS, minZoom); // zoom-in
+        this.zoomBehavior.scaleExtent([minZoom, maxZoom]);
+        this.zoomBehavior.extent([[this.boxes.canvas.xmin, this.boxes.canvas.ymin], [this.boxes.canvas.xmax, this.boxes.canvas.ymax]]);
+        const currentZoom = this.visWorldToZoomTransform(this.boxes.visWorld);
+        this.zoomBehavior.transform(this.dom?.svg as any, currentZoom);
     }
 
     private zoomTransformToVisWorld(transform: { k: number, x: number, y: number }): Box {
@@ -608,16 +632,17 @@ export class Heatmap<TX, TY, TItem> {
     zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined): ZoomEventParam<TX, TY, TItem> {
         if (!this.dom || !this.zoomBehavior) return undefined;
 
-        const xmin = clamp(this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.boxes.wholeWorld.xmin, this.boxes.wholeWorld.xmin, this.boxes.wholeWorld.xmax - MIN_ZOOMED_DATAPOINTS_HARD);
-        const xmax = clamp(this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.boxes.wholeWorld.xmax, xmin + MIN_ZOOMED_DATAPOINTS_HARD, this.boxes.wholeWorld.xmax);
-        const ymin = clamp(this.getZoomRequestIndexMagic('y', 'Min', z) ?? this.boxes.wholeWorld.ymin, this.boxes.wholeWorld.ymin, this.boxes.wholeWorld.ymax - MIN_ZOOMED_DATAPOINTS_HARD);
-        const ymax = clamp(this.getZoomRequestIndexMagic('y', 'Max', z) ?? this.boxes.wholeWorld.ymax, ymin + MIN_ZOOMED_DATAPOINTS_HARD, this.boxes.wholeWorld.ymax);
-        const visWorldBox = Box.create(xmin, ymin, xmax, ymax);
+        const visWorldBox = Box.clamp({
+            xmin: this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.boxes.wholeWorld.xmin,
+            xmax: this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.boxes.wholeWorld.xmax,
+            ymin: this.getZoomRequestIndexMagic('y', 'Min', z) ?? this.boxes.wholeWorld.ymin,
+            ymax: this.getZoomRequestIndexMagic('y', 'Max', z) ?? this.boxes.wholeWorld.ymax,
+        }, this.boxes.wholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
 
         const xScale = Box.width(this.boxes.canvas) / Box.width(visWorldBox);
         const yScale = Box.height(this.boxes.canvas) / Box.height(visWorldBox);
 
-        const transform = d3.zoomIdentity.scale(xScale).translate(-xmin, 0);
+        const transform = d3.zoomIdentity.scale(xScale).translate(-visWorldBox.xmin, 0);
         this.zoomBehavior.transform(this.dom.svg as any, transform);
         return this.zoomParamFromVisWorld(visWorldBox);
     }

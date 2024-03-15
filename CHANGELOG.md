@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+- Changing domains while keeping data (`setDomains`)
+- Adjust zoom behavior when xDomain or yDomain changes size
+
 ## [0.6.0] - 2024-03-13
 
 - Fixed tooltip placement bug (not moving when scrolling page)
