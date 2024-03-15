@@ -11,6 +11,7 @@ export async function sleep(ms: number) {
     await new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/** Return size of a DOM element `selection` */
 export function getSize(selection: AnySelection): BoxSize {
     const { width, height } = selection.node()!.getBoundingClientRect();
     return { width, height };
@@ -31,6 +32,7 @@ export function kebabCase(str: string) {
     return str.replace(/([A-Z])/g, '-$1').toLowerCase();
 }
 
+/** Emit a new value for `subject`, unless it is equal to the current value */
 export function nextIfChanged<T>(subject: BehaviorSubject<T>, newValue: T, key: ((value: T) => any) = (v => v)) {
     if (!isEqual(key(subject.getValue()), key(newValue))) {
         subject.next(newValue);
@@ -70,4 +72,9 @@ export function runWithTiming(f: () => any) {
     f();
     const end = Date.now();
     return end - start;
+}
+
+export function formatDataItem(item: any): string {
+    if (typeof item === 'number') return item.toFixed(3);
+    else return JSON.stringify(item);
 }

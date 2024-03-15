@@ -2,23 +2,28 @@ import * as d3 from 'd3';
 import { clamp, cloneDeep, isNil, merge, round } from 'lodash';
 import { BehaviorSubject } from 'rxjs';
 import { Color } from './color';
-import { Data, Image, getDataItem, makeRandomRawData } from './data';
+import { Data, Image } from './data';
 import { Domain } from './domain';
 import { Downsampler } from './downsampling';
-import { Box, BoxSize, Boxes, Scales, XY, scaleDistance } from './scales';
-import { attrd, getSize, minimum, nextIfChanged } from './utils';
+import { Box, Boxes, Scales, XY, scaleDistance } from './scales';
+import { attrd, formatDataItem, getSize, minimum, nextIfChanged } from './utils';
 
 
-// TODO: publish on npm before we move this to production, serve via jsdelivr
-// TODO: style via CSS file, avoid inline styles
-// TODO: think in more depth what could happen when changing data type with filters, providers, etc. already set
-// TODO: Highlight column and row on hover - should it also be shown on empty tiles? (filtered-out)
-// TODO: Smoothen zooming and panning with mouse wheel?
-// TODO: avoid Moire patterns and waves (perhaps needs downscaling to exact canvas size?)
-// TODO: drop boxes.dom or boxes.canvas as they are now equal
+// TODO: Should: style via CSS file, avoid inline styles
+// TODO: Should: publish on npm before we move this to production, serve via jsdelivr
+// TODO: Should: think in more depth what could happen when changing data type with filters, providers, etc. already set
+// TODO: Should: reasonable level of customizability
+// TODO: Should: docs
+// TODO: Could: avoid Moire patterns and waves (perhaps needs downscaling to exact canvas size)
+// TODO: Could: various zoom modes (horizontal, vertical, both, none...)
+// TODO: Would: try setting `downsamplingPixelsPerRect` dynamically, based on rendering times
+// TODO: Would: Smoothen zooming and panning with mouse wheel?
 
 
+/** Prefix for class names of DOM elements */
 const AppName = 'hotmap';
+
+/** Class names of DOM elements */
 const Class = {
     MainDiv: `${AppName}-main-div`,
     CanvasDiv: `${AppName}-canvas-div`,
@@ -31,6 +36,7 @@ const Class = {
     PinnedTooltipClose: `${AppName}-pinned-tooltip-close`,
     Overlay: `${AppName}-overlay`,
 };
+
 const MIN_ZOOMED_DATAPOINTS = 1;
 const MIN_ZOOMED_DATAPOINTS_HARD = 1;
 
@@ -48,21 +54,25 @@ const PAN_SENSITIVITY = 0.6;
 const CANVAS_INIT_SIZE = { width: 100, height: 100 };
 
 export type DataDescription<TX, TY, TItem> = {
+    /** Array of X values assigned to columns, from left to right ("column names") */
     xDomain: TX[],
+    /** Array of Y values assigned to rows, from top to bottom ("row names") */
     yDomain: TY[],
     /** Data items to show in the heatmap (each item is visualized as a rectangle) */
     items: TItem[],
     /** X values for the data items (either an array with the X values (must have the same length as `items`), or a function that computes X value for given item)  */
     x: ((dataItem: TItem, index: number) => TX) | TX[],
-    /** Y values for the data items (either an array with the Y values (must have the same length as `items`), or a function that computes X value for given item)  */
+    /** Y values for the data items (either an array with the Y values (must have the same length as `items`), or a function that computes Y value for given item)  */
     y: ((dataItem: TItem, index: number) => TY) | TY[],
 }
 
 /** Types of input parameters of provider functions (that are passed to setTooltip etc.) */
 type ProviderParams<TX, TY, TItem> = [d: TItem, x: TX, y: TY, xIndex: number, yIndex: number]
 
+/** A function that returns something (of type `TResult`) for a data item (such functions are passed to setTooltip, setColor etc.). */
 type Provider<TX, TY, TItem, TResult> = (...args: ProviderParams<TX, TY, TItem>) => TResult
 
+/** Emitted on data-item-related events (hover, click...) */
 type ItemEventParam<TX, TY, TItem> = {
     datum: TItem,
     x: TX,
@@ -72,6 +82,7 @@ type ItemEventParam<TX, TY, TItem> = {
     sourceEvent: MouseEvent,
 } | undefined
 
+/** Emitted on zoom event */
 type ZoomEventParam<TX, TY, TItem> = {
     /** Continuous X index corresponding to the left edge of the viewport */
     xMinIndex: number,
@@ -113,15 +124,16 @@ type ZoomEventParam<TX, TY, TItem> = {
 
 const DefaultColor = Color.fromString('#888888');
 export const DefaultColorProvider = () => DefaultColor;
-export const DefaultNumericColorProvider = Color.createScale('YlOrRd');
-// const DefaultNumericColorProvider = Color.createScale([0, 0.5, 1], ['#2222dd', '#dddddd', '#dd2222']);
+export const DefaultNumericColorProviderFactory = (min: number, max: number) => Color.createScale('YlOrRd', [min, max]);
 
 export function DefaultTooltipProvider(dataItem: unknown, x: unknown, y: unknown, xIndex: number, yIndex: number): string {
     return `x index: ${xIndex}<br>y index: ${yIndex}<br>x value: ${x}<br>y value: ${y}<br>item: ${formatDataItem(dataItem)}`;
 }
 
-type XAlignment = 'left' | 'center' | 'right'
-type YAlignment = 'top' | 'center' | 'bottom'
+/** Controls how X axis values align with the columns when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on X axis can be aligned to the left edge/center/right edge of the column showing that value) */
+export type XAlignmentMode = 'left' | 'center' | 'right'
+/** Controls how Y axis values align with the rows when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on Y axis is aligned to the top edge/center/bottom edge of the row showing that value) */
+export type YAlignmentMode = 'top' | 'center' | 'bottom'
 
 export type VisualParams = typeof DefaultVisualParams;
 
@@ -153,8 +165,8 @@ export class Heatmap<TX, TY, TItem> {
     private xDomain: Domain<TX>;
     private yDomain: Domain<TY>;
     private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
-    private xAlignment: XAlignment = 'center';
-    private yAlignment: YAlignment = 'center';
+    private xAlignment: XAlignmentMode = 'center';
+    private yAlignment: YAlignmentMode = 'center';
 
     private colorProvider: Provider<TX, TY, TItem, string | Color> = DefaultColorProvider;
     private tooltipProvider?: Provider<TX, TY, TItem, string> = DefaultTooltipProvider;
@@ -166,26 +178,30 @@ export class Heatmap<TX, TY, TItem> {
         zoom: new BehaviorSubject<ZoomEventParam<TX, TY, TItem>>(undefined),
         resize: new BehaviorSubject<Box | undefined>(undefined),
     } as const;
-
-    private rootDiv: d3.Selection<HTMLDivElement, any, any, any>;
-    private mainDiv: d3.Selection<HTMLDivElement, any, any, any>;
-    private canvasDiv: d3.Selection<HTMLDivElement, any, any, any>;
-    private canvas: d3.Selection<HTMLCanvasElement, any, any, any>;
-    private svg: d3.Selection<SVGSVGElement, any, any, any>;
-    private ctx: CanvasRenderingContext2D;
+    /** DOM elements managed by this component */
+    private dom?: {
+        rootDiv: d3.Selection<HTMLDivElement, any, any, any>;
+        mainDiv: d3.Selection<HTMLDivElement, any, any, any>;
+        canvasDiv: d3.Selection<HTMLDivElement, any, any, any>;
+        canvas: d3.Selection<HTMLCanvasElement, any, any, any>;
+        svg: d3.Selection<SVGSVGElement, any, any, any>;
+    };
+    /** Canvas rendering context */
+    private ctx?: CanvasRenderingContext2D;
     private boxes: Boxes;
     private scales: Scales;
     /** Approximate width of a rectangle in pixels, when showing downsampled data.
-     * (higher value means more responsive but shittier visualization)
-     * TODO try setting this dynamically, based on rendering times */
+     * (higher value means more responsive but lower-resolution visualization) */
     private downsamplingPixelsPerRect = 4;
     /** Position of the pinned tooltip, if any. In world coordinates, continuous. Use `Math.floor` to get column/row index. */
     private pinnedTooltip?: XY = undefined;
     private readonly lastWheelEvent = { timestamp: 0, absDelta: 0, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false };
 
 
-    static create(): Heatmap<number, number, number>
-    static create<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>): Heatmap<TX_, TY_, TItem_>
+    /** Create a new `Heatmap` and set `data` */
+    static create<TX, TY, TItem>(data: DataDescription<TX, TY, TItem>): Heatmap<TX, TY, TItem>;
+    /** Create a new `Heatmap` with dummy data */
+    static create(): Heatmap<number, number, number>;
     static create<TX_, TY_, TItem_>(data?: DataDescription<TX_, TY_, TItem_>): Heatmap<TX_, TY_, TItem_> | Heatmap<number, number, number> {
         if (data !== undefined) {
             return new this(data);
@@ -198,36 +214,37 @@ export class Heatmap<TX, TY, TItem> {
     private constructor(data: DataDescription<TX, TY, TItem>) {
         this.setData(data);
         if (this.data.isNumeric) {
-            Downsampler.fromNumbers(this.data as Data<number>);
-            (this as unknown as Heatmap<TX, TY, number>).setColor(DefaultNumericColorProvider);
+            const dataRange = Data.getRange(this.data as Data<number>);
+            const colorProvider = DefaultNumericColorProviderFactory(dataRange.min, dataRange.max);
+            (this as unknown as Heatmap<TX, TY, number>).setColor(colorProvider);
         }
     }
 
 
     /** Clear all the contents of the root div. */
     remove(): void {
-        if (!this.rootDiv) return;
-        this.rootDiv.select('*').remove();
+        if (!this.dom) return;
+        this.dom.rootDiv.select('*').remove();
     }
 
     /** Render this heatmap in the given DIV element */
     render(divElementOrId: HTMLDivElement | string): this {
-        if (this.rootDiv) {
-            console.error(`This ${this.constructor.name} has already been rendered in element`, this.rootDiv.node());
+        if (this.dom) {
+            console.error(`This ${this.constructor.name} has already been rendered in element`, this.dom.rootDiv.node());
             throw new Error(`This ${this.constructor.name} has already been rendered. Cannot render again.`);
         }
         console.time('Hotmap render');
 
-        this.rootDiv = (typeof divElementOrId === 'string') ? d3.select(`#${divElementOrId}`) : d3.select(divElementOrId);
-        if (this.rootDiv.empty()) throw new Error('Failed to initialize, wrong div ID?');
+        const rootDiv: d3.Selection<HTMLDivElement, any, any, any> = (typeof divElementOrId === 'string') ? d3.select(`#${divElementOrId}`) : d3.select(divElementOrId);
+        if (rootDiv.empty()) throw new Error('Failed to initialize, wrong div ID?');
         this.remove();
 
-        this.mainDiv = attrd(this.rootDiv.append('div'), {
+        const mainDiv = attrd(rootDiv.append('div'), {
             class: Class.MainDiv,
             style: { position: 'relative', width: '100%', height: '100%' },
         });
 
-        this.canvasDiv = attrd(this.mainDiv.append('div'), {
+        const canvasDiv = attrd(mainDiv.append('div'), {
             class: Class.CanvasDiv,
             style: {
                 position: 'absolute',
@@ -235,13 +252,13 @@ export class Heatmap<TX, TY, TItem> {
             },
         });
 
-        this.canvas = attrd(this.canvasDiv.append('canvas'), {
+        const canvas = attrd(canvasDiv.append('canvas'), {
             width: CANVAS_INIT_SIZE.width,
             height: CANVAS_INIT_SIZE.height,
             style: { position: 'absolute', width: '100%', height: '100%' },
         });
 
-        const ctx = this.canvas.node()?.getContext('2d');
+        const ctx = canvas.node()?.getContext('2d');
         if (ctx) this.ctx = ctx;
         else throw new Error('Failed to initialize canvas');
 
@@ -255,18 +272,21 @@ export class Heatmap<TX, TY, TItem> {
             if (!box) return;
             this.boxes.canvas = box;
             this.boxes.canvas = box;
-            this.ctx.canvas.width = Box.width(box);
-            this.ctx.canvas.height = Box.height(box);
             this.scales = Scales(this.boxes);
+            if (this.ctx) {
+                this.ctx.canvas.width = Box.width(box);
+                this.ctx.canvas.height = Box.height(box);
+            }
             this.draw();
         });
 
-        this.svg = attrd(this.canvasDiv.append('svg'), {
+        const svg = attrd(canvasDiv.append('svg'), {
             style: { position: 'absolute', width: '100%', height: '100%' },
         });
+        this.dom = { rootDiv, mainDiv, canvasDiv, canvas, svg };
 
         for (const eventName in this.handlers) {
-            this.svg.on(eventName, e => this.handlers[eventName as keyof typeof this.handlers](e));
+            svg.on(eventName, e => this.handlers[eventName as keyof typeof this.handlers](e));
             // wheel event must be subscribed before setting zoom
         }
 
@@ -285,7 +305,7 @@ export class Heatmap<TX, TY, TItem> {
         const image = Image.create(this.data.nColumns, this.data.nRows);
         for (let iy = 0; iy < this.data.nRows; iy++) {
             for (let ix = 0; ix < this.data.nColumns; ix++) {
-                const item = getDataItem(this.data, ix, iy);
+                const item = Data.getItem(this.data, ix, iy);
                 if (item === undefined) continue; // keep transparent black
                 const color = this.colorProvider(item, this.xDomain.values[ix], this.yDomain.values[iy], ix, iy);
                 const c = (typeof color === 'string') ? Color.fromString(color) : color;
@@ -297,8 +317,8 @@ export class Heatmap<TX, TY, TItem> {
     }
 
     private emitResize() {
-        if (!this.canvas) return;
-        const size = getSize(this.canvas);
+        if (!this.dom) return;
+        const size = getSize(this.dom.canvas);
         const box = Box.create(0, 0, size.width, size.height);
         this.events.resize.next(box);
     }
@@ -351,6 +371,16 @@ export class Heatmap<TX, TY, TItem> {
         return self;
     }
 
+    /** Set a color provider function (takes data item and position and returns color).
+     * Example:
+     * ```
+     * hm.setColor((d, x, y, xIndex, yIndex) => d >= 0.5 ? 'black' : '#ff0000');
+     * ```
+     * Use `Color.createScale` to create efficient color providers for big numeric data:
+     * ```
+     * hm.setColor(Color.createScale('YlOrRd', [0, 100]));
+     * ```
+     */
     setColor(colorProvider: (...args: ProviderParams<TX, TY, TItem>) => string | Color): this {
         this.colorProvider = colorProvider;
         this.downsampler = undefined;
@@ -379,19 +409,15 @@ export class Heatmap<TX, TY, TItem> {
     }
 
     /** Controls how column/row indices and names map to X and Y axes. */
-    setAlignment(x: XAlignment | undefined, y: YAlignment | undefined): this {
+    setAlignment(x: XAlignmentMode | undefined, y: YAlignmentMode | undefined): this {
         if (x) this.xAlignment = x;
         if (y) this.yAlignment = y;
         this.emitZoom();
         return this;
     }
 
-    private getDataItem(x: number, y: number): TItem | undefined {
-        return getDataItem(this.data, x, y);
-    }
-
     private draw() {
-        if (!this.rootDiv) return;
+        if (!this.dom) return;
         const xResolution = Box.width(this.boxes.canvas) / this.downsamplingPixelsPerRect;
         this.downsampler ??= Downsampler.fromImage(this.getColorArray());
         // console.time('downsample')
@@ -401,8 +427,7 @@ export class Heatmap<TX, TY, TItem> {
     }
 
     private drawTheseData(data: Data<TItem>, xScale: number) {
-        if (!this.rootDiv) return;
-        // this.ctx.resetTransform(); this.ctx.scale(scale, 1);
+        if (!this.ctx) return;
         this.ctx.clearRect(0, 0, Box.width(this.boxes.canvas), Box.height(this.boxes.canvas));
         const width = scaleDistance(this.scales.worldToCanvas.x, 1) * xScale;
         const height = scaleDistance(this.scales.worldToCanvas.y, 1);
@@ -413,7 +438,7 @@ export class Heatmap<TX, TY, TItem> {
 
         for (let iy = 0; iy < data.nRows; iy++) {
             for (let ix = colFrom; ix < colTo; ix++) {
-                const item = getDataItem(data, ix, iy);
+                const item = Data.getItem(data, ix, iy);
                 if (item === undefined) continue;
                 const color = this.colorProvider(item, this.xDomain.values[ix], this.yDomain.values[iy], ix, iy);
                 this.ctx.fillStyle = (typeof color === 'string') ? color : Color.toString(color);
@@ -425,8 +450,7 @@ export class Heatmap<TX, TY, TItem> {
     }
 
     private drawThisImage(image: Image, xScale: number, yScale: number) {
-        if (!this.rootDiv) return;
-        // this.ctx.resetTransform(); this.ctx.scale(scale, 1);
+        if (!this.ctx) return;
         this.ctx.clearRect(0, 0, Box.width(this.boxes.canvas), Box.height(this.boxes.canvas));
         const width = scaleDistance(this.scales.worldToCanvas.x, 1) * xScale;
         const height = scaleDistance(this.scales.worldToCanvas.y, 1);
@@ -472,11 +496,13 @@ export class Heatmap<TX, TY, TItem> {
         // console.timeEnd(`drawThisImage ${colTo - colFrom}`)
     }
 
+    /** Return horizontal gap between rectangles, in canvas pixels */
     private getXGap(colWidthOnCanvas: number): number {
         const gap1 = isNil(this.visualParams.xGapPixels) ? undefined : this.visualParams.xGapPixels;
         const gap2 = isNil(this.visualParams.xGapRelative) ? undefined : this.visualParams.xGapRelative * colWidthOnCanvas;
         return clamp(minimum(gap1, gap2) ?? 0, 0, colWidthOnCanvas);
     }
+    /** Return vertical gap between rectangles, in canvas pixels */
     private getYGap(rowHeightOnCanvas: number): number {
         const gap1 = isNil(this.visualParams.yGapPixels) ? undefined : this.visualParams.yGapPixels;
         const gap2 = isNil(this.visualParams.yGapRelative) ? undefined : this.visualParams.yGapRelative * rowHeightOnCanvas;
@@ -484,6 +510,7 @@ export class Heatmap<TX, TY, TItem> {
     }
 
     private addZoomBehavior() {
+        if (!this.dom) return;
         if (this.zoomBehavior) {
             // Remove any old behavior
             this.zoomBehavior.on('zoom', null);
@@ -502,19 +529,19 @@ export class Heatmap<TX, TY, TItem> {
             this.emitZoom();
             this.draw();
         });
-        this.svg.call(this.zoomBehavior as any);
+        this.dom.svg.call(this.zoomBehavior as any);
         // .on('wheel', e => e.preventDefault()); // Prevent fallback to normal scroll when on min/max zoom
         this.zoomBehavior.translateExtent([[this.boxes.wholeWorld.xmin, -Infinity], [this.boxes.wholeWorld.xmax, Infinity]]);
         this.events.resize.subscribe(box => {
             if (!this.zoomBehavior) return;
-            const domWidth = Box.width(this.boxes.canvas);
+            const canvasWidth = Box.width(this.boxes.canvas);
             const wholeWorldWidth = Box.width(this.boxes.wholeWorld);
-            const minZoom = domWidth / wholeWorldWidth; // zoom-out
-            const maxZoom = Math.max(domWidth / MIN_ZOOMED_DATAPOINTS, minZoom); // zoom-in
+            const minZoom = canvasWidth / wholeWorldWidth; // zoom-out
+            const maxZoom = Math.max(canvasWidth / MIN_ZOOMED_DATAPOINTS, minZoom); // zoom-in
             this.zoomBehavior.scaleExtent([minZoom, maxZoom]);
             this.zoomBehavior.extent([[this.boxes.canvas.xmin, this.boxes.canvas.ymin], [this.boxes.canvas.xmax, this.boxes.canvas.ymax]]);
             const currentZoom = this.visWorldToZoomTransform(this.boxes.visWorld);
-            this.zoomBehavior.transform(this.svg as any, currentZoom);
+            this.zoomBehavior.transform(this.dom?.svg as any, currentZoom);
         });
     }
 
@@ -577,8 +604,9 @@ export class Heatmap<TX, TY, TItem> {
         }
     }
 
+    /** Enforce change of zoom and return the zoom value after the change */
     zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined): ZoomEventParam<TX, TY, TItem> {
-        if (!this.zoomBehavior) return undefined;
+        if (!this.dom || !this.zoomBehavior) return undefined;
 
         const xmin = clamp(this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.boxes.wholeWorld.xmin, this.boxes.wholeWorld.xmin, this.boxes.wholeWorld.xmax - MIN_ZOOMED_DATAPOINTS_HARD);
         const xmax = clamp(this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.boxes.wholeWorld.xmax, xmin + MIN_ZOOMED_DATAPOINTS_HARD, this.boxes.wholeWorld.xmax);
@@ -590,10 +618,11 @@ export class Heatmap<TX, TY, TItem> {
         const yScale = Box.height(this.boxes.canvas) / Box.height(visWorldBox);
 
         const transform = d3.zoomIdentity.scale(xScale).translate(-xmin, 0);
-        this.zoomBehavior.transform(this.svg as any, transform);
+        this.zoomBehavior.transform(this.dom.svg as any, transform);
         return this.zoomParamFromVisWorld(visWorldBox);
     }
 
+    /** Return current zoom */
     getZoom(): ZoomEventParam<TX, TY, TItem> {
         return this.zoomParamFromVisWorld(this.boxes.visWorld);
     }
@@ -647,7 +676,7 @@ export class Heatmap<TX, TY, TItem> {
         }
         const xIndex = Math.floor(this.scales.canvasToWorld.x(event.offsetX));
         const yIndex = Math.floor(this.scales.canvasToWorld.y(event.offsetY));
-        const datum = this.getDataItem(xIndex, yIndex);
+        const datum = Data.getItem(this.data, xIndex, yIndex);
         if (!datum) {
             return undefined;
         }
@@ -664,6 +693,7 @@ export class Heatmap<TX, TY, TItem> {
     }
 
     private drawMarkers(pointed: ItemEventParam<TX, TY, TItem>) {
+        if (!this.dom) return;
         if (pointed) {
             const x = this.scales.worldToCanvas.x(pointed.xIndex);
             const y = this.scales.worldToCanvas.y(pointed.yIndex);
@@ -685,22 +715,24 @@ export class Heatmap<TX, TY, TItem> {
                 height,
             });
         } else {
-            this.svg.selectAll('.' + Class.Marker).remove();
-            this.svg.selectAll('.' + Class.MarkerX).remove();
-            this.svg.selectAll('.' + Class.MarkerY).remove();
+            this.dom.svg.selectAll('.' + Class.Marker).remove();
+            this.dom.svg.selectAll('.' + Class.MarkerX).remove();
+            this.dom.svg.selectAll('.' + Class.MarkerY).remove();
         }
     }
 
     private addOrUpdateMarker(className: string, staticAttrs: Parameters<typeof attrd>[1], dynamicAttrs: Parameters<typeof attrd>[1]) {
-        const marker = this.svg.selectAll('.' + className).data([1]);
+        if (!this.dom) return;
+        const marker = this.dom.svg.selectAll('.' + className).data([1]);
         attrd(marker.enter().append('rect'), { class: className, ...staticAttrs, ...dynamicAttrs });
         attrd(marker, dynamicAttrs);
     }
 
     private drawTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
+        if (!this.dom) return;
         const thisTooltipPinned = pointed && this.pinnedTooltip && pointed.xIndex === Math.floor(this.pinnedTooltip.x) && pointed.yIndex === Math.floor(this.pinnedTooltip.y);
         if (pointed && !thisTooltipPinned && this.tooltipProvider) {
-            const tooltip = this.canvasDiv.selectAll('.' + Class.Tooltip).data([1]);
+            const tooltip = this.dom.canvasDiv.selectAll('.' + Class.Tooltip).data([1]);
             const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
             const tooltipText = this.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
             // Create tooltip if doesn't exist
@@ -720,18 +752,19 @@ export class Heatmap<TX, TY, TItem> {
                 style: { ...tooltipPosition },
             }).html(tooltipText);
         } else {
-            this.canvasDiv.selectAll('.' + Class.Tooltip).remove();
+            this.dom.canvasDiv.selectAll('.' + Class.Tooltip).remove();
         }
     }
 
     private drawPinnedTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
-        this.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
+        if (!this.dom) return;
+        this.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
         if (pointed && this.tooltipProvider) {
             this.pinnedTooltip = { x: this.scales.canvasToWorld.x(pointed.sourceEvent.offsetX), y: this.scales.canvasToWorld.y(pointed.sourceEvent.offsetY) };
             const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
             const tooltipText = this.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
 
-            const tooltip = attrd(this.canvasDiv.append('div'), {
+            const tooltip = attrd(this.dom.canvasDiv.append('div'), {
                 class: Class.PinnedTooltipBox,
                 style: { position: 'absolute', ...tooltipPosition, zIndex: 0 },
             });
@@ -793,12 +826,12 @@ export class Heatmap<TX, TY, TItem> {
     private addPinnedTooltipBehavior() {
         this.events.click.subscribe(pointed => this.drawPinnedTooltip(pointed));
         const updatePinnedTooltipPosition = () => {
-            if (this.pinnedTooltip) {
+            if (this.dom && this.pinnedTooltip) {
                 const domPosition = {
                     offsetX: this.scales.worldToCanvas.x(this.pinnedTooltip.x),
                     offsetY: this.scales.worldToCanvas.y(this.pinnedTooltip.y),
                 };
-                attrd(this.canvasDiv.selectAll('.' + Class.PinnedTooltipBox), { style: this.getTooltipPosition(domPosition) });
+                attrd(this.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox), { style: this.getTooltipPosition(domPosition) });
             }
         };
         this.events.zoom.subscribe(updatePinnedTooltipPosition);
@@ -814,9 +847,10 @@ export class Heatmap<TX, TY, TItem> {
     }
 
     private showScrollingMessage() {
-        if (!this.mainDiv.selectAll(`.${Class.Overlay}`).empty()) return;
+        if (!this.dom) return;
+        if (!this.dom.mainDiv.selectAll(`.${Class.Overlay}`).empty()) return;
 
-        const overlay = attrd(this.mainDiv.append('div'), {
+        const overlay = attrd(this.dom.mainDiv.append('div'), {
             class: Class.Overlay,
             style: { position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', zIndex: 0 },
         });
@@ -863,6 +897,7 @@ export class Heatmap<TX, TY, TItem> {
         mouseleave: (e: MouseEvent) => this.handleHover(undefined),
         click: (e: MouseEvent) => this.events.click.next(this.getPointedItem(e)),
         wheel: (e: WheelEvent) => {
+            if (!this.dom) return;
             e.preventDefault(); // TODO ???
 
             // Magic to handle touchpad scrolling on Mac (when user lifts fingers from touchpad, but the browser is still getting wheel events)
@@ -882,7 +917,7 @@ export class Heatmap<TX, TY, TItem> {
                 const action = this.wheelAction(e);
                 if (action.kind === 'pan') {
                     const shiftX = PAN_SENSITIVITY * scaleDistance(this.scales.canvasToWorld.x, action.deltaX);
-                    this.zoomBehavior.duration(1000).translateBy(this.svg as any, shiftX, 0);
+                    this.zoomBehavior.duration(1000).translateBy(this.dom.svg as any, shiftX, 0);
                 }
                 if (action.kind === 'showHelp') {
                     this.showScrollingMessage();
@@ -894,7 +929,7 @@ export class Heatmap<TX, TY, TItem> {
 
 
 function makeRandomData(nColumns: number, nRows: number): DataDescription<number, number, number> {
-    const raw = makeRandomRawData(nColumns, nRows);
+    const raw = Data.createRandom(nColumns, nRows);
     return {
         items: raw.items as number[],
         x: (d, i) => i % nColumns,
@@ -912,12 +947,7 @@ function makeRandomData2(nColumns: number, nRows: number): DataDescription<numbe
     };
 }
 
-export function formatDataItem(item: any): string {
-    if (typeof item === 'number') return item.toFixed(3);
-    else return JSON.stringify(item);
-}
-
-function indexAlignmentShift(alignment: XAlignment | YAlignment) {
+function indexAlignmentShift(alignment: XAlignmentMode | YAlignmentMode) {
     if (alignment === 'left' || alignment === 'top') return 0;
     if (alignment === 'center') return -0.5;
     return -1;

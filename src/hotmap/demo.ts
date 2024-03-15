@@ -1,5 +1,6 @@
 import * as d3 from 'd3';
-import { Heatmap, formatDataItem } from './heatmap';
+import { Heatmap } from './heatmap';
+import { formatDataItem } from './utils';
 
 
 export function demo(divElementOrId: HTMLDivElement | string) {
