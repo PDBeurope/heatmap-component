@@ -28,9 +28,9 @@ export interface Boxes {
     visWorld: Box,
     /** The whole world (~ maximum zoom-out) */
     wholeWorld: Box,
-    /** Viewport in DOM coordinates (starts at [0,0]) */
-    dom: Box,
-    /** Viewport in the canvas coordinates (starts at [0,0]) */
+    /** Viewport in the canvas coordinates (starts at [0,0]).
+     * These coordinates can be used both for interactivity via DOM events and for drawing via canvas context,
+     * because the logical size of the canvas is synchronized with its DOM size. */
     canvas: Box,
 }
 
@@ -40,12 +40,8 @@ interface XYScale {
 }
 
 export interface Scales {
-    worldToDom: XYScale,
-    domToWorld: XYScale,
     worldToCanvas: XYScale,
     canvasToWorld: XYScale,
-    domToCanvas: XYScale,
-    canvasToDom: XYScale,
 }
 
 function getXScale(source: Box, dest: Box) { return d3.scaleLinear([source.xmin, source.xmax], [dest.xmin, dest.xmax]).clamp(false); }
@@ -53,14 +49,6 @@ function getYScale(source: Box, dest: Box) { return d3.scaleLinear([source.ymin,
 
 export function Scales(boxes: Boxes): Scales {
     return {
-        worldToDom: {
-            x: getXScale(boxes.visWorld, boxes.dom),
-            y: getYScale(boxes.visWorld, boxes.dom),
-        },
-        domToWorld: {
-            x: getXScale(boxes.dom, boxes.visWorld),
-            y: getYScale(boxes.dom, boxes.visWorld),
-        },
         worldToCanvas: {
             x: getXScale(boxes.visWorld, boxes.canvas),
             y: getYScale(boxes.visWorld, boxes.canvas),
@@ -68,14 +56,6 @@ export function Scales(boxes: Boxes): Scales {
         canvasToWorld: {
             x: getXScale(boxes.canvas, boxes.visWorld),
             y: getYScale(boxes.canvas, boxes.visWorld),
-        },
-        domToCanvas: {
-            x: getXScale(boxes.dom, boxes.canvas),
-            y: getYScale(boxes.dom, boxes.canvas),
-        },
-        canvasToDom: {
-            x: getXScale(boxes.canvas, boxes.dom),
-            y: getYScale(boxes.canvas, boxes.dom),
         },
     };
 }
