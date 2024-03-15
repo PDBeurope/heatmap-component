@@ -211,11 +211,6 @@ export class Heatmap<TX, TY, TItem> {
 
     /** Render this heatmap in the given DIV element */
     render(divElementOrId: HTMLDivElement | string): this {
-        // console.time('Get all colors')
-        // const colorArray = this.getColorArray();
-        // console.timeEnd('Get all colors')
-        // console.log('color:', d3.color('rgba(500,50,50,0.5)')?.formatHex());
-
         if (this.rootDiv) {
             console.error(`This ${this.constructor.name} has already been rendered in element`, this.rootDiv.node());
             throw new Error(`This ${this.constructor.name} has already been rendered. Cannot render again.`);
@@ -300,6 +295,7 @@ export class Heatmap<TX, TY, TItem> {
         // console.timeEnd('get all colors')
         return image;
     }
+
     private emitResize() {
         if (!this.canvas) return;
         const size = getSize(this.canvas);
@@ -441,18 +437,24 @@ export class Heatmap<TX, TY, TItem> {
             * (yScale === 1 ? 1 : (1 - this.getYGap(height) / height)); // This compensates omitting gaps by lowering opacity (when scaled)
         const colFrom = Math.floor(this.boxes.visWorld.xmin / xScale);
         const colTo = Math.ceil(this.boxes.visWorld.xmax / xScale); // exclusive
+        // console.time(`drawThisImage ${colTo - colFrom}`)
 
         const { nRows, nColumns } = image;
         for (let iy = 0; iy < nRows; iy++) {
+            if (iy < 0 || iy >= nRows) continue;
+            const y = this.scales.worldToCanvas.y(iy);
+            let yFrom = y, yTo = y + height;
+            if (yScale === 1) {
+                yFrom += yHalfGap;
+                yTo -= yHalfGap;
+            } else {
+                yFrom = Math.floor(yFrom);
+                yTo = Math.floor(yTo);
+            }
             for (let ix = colFrom; ix < colTo; ix++) {
-                if (ix < 0 || ix >= nColumns || iy < 0 || iy >= nRows) continue;
-                let color = Color.fromImage(image, ix, iy);
-                if (opacityRatio !== 1) color = Color.scaleAlpha(color, opacityRatio);
-                this.ctx.fillStyle = Color.toString(color);
+                if (ix < 0 || ix >= nColumns) continue;
                 const x = this.scales.worldToCanvas.x(ix * xScale);
-                const y = this.scales.worldToCanvas.y(iy);
                 let xFrom = x, xTo = x + width;
-                let yFrom = y, yTo = y + height;
                 if (xScale === 1) {
                     xFrom += xHalfGap;
                     xTo -= xHalfGap;
@@ -461,16 +463,13 @@ export class Heatmap<TX, TY, TItem> {
                     xFrom = Math.floor(xFrom);
                     xTo = Math.floor(xTo);
                 }
-                if (yScale === 1) {
-                    yFrom += yHalfGap;
-                    yTo -= yHalfGap;
-                } else {
-                    yFrom = Math.floor(yFrom);
-                    yTo = Math.floor(yTo);
-                }
+                let color = Color.fromImage(image, ix, iy);
+                if (opacityRatio !== 1) color = Color.scaleAlpha(color, opacityRatio);
+                this.ctx.fillStyle = Color.toString(color); // this line is a performance bottleneck, .fillStyle only takes strings :(
                 this.ctx.fillRect(xFrom, yFrom, xTo - xFrom, yTo - yFrom);
             }
         }
+        // console.timeEnd(`drawThisImage ${colTo - colFrom}`)
     }
 
     private getXGap(colWidthOnCanvas: number): number {

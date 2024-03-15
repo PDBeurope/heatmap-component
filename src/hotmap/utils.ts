@@ -63,3 +63,11 @@ export function sortDirection(array: number[]): 'asc' | 'desc' | 'none' {
         return 'desc';
     }
 }
+
+/** Run `f()` and return its running time in ms */
+export function runWithTiming(f: () => any) {
+    const start = Date.now();
+    f();
+    const end = Date.now();
+    return end - start;
+}
