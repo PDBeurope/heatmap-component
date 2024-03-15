@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file, following t
 
 - Changing domains while keeping data (`setDomains`)
 - Adjust zoom behavior when xDomain or yDomain changes size
+- Styling via CSS
 
 ## [0.6.0] - 2024-03-13
 

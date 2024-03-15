@@ -9,7 +9,6 @@ import { Box, Boxes, Scales, XY, scaleDistance } from './scales';
 import { attrd, formatDataItem, getSize, minimum, nextIfChanged } from './utils';
 
 
-// TODO: Should: style via CSS file, avoid inline styles
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
 // TODO: Should: think in more depth what could happen when changing data type with filters, providers, etc. already set
 // TODO: Should: reasonable level of customizability
@@ -20,22 +19,24 @@ import { attrd, formatDataItem, getSize, minimum, nextIfChanged } from './utils'
 // TODO: Would: Smoothen zooming and panning with mouse wheel?
 
 
-/** Prefix for class names of DOM elements */
-const AppName = 'hotmap';
 
 /** Class names of DOM elements */
 const Class = {
-    MainDiv: `${AppName}-main-div`,
-    CanvasDiv: `${AppName}-canvas-div`,
-    Marker: `${AppName}-marker`,
-    MarkerX: `${AppName}-marker-x`,
-    MarkerY: `${AppName}-marker-y`,
-    Tooltip: `${AppName}-tooltip`,
-    PinnedTooltipBox: `${AppName}-pinned-tooltip-box`,
-    PinnedTooltipContent: `${AppName}-pinned-tooltip-content`,
-    PinnedTooltipClose: `${AppName}-pinned-tooltip-close`,
-    Overlay: `${AppName}-overlay`,
-};
+    MainDiv: 'hotmap-main-div',
+    CanvasDiv: 'hotmap-canvas-div',
+    Marker: 'hotmap-marker',
+    MarkerX: 'hotmap-marker-x',
+    MarkerY: 'hotmap-marker-y',
+    TooltipBox: 'hotmap-tooltip-box',
+    TooltipContent: 'hotmap-tooltip-content',
+    PinnedTooltipBox: 'hotmap-pinned-tooltip-box',
+    PinnedTooltipContent: 'hotmap-pinned-tooltip-content',
+    PinnedTooltipPin: 'hotmap-pinned-tooltip-pin',
+    PinnedTooltipClose: 'hotmap-pinned-tooltip-close',
+    Overlay: 'hotmap-overlay',
+    OverlayShade: 'hotmap-overlay-shade',
+    OverlayMessage: 'hotmap-overlay-message',
+} as const;
 
 const MIN_ZOOMED_DATAPOINTS = 1;
 const MIN_ZOOMED_DATAPOINTS_HARD = 1;
@@ -147,13 +148,8 @@ export const DefaultVisualParams = {
     /** Vertical gap between neighboring rows relative to (row height + gap). If both `yGapPixels` and `yGapRelative` are non-null, the smaller final gap value will be used. The margin before the first and after the last row is half of the gap between rows. */
     yGapRelative: 0.1 as number | null,
 
-    /** Position of bottom-left corner of tooltip box relative to the mouse position (right) */
-    tooltipOffsetX: 5 as number,
-    /** Position of bottom-left corner of tooltip box relative to the mouse position (down) */
-    tooltipOffsetY: -8 as number,
-
     // More config via CSS:
-    // .hotmap-canvas-div { background-color: none; }
+    // .hotmap-canvas-div { background-color: none; }...
 };
 
 
@@ -246,10 +242,7 @@ export class Heatmap<TX, TY, TItem> {
 
         const canvasDiv = attrd(mainDiv.append('div'), {
             class: Class.CanvasDiv,
-            style: {
-                position: 'absolute',
-                left: '0px', right: '0px', top: '0px', bottom: '0px',
-            },
+            style: { position: 'absolute', width: '100%', height: '100%' },
         });
 
         const canvas = attrd(canvasDiv.append('canvas'), {
@@ -757,27 +750,25 @@ export class Heatmap<TX, TY, TItem> {
         if (!this.dom) return;
         const thisTooltipPinned = pointed && this.pinnedTooltip && pointed.xIndex === Math.floor(this.pinnedTooltip.x) && pointed.yIndex === Math.floor(this.pinnedTooltip.y);
         if (pointed && !thisTooltipPinned && this.tooltipProvider) {
-            const tooltip = this.dom.canvasDiv.selectAll('.' + Class.Tooltip).data([1]);
             const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
             const tooltipText = this.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
-            // Create tooltip if doesn't exist
-            attrd(tooltip.enter().append('div'), {
-                class: Class.Tooltip,
-                style: {
-                    position: 'absolute',
-                    ...tooltipPosition,
-                    backgroundColor: 'white',
-                    border: 'solid black 1px',
-                    paddingBlock: '0.35em', paddingInline: '0.7em',
-                    boxShadow: '0px 5px 15px rgba(0,0,0,0.75)',
-                },
-            }).html(tooltipText);
-            // Update tooltip position and content if exists
-            attrd(tooltip, {
-                style: { ...tooltipPosition },
-            }).html(tooltipText);
+            let tooltip = this.dom.canvasDiv.selectAll<HTMLDivElement, any>('.' + Class.TooltipBox);
+            if (tooltip.empty()) {
+                // Create tooltip if doesn't exist
+                tooltip = attrd(this.dom.canvasDiv.append('div'), {
+                    class: Class.TooltipBox,
+                    style: { position: 'absolute', ...tooltipPosition }
+                });
+                attrd(tooltip.append('div'), { class: Class.TooltipContent })
+                    .html(tooltipText);
+            } else {
+                // Update tooltip position and content if exists
+                attrd(tooltip, { style: tooltipPosition })
+                    .select('.' + Class.TooltipContent)
+                    .html(tooltipText);
+            }
         } else {
-            this.dom.canvasDiv.selectAll('.' + Class.Tooltip).remove();
+            this.dom.canvasDiv.selectAll('.' + Class.TooltipBox).remove();
         }
     }
 
@@ -791,55 +782,28 @@ export class Heatmap<TX, TY, TItem> {
 
             const tooltip = attrd(this.dom.canvasDiv.append('div'), {
                 class: Class.PinnedTooltipBox,
-                style: { position: 'absolute', ...tooltipPosition, zIndex: 0 },
+                style: { position: 'absolute', ...tooltipPosition },
             });
 
             // Tooltip content
-            attrd(tooltip.append('div'), {
-                class: Class.PinnedTooltipContent,
-                style: {
-                    backgroundColor: 'white', border: 'solid black 1px',
-                    paddingBlock: '0.35em', paddingInline: '0.7em',
-                    boxShadow: '0px 5px 15px rgba(0,0,0,0.75)',
-                },
-            }).html(tooltipText);
+            attrd(tooltip.append('div'), { class: Class.PinnedTooltipContent })
+                .html(tooltipText);
 
             // Tooltip close button
-            const closeButton = attrd(tooltip.append('div'), {
-                class: Class.PinnedTooltipClose,
-                style: {
-                    position: 'absolute', top: '-8px', right: '-8px',
-                    width: '16px', height: '16px', borderRadius: '1000px',
-                    backgroundColor: 'black',
-                    border: 'solid black 1px',
-                },
-            })
-                .on('click', () => this.events.click.next(undefined));
-            attrd(closeButton.append('svg'), {
-                style: {
-                    position: 'absolute',
-                    width: '100%', height: '100%',
-                },
-            })
+            attrd(tooltip.append('div'), { class: Class.PinnedTooltipClose })
+                .on('click', () => this.events.click.next(undefined))
+                .append('svg')
                 .attr('viewBox', '0 0 24 24')
                 .attr('preserveAspectRatio', 'none')
-                .append('path').attr('d', 'M19,6.41 L17.59,5 L12,10.59 L6.41,5 L5,6.41 L10.59,12 L5,17.59 L6.41,19 L12,13.41 L17.59,19 L19,17.59 L13.41,12 L19,6.41 Z')
-                .style('fill', 'white').style('stroke', 'white');
+                .append('path')
+                .attr('d', 'M19,6.41 L17.59,5 L12,10.59 L6.41,5 L5,6.41 L10.59,12 L5,17.59 L6.41,19 L12,13.41 L17.59,19 L19,17.59 L13.41,12 L19,6.41 Z');
 
             // Tooltip pin
-            attrd(tooltip.append('svg'), {
-                style: {
-                    position: 'absolute',
-                    left: `${-this.visualParams.tooltipOffsetX}px`, bottom: `${this.visualParams.tooltipOffsetY}px`,
-                    width: `${Math.abs(this.visualParams.tooltipOffsetX) / 0.6}px`, height: `${Math.abs(this.visualParams.tooltipOffsetY) / 0.6}px`,
-                    zIndex: -1,
-                    pointerEvents: 'none',
-                },
-            })
+            attrd(tooltip.append('svg'), { class: Class.PinnedTooltipPin })
                 .attr('viewBox', '0 0 100 100')
                 .attr('preserveAspectRatio', 'none')
-                .append('path').attr('d', 'M0,100 L100,40 L60,0 Z')
-                .style('fill', 'black');
+                .append('path')
+                .attr('d', 'M0,100 L100,40 L60,0 Z');
 
             // Remove any non-pinned tooltip
             this.drawTooltip(undefined);
@@ -865,8 +829,8 @@ export class Heatmap<TX, TY, TItem> {
 
     /** Return tooltip position as CSS style parameters (for position:absolute within this.canvasDiv) for mouse event `e` triggered on this.svg.  */
     private getTooltipPosition(e: MouseEvent | { offsetX: number, offsetY: number }) {
-        const left = `${(e.offsetX ?? 0) + this.visualParams.tooltipOffsetX}px`;
-        const bottom = `${Box.height(this.boxes.canvas) - (e.offsetY ?? 0) - this.visualParams.tooltipOffsetY}px`;
+        const left = `${(e.offsetX ?? 0)}px`;
+        const bottom = `${Box.height(this.boxes.canvas) - (e.offsetY ?? 0)}px`;
         const display = Box.containsPoint(this.boxes.canvas, { x: e.offsetX, y: e.offsetY }) ? 'unset' : 'none';
         return { left, bottom, display };
     }
@@ -875,20 +839,10 @@ export class Heatmap<TX, TY, TItem> {
         if (!this.dom) return;
         if (!this.dom.mainDiv.selectAll(`.${Class.Overlay}`).empty()) return;
 
-        const overlay = attrd(this.dom.mainDiv.append('div'), {
-            class: Class.Overlay,
-            style: { position: 'absolute', width: '100%', height: '100%', pointerEvents: 'none', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', zIndex: 0 },
-        });
-        attrd(overlay.append('div'), {
-            style: { position: 'absolute', width: '100%', height: '100%', backgroundColor: 'black', opacity: 0.4, zIndex: -1 },
-        });
-        attrd(overlay.append('div'), {
-            style: {
-                margin: '5px', paddingBlock: '1em', paddingInline: '1.6em',
-                textAlign: 'center', fontSize: '150%', fontWeight: 'bold',
-                backgroundColor: 'white', border: 'solid black 1px', boxShadow: '0px 5px 15px rgba(0,0,0,0.75)',
-            },
-        }).text('Press Ctrl and scroll to apply zoom');
+        const overlay = attrd(this.dom.mainDiv.append('div'), { class: Class.Overlay });
+        attrd(overlay.append('div'), { class: Class.OverlayShade });
+        attrd(overlay.append('div'), { class: Class.OverlayMessage })
+            .text('Press Ctrl and scroll to apply zoom');
         setTimeout(() => overlay.remove(), 750);
     }
 
