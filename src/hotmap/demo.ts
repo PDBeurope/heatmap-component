@@ -1,6 +1,8 @@
 import * as d3 from 'd3';
 import { Heatmap } from './heatmap';
 import { formatDataItem } from './utils';
+import { resamplingCoefficients } from './downsampling';
+import { sum } from 'lodash';
 
 
 export function demo(divElementOrId: HTMLDivElement | string) {
@@ -12,6 +14,11 @@ export function demo(divElementOrId: HTMLDivElement | string) {
     // hm.setFilter(d => d > 0.1);
     // setTimeout(()=> hm.setFilter(undefined), 2000);
     (window as any).hm = hm;
+    // const q = resamplingCoefficients(10, 4, { from: 2.6, to: 10 });
+    // for (let i = 0; i < q.from.length; i++) {
+    //     console.log(q.from[i], q.to[i], q.weight[i]);
+    // }
+    // console.log(sum(q.weight));
     // benchmarkColor('#caffeeee', 1e7)
 }
 

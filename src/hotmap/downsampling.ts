@@ -1,5 +1,5 @@
 import { Data, Image } from './data';
-import { XY } from './scales';
+import { Box, XY } from './scales';
 
 
 type DownsamplingMode = 'number' | 'image'
@@ -80,7 +80,9 @@ function getOrCompute<M extends DownsamplingMode>(downsampler: Downsampler<M>, r
         const srcResolution = downsamplingSource2D(resolution, { x: downsampler.nColumns, y: downsampler.nRows });
         if (!srcResolution || srcResolution.x > downsampler.nColumns || srcResolution.y > downsampler.nRows) throw new Error('AssertionError');
         const srcData: DataType<M> = getOrCompute(downsampler, srcResolution);
-        const result = (downsampler.mode === 'image' ? downsampleImage(srcData as DataType<'image'>, resolution) : downsampleNumbers(srcData as DataType<'number'>, resolution)) as DataType<M>;
+        const result = (downsampler.mode === 'image' ?
+            downsampleImage(srcData as DataType<'image'>, resolution)
+            : downsampleNumbers(srcData as DataType<'number'>, resolution)) as DataType<M>;
         set(downsampler, resolution, result);
         return result;
     }
@@ -114,25 +116,25 @@ function downsamplingSource2D(wanted: XY, original: XY): XY | undefined {
 
 
 /** Downsample 2D array of numbers to a new size. */
-function downsampleNumbers(input: Data<number>, newSize: XY): Data<number> {
-    if (input.nColumns === 2 * newSize.x && input.nRows === newSize.y) {
+function downsampleNumbers(input: Data<number>, newSize: XY, crop?: Partial<Box>): Data<number> {
+    if (!crop && input.nColumns === 2 * newSize.x && input.nRows === newSize.y) {
         return downsampleNumbers_halveX(input);
-    } else if (input.nColumns === newSize.x && input.nRows === 2 * newSize.y) {
-        return downsampleNumbers_halveY(input);
-    } else {
-        return downsampleNumbers_general(input, newSize);
     }
+    if (!crop && input.nColumns === newSize.x && input.nRows === 2 * newSize.y) {
+        return downsampleNumbers_halveY(input);
+    }
+    return downsampleNumbers_general(input, newSize, crop);
 }
 
 /** Downsample 2D array of numbers to a new size - implementation for general sizes. */
-function downsampleNumbers_general(input: Data<number>, newSize: { x: number, y: number }): Data<number> {
+function downsampleNumbers_general(input: Data<number>, newSize: { x: number, y: number }, crop?: Partial<Box>): Data<number> {
     const w0 = input.nColumns;
     const h0 = input.nRows;
     const w1 = newSize.x;
     const h1 = newSize.y;
     if (input.items.length !== h0 * w0) throw new Error('ValueError: length of input.items must be input.nColumns * input.nRows');
-    const x = resamplingCoefficients(w0, w1);
-    const y = resamplingCoefficients(h0, h1);
+    const x = resamplingCoefficients(w0, w1, { from: crop?.xmin, to: crop?.xmax });
+    const y = resamplingCoefficients(h0, h1, { from: crop?.ymin, to: crop?.ymax });
     const out = new Float32Array(h1 * w1);
     for (let i = 0; i < y.from.length; i++) { // row index
         const y_from_offset = y.from[i] * w0;
@@ -191,26 +193,26 @@ function downsampleNumbers_halveY(input: Data<number>): Data<number> {
 
 
 /** Downsample image to a new size. */
-function downsampleImage(input: Image, newSize: XY): Image {
-    if (input.nColumns === 2 * newSize.x && input.nRows === newSize.y) {
+function downsampleImage(input: Image, newSize: XY, crop?: Partial<Box>): Image {
+    if (!crop && input.nColumns === 2 * newSize.x && input.nRows === newSize.y) {
         return downsampleImage_halveX(input);
-    } else if (input.nColumns === newSize.x && input.nRows === 2 * newSize.y) {
-        return downsampleImage_halveY(input);
-    } else {
-        return downsampleImage_general(input, newSize);
     }
+    if (!crop && input.nColumns === newSize.x && input.nRows === 2 * newSize.y) {
+        return downsampleImage_halveY(input);
+    }
+    return downsampleImage_general(input, newSize, crop);
 }
 
 /** Downsample image to a new size - implementation for general sizes. */
-function downsampleImage_general(input: Image, newSize: XY): Image {
+function downsampleImage_general(input: Image, newSize: XY, crop?: Partial<Box>): Image {
     const N_CHANNELS = 4;
     const w0 = input.nColumns;
     const h0 = input.nRows;
     const w1 = newSize.x;
     const h1 = newSize.y;
     if (input.items.length !== N_CHANNELS * h0 * w0) throw new Error('ValueError: length of Image.items must be 4 * Image.nColumns * Image.nRows');
-    const y = resamplingCoefficients(h0, h1);
-    const x = resamplingCoefficients(w0, w1);
+    const x = resamplingCoefficients(w0, w1, { from: crop?.xmin, to: crop?.xmax });
+    const y = resamplingCoefficients(h0, h1, { from: crop?.ymin, to: crop?.ymax });
     const out = new Uint8ClampedArray(h1 * w1 * N_CHANNELS); // We will always downsample by a factor between 1 and 2, so rounding errors here are not a big issue (for higher factors the errors could sum up to a big error)
     for (let i = 0; i < y.from.length; i++) { // row index
         for (let j = 0; j < x.from.length; j++) { // column index
@@ -284,16 +286,18 @@ function downsampleImage_halveY(input: Image): Image {
  * Typically one old pixel will contribute to more new pixels and vice versa.
  * Sum of weights contributed to each new pixel must be equal to 1.
  * To use for 2D images, calculate row-wise and column-wise weights and multiply them. */
-function resamplingCoefficients(nOld: number, nNew: number) {
-    const scale = nNew / nOld;
-    let i = 0;
-    let j = 0;
-    let p = 0;
+export function resamplingCoefficients(nOld: number, nNew: number, crop?: { from?: number, to?: number }) {
+    const oldFrom = crop?.from ?? 0;
+    const oldTo = crop?.to ?? nOld;
+    const scale = nNew / (oldTo - oldFrom);
+    let i = Math.floor(oldFrom); // Current pixel in the old image
+    let j = 0; // Current pixel in the new image
+    let p = 0; // Current continuous position in the new image
     const from = [];
     const to = [];
     const weight = [];
-    while (p < nNew) {
-        const nextINotch = scale * (i + 1);
+    while (p < nNew && i < oldTo) { // the second part of the condition is needed because of rounding errors
+        const nextINotch = scale * (i + 1 - oldFrom);
         const nextJNotch = j + 1;
         if (nextINotch <= nextJNotch) {
             from.push(i);
