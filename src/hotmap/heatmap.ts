@@ -6,7 +6,7 @@ import { Data, Image } from './data';
 import { Domain } from './domain';
 import { Downsampler } from './downsampling';
 import { Box, Boxes, Scales, XY, scaleDistance } from './scales';
-import { attrd, formatDataItem, getSize, minimum, nextIfChanged } from './utils';
+import { Refresher, attrd, formatDataItem, getSize, minimum, nextIfChanged } from './utils';
 
 
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
@@ -270,7 +270,7 @@ export class Heatmap<TX, TY, TItem> {
                 this.ctx.canvas.width = Box.width(box);
                 this.ctx.canvas.height = Box.height(box);
             }
-            this.draw();
+            this.requestDraw();
         });
 
         const svg = attrd(canvasDiv.append('svg'), {
@@ -333,7 +333,7 @@ export class Heatmap<TX, TY, TItem> {
             this.scales = Scales(this.boxes);
         }
         this.adjustZoomExtent();
-        this.draw();
+        this.requestDraw();
         return this;
     }
 
@@ -400,7 +400,7 @@ export class Heatmap<TX, TY, TItem> {
     setColor(colorProvider: (...args: ProviderParams<TX, TY, TItem>) => string | Color): this {
         this.colorProvider = colorProvider;
         this.downsampler = undefined;
-        this.draw();
+        this.requestDraw();
         return this;
     }
 
@@ -420,7 +420,7 @@ export class Heatmap<TX, TY, TItem> {
 
     setVisualParams(params: Partial<VisualParams>): this {
         this.visualParams = merge(cloneDeep(this.visualParams), params);
-        this.draw();
+        this.requestDraw();
         return this;
     }
 
@@ -432,7 +432,13 @@ export class Heatmap<TX, TY, TItem> {
         return this;
     }
 
-    private draw() {
+    private readonly drawer = Refresher(() => this._draw());
+    private requestDraw() {
+        this.drawer.requestRefresh();
+    }
+
+    /** Do not call directly! Call `requestDraw` instead to avoid browser freezing. */
+    private _draw() {
         if (!this.dom) return;
         const xResolution = Box.width(this.boxes.canvas) / this.downsamplingPixelsPerRect;
         this.downsampler ??= Downsampler.fromImage(this.getColorArray());
@@ -477,7 +483,7 @@ export class Heatmap<TX, TY, TItem> {
             * (yScale === 1 ? 1 : (1 - this.getYGap(height) / height)); // This compensates omitting gaps by lowering opacity (when scaled)
         const colFrom = Math.floor(this.boxes.visWorld.xmin / xScale);
         const colTo = Math.ceil(this.boxes.visWorld.xmax / xScale); // exclusive
-        // console.time(`drawThisImage ${colTo - colFrom}`)
+        // console.time(`drawThisImage ${colTo - colFrom} ${image.nRows}`)
 
         const { nRows, nColumns } = image;
         for (let iy = 0; iy < nRows; iy++) {
@@ -506,10 +512,11 @@ export class Heatmap<TX, TY, TItem> {
                 let color = Color.fromImage(image, ix, iy);
                 if (opacityRatio !== 1) color = Color.scaleAlpha(color, opacityRatio);
                 this.ctx.fillStyle = Color.toString(color); // this line is a performance bottleneck, .fillStyle only takes strings :(
+                // this.ctx.fillStyle = (ix+iy)%2?'#ff0000':'#cccccc'
                 this.ctx.fillRect(xFrom, yFrom, xTo - xFrom, yTo - yFrom);
             }
         }
-        // console.timeEnd(`drawThisImage ${colTo - colFrom}`)
+        // console.timeEnd(`drawThisImage ${colTo - colFrom} ${image.nRows}`)
     }
 
     /** Return horizontal gap between rectangles, in canvas pixels */
@@ -543,7 +550,7 @@ export class Heatmap<TX, TY, TItem> {
             this.scales = Scales(this.boxes);
             this.handleHover(e.sourceEvent);
             this.emitZoom();
-            this.draw();
+            this.requestDraw();
         });
         this.dom.svg.call(this.zoomBehavior as any);
         // .on('wheel', e => e.preventDefault()); // Prevent fallback to normal scroll when on min/max zoom
