@@ -55,6 +55,10 @@ const PAN_SENSITIVITY = 0.6;
 /** Initial size set to canvas (doesn't really matter because it will be immediately resized to the real size) */
 const CANVAS_INIT_SIZE = { width: 100, height: 100 };
 
+/** Size of rectangle in pixels, when showing gaps is switched on (for smaller sizes off, to avoid Moire patterns) */
+const MIN_PIXELS_PER_RECT_FOR_GAPS = 2;
+
+
 export type DataDescription<TX, TY, TItem> = {
     /** Array of X values assigned to columns, from left to right ("column names") */
     xDomain: TX[],
@@ -472,71 +476,68 @@ export class Heatmap<TX, TY, TItem> {
         }
     }
 
-    im?: Image;
-    imData?: ImageData;
-    private drawThisImage(image: Image, xScale: number, yScale: number) {
-        if (!this.ctx) return;
-        // console.log(xScale === 1 ? 'draw full' : 'draw down')
-        this.ctx.clearRect(0, 0, Box.width(this.boxes.canvas), Box.height(this.boxes.canvas));
-        const width = scaleDistance(this.scales.worldToCanvas.x, 1) * xScale;
-        const height = scaleDistance(this.scales.worldToCanvas.y, 1);
-        const xHalfGap = 0.5 * this.getXGap(width);
-        const yHalfGap = 0.5 * this.getYGap(height);
-        const opacityRatio =
-            (xScale === 1 ? 1 : (1 - this.getXGap(width) / width))
-            * (yScale === 1 ? 1 : (1 - this.getYGap(height) / height)); // This compensates omitting gaps by lowering opacity (when scaled)
-        // TODO opacity vs gaps shouldn't be decided based on scale
-        const colFrom = Math.floor(this.boxes.visWorld.xmin / xScale);
-        const colTo = Math.ceil(this.boxes.visWorld.xmax / xScale); // exclusive
-        console.time(`drawThisImage ${colTo - colFrom} ${image.nRows}`)
-
+    _canvasImage?: Image;
+    private getCanvasImage(): Image {
+        if (!this.ctx) throw new Error('`getCanvasImage` should only be called when canvas is initialized');
         const w = Math.floor(this.ctx.canvas.width);
         const h = Math.floor(this.ctx.canvas.height);
-        if (this.im && this.im.nColumns === w && this.im.nRows === h) {
-            Image.clear(this.im);
+        if (this._canvasImage && this._canvasImage.nColumns === w && this._canvasImage.nRows === h) {
+            Image.clear(this._canvasImage);
         } else {
-            this.im = Image.create(w, h);
+            this._canvasImage = Image.create(w, h);
         }
-        const im = this.im;
-        const { nRows, nColumns } = image;
-        for (let iy = 0; iy < nRows; iy++) {
-            if (iy < 0 || iy >= nRows) continue;
-            const y = this.scales.worldToCanvas.y(iy);
-            let yFrom = y, yTo = y + height;
-            if (yScale === 1) {
-                yFrom += yHalfGap;
-                yTo -= yHalfGap;
-            } else {
-                // yFrom = Math.floor(yFrom);
-                // yTo = Math.floor(yTo);
-            }
-            for (let ix = colFrom; ix < colTo; ix++) {
-                if (ix < 0 || ix >= nColumns) continue; // TODO include this in the loop fromto
-                const x = this.scales.worldToCanvas.x(ix * xScale);
-                let xFrom = x, xTo = x + width;
-                if (xScale === 1) {
-                    xFrom += xHalfGap;
-                    xTo -= xHalfGap;
-                } else {
-                    // This magic is to fight Moire patterns
-                    // xFrom = Math.floor(xFrom);
-                    // xTo = Math.floor(xTo);
-                }
-                let color = Color.fromImage(image, ix, iy);
-                if (opacityRatio !== 1) color = Color.scaleAlpha(color, opacityRatio);
-                // this.ctx.fillStyle = Color.toString(color); // this line is a performance bottleneck, .fillStyle only takes strings :(
-                // this.ctx.fillRect(xFrom, yFrom, xTo - xFrom, yTo - yFrom);
-                Image.addRect(im, xFrom, yFrom, xTo, yTo, color);
-            }
-        }
-        if (im.nColumns === this.imData?.width && im.nRows === this.imData.height) {
-            this.imData = Image.toImageData(im, this.imData); // fill in place 
-        } else {
-            this.imData = Image.toImageData(im); // allocate new
-        }
-        this.ctx.putImageData(this.imData, 0, 0);
+        return this._canvasImage;
+    }
 
-        console.timeEnd(`drawThisImage ${colTo - colFrom} ${image.nRows}`)
+    _canvasImageData?: ImageData;
+    private getCanvasImageData(): ImageData {
+        if (!this.ctx) throw new Error('`getCanvasImageData` should only be called when canvas is initialized');
+        const w = Math.floor(this.ctx.canvas.width);
+        const h = Math.floor(this.ctx.canvas.height);
+        if (this._canvasImageData && this._canvasImageData.width === w && this._canvasImageData.height === h) {
+            return this._canvasImageData;
+        } else {
+            this._canvasImageData = new ImageData(w, h);
+            return this._canvasImageData;
+        }
+    }
+    private drawThisImage(image: Image, xScale: number, yScale: number) {
+        if (!this.ctx || !this.dom) return;
+        this.ctx.clearRect(0, 0, Box.width(this.boxes.canvas), Box.height(this.boxes.canvas));
+        const rectWidth = scaleDistance(this.scales.worldToCanvas.x, 1) * xScale;
+        const rectHeight = scaleDistance(this.scales.worldToCanvas.y, 1) * yScale;
+        const showXGaps = Box.width(this.boxes.canvas) > MIN_PIXELS_PER_RECT_FOR_GAPS * Box.width(this.boxes.visWorld);
+        const showYGaps = Box.height(this.boxes.canvas) > MIN_PIXELS_PER_RECT_FOR_GAPS * Box.height(this.boxes.visWorld);
+        const xHalfGap = showXGaps ? 0.5 * this.getXGap(rectWidth) : 0;
+        const yHalfGap = showYGaps ? 0.5 * this.getYGap(rectHeight) : 0;
+        const globalOpacity =
+            (showXGaps ? 1 : (1 - this.getXGap(rectWidth) / rectWidth))
+            * (showYGaps ? 1 : (1 - this.getYGap(rectHeight) / rectHeight));
+        this.dom.canvas.style('opacity', globalOpacity); // This compensates for not showing gaps by lowering opacity (when scaled)
+        const colFrom = clamp(Math.floor(this.boxes.visWorld.xmin / xScale), 0, image.nColumns);
+        const colTo = clamp(Math.ceil(this.boxes.visWorld.xmax / xScale), 0, image.nColumns); // exclusive
+        console.time(`drawThisImage`)
+        // console.log(showXGaps ? 'draw full' : 'draw down', Box.width(this.boxes.canvas) / Box.width(this.boxes.visWorld))
+
+        const canvasImage = this.getCanvasImage();
+        const { nRows } = image;
+        for (let iy = 0; iy < nRows; iy++) {
+            const y = this.scales.worldToCanvas.y(iy);
+            const yFrom = y + yHalfGap;
+            const yTo = y + rectHeight - yHalfGap;
+            for (let ix = colFrom; ix < colTo; ix++) {
+                const x = this.scales.worldToCanvas.x(ix * xScale);
+                const xFrom = x + xHalfGap;
+                const xTo = x + rectWidth - xHalfGap;
+                const color = Color.fromImage(image, ix, iy);
+                Image.addRect(canvasImage, xFrom, yFrom, xTo, yTo, color);
+            }
+        }
+        const imageData = this.getCanvasImageData();
+        Image.toImageData(canvasImage, imageData)
+        this.ctx.putImageData(imageData, 0, 0);
+
+        console.timeEnd(`drawThisImage`)
     }
 
     /** Return horizontal gap between rectangles, in canvas pixels */

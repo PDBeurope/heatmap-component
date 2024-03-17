@@ -99,7 +99,11 @@ export function Refresher(refresh: () => any) {
             requested = false;
             running = true;
             await sleep(0); // let other things happen (this pushes the rest of the function to the end of the queue)
-            refresh();
+            try {
+                refresh();
+            } catch (err) {
+                console.error(err);
+            }
             running = false;
         }
     }

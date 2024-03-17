@@ -1,7 +1,6 @@
 import { clamp, range } from 'lodash';
-import { Box } from './scales';
-import { IsNumeric } from './utils';
 import { Color } from './color';
+import { IsNumeric } from './utils';
 
 
 /** Represents a 2D array of values of type `TItem | undefined` */
@@ -96,8 +95,7 @@ export const Image = {
         }
     },
     /** Convert `Image` (ARaGaBa) to regular `ImageData` (RGBA) */
-    toImageData(image: Image, out?: ImageData): ImageData {
-        out ??= new ImageData(image.nColumns, image.nRows);
+    toImageData(image: Image, out: ImageData): ImageData {
         for (let i = 0, n = image.items.length; i < n; i += 4) {
             const color = Color.fromAragabaArray(image.items, i);
             Color.toRgbaArray(color, out.data, i);
