@@ -40,6 +40,10 @@ export const Downsampler = {
         return result;
     },
 
+    getOriginal<M extends DownsamplingMode>(downsampler: Downsampler<M>): DataType<M> {
+        return get(downsampler, { x: downsampler.nColumns, y: downsampler.nRows })!;
+    },
+
     /** Get data downsampled approximately to `minResolution`.
      * The returned resolution will be at least `minResolution` but less then double that, in each dimension.
      * The returned data will be equal to the original data if `minResolution` is big enough. */
@@ -49,6 +53,39 @@ export const Downsampler = {
             y: downsamplingTarget(downsampler.nRows, minResolution.y),
         };
         return getOrCompute(downsampler, targetResolution);
+    },
+
+    getDownsampledRegion<M extends DownsamplingMode>(downsampler: Downsampler<M>, crop: Box, resolution: XY) {
+        type Strategy = 'original' | 'downsampled'
+        const xStrategy: Strategy = resolution.x < downsampler.nColumns ? 'downsampled' : 'original';
+        const yStrategy: Strategy = resolution.y < downsampler.nRows ? 'downsampled' : 'original';
+        if (xStrategy === 'original' && yStrategy === 'original') {
+            return {
+                xStrategy,
+                yStrategy,
+                data: this.getOriginal(downsampler),
+            }
+        }
+        const src = this.getDownsampled(downsampler, resolution);
+        let finalSize = { x: downsampler.nColumns, y: downsampler.nRows };
+        let finalCrop: Partial<Box> = {};
+        if (xStrategy === 'downsampled') {
+            const xScale = src.nColumns / downsampler.nColumns;
+            finalCrop.xmin = crop.xmin * xScale;
+            finalCrop.xmax = crop.xmax * xScale;
+            finalSize.x = resolution.x;
+        }
+        if (yStrategy === 'downsampled') {
+            const yScale = src.nRows / downsampler.nRows;
+            finalCrop.ymin = crop.ymin * yScale;
+            finalCrop.ymax = crop.ymax * yScale;
+            finalSize.y = resolution.y;
+        }
+        return {
+            xStrategy,
+            yStrategy,
+            data: downsample(downsampler.mode, src, finalSize, finalCrop),
+        };
     },
 };
 
@@ -71,7 +108,7 @@ function set<M extends DownsamplingMode>(downsampler: Downsampler<M>, resolution
     downsampler.downsampled[resolutionString(resolution)] = value;
 }
 
-/** Get data downsampled to `resolution` (exactly).  */
+/** Get data downsampled to `resolution` (exactly), with caching.  */
 function getOrCompute<M extends DownsamplingMode>(downsampler: Downsampler<M>, resolution: XY): DataType<M> {
     const cached = get(downsampler, resolution);
     if (cached) {
@@ -80,9 +117,10 @@ function getOrCompute<M extends DownsamplingMode>(downsampler: Downsampler<M>, r
         const srcResolution = downsamplingSource2D(resolution, { x: downsampler.nColumns, y: downsampler.nRows });
         if (!srcResolution || srcResolution.x > downsampler.nColumns || srcResolution.y > downsampler.nRows) throw new Error('AssertionError');
         const srcData: DataType<M> = getOrCompute(downsampler, srcResolution);
-        const result = (downsampler.mode === 'image' ?
-            downsampleImage(srcData as DataType<'image'>, resolution)
-            : downsampleNumbers(srcData as DataType<'number'>, resolution)) as DataType<M>;
+        // const result = (downsampler.mode === 'image' ?
+        //     downsampleImage(srcData as DataType<'image'>, resolution)
+        //     : downsampleNumbers(srcData as DataType<'number'>, resolution)) as DataType<M>;
+        const result = downsample(downsampler.mode, srcData, resolution);
         set(downsampler, resolution, result);
         return result;
     }
@@ -114,6 +152,14 @@ function downsamplingSource2D(wanted: XY, original: XY): XY | undefined {
     }
 }
 
+/** Downsample image or 2D array of numbers to a new size. */
+function downsample<M extends DownsamplingMode>(mode: M, input: DataType<M>, newSize: XY, crop?: Partial<Box>): DataType<M> {
+    if (mode === 'image') {
+        return downsampleImage(input as DataType<'image'>, newSize, crop) as DataType<M>;
+    } else {
+        return downsampleNumbers(input as DataType<'number'>, newSize, crop) as DataType<M>;
+    }
+}
 
 /** Downsample 2D array of numbers to a new size. */
 function downsampleNumbers(input: Data<number>, newSize: XY, crop?: Partial<Box>): Data<number> {

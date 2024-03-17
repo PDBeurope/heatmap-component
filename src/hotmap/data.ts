@@ -29,6 +29,7 @@ export const Data = {
             const x = i % nColumns;
             const y = Math.floor(i / nColumns);
             const value = (x === 0 || y === nRows - 1) ? 0 : (x === nColumns - 1 || y === 0) ? 1 : Math.random();
+            // const value = (x === 0 || y === nRows - 1) ? 0 : (x === nColumns - 1 || y === 0) ? 1 : (x%2);
             return value;
         });
         return { nColumns, nRows, items, isNumeric: true };

@@ -188,23 +188,22 @@ export class Heatmap<TX, TY, TItem> {
     private scales: Scales;
     /** Approximate width of a rectangle in pixels, when showing downsampled data.
      * (higher value means more responsive but lower-resolution visualization) */
-    private downsamplingPixelsPerRect = 4;
+    private downsamplingPixelsPerRect = 1;
     /** Position of the pinned tooltip, if any. In world coordinates, continuous. Use `Math.floor` to get column/row index. */
     private pinnedTooltip?: XY = undefined;
     private readonly lastWheelEvent = { timestamp: 0, absDelta: 0, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false };
 
 
     /** Create a new `Heatmap` and set `data` */
-    static create<TX, TY, TItem>(data: DataDescription<TX, TY, TItem>): Heatmap<TX, TY, TItem>;
+    static create<TX, TY, TItem>(data: DataDescription<TX, TY, TItem>): Heatmap<TX, TY, TItem> {
+        return new this(data);
+    }
+
     /** Create a new `Heatmap` with dummy data */
-    static create(): Heatmap<number, number, number>;
-    static create<TX_, TY_, TItem_>(data?: DataDescription<TX_, TY_, TItem_>): Heatmap<TX_, TY_, TItem_> | Heatmap<number, number, number> {
-        if (data !== undefined) {
-            return new this(data);
-        } else {
-            // return new this(makeRandomData2(2000, 20));
-            return new this(makeRandomData2(2e5, 20));
-        }
+    static createDummy(nColumns: number = 20, nRows: number = 20): Heatmap<number, number, number> {
+        // return new this(makeRandomData2(2000, 20));
+        return new this(makeRandomData2(nColumns, nRows));
+        // return new this(makeRandomData2(2e5, 20));
     }
 
     private constructor(data: DataDescription<TX, TY, TItem>) {
@@ -445,6 +444,7 @@ export class Heatmap<TX, TY, TItem> {
         // console.time('downsample')
         const downsampledImage = Downsampler.getDownsampled(this.downsampler, { x: xResolution * Box.width(this.boxes.wholeWorld) / (Box.width(this.boxes.visWorld)), y: this.data.nRows });
         // console.timeEnd('downsample')
+        // return this.drawThisImage(downsampledImage, this.data.nColumns / downsampledImage.nColumns + 0.000001, 1); // debug TODO remove 0.000001
         return this.drawThisImage(downsampledImage, this.data.nColumns / downsampledImage.nColumns, 1);
     }
 
@@ -473,6 +473,7 @@ export class Heatmap<TX, TY, TItem> {
 
     private drawThisImage(image: Image, xScale: number, yScale: number) {
         if (!this.ctx) return;
+        console.log(xScale === 1 ? 'draw full' : 'draw down')
         this.ctx.clearRect(0, 0, Box.width(this.boxes.canvas), Box.height(this.boxes.canvas));
         const width = scaleDistance(this.scales.worldToCanvas.x, 1) * xScale;
         const height = scaleDistance(this.scales.worldToCanvas.y, 1);
