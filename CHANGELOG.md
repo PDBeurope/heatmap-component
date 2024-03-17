@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+- More efficient drawing to canvas (`putImageData` instead of `fillRect`)
+
 ## [0.7.0] - 2024-03-15
 
 - Changing domains while keeping data (`setDomains`)

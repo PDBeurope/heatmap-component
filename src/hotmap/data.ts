@@ -1,5 +1,7 @@
-import { range } from 'lodash';
+import { clamp, range } from 'lodash';
+import { Box } from './scales';
 import { IsNumeric } from './utils';
+import { Color } from './color';
 
 
 /** Represents a 2D array of values of type `TItem | undefined` */
@@ -64,8 +66,42 @@ export interface Image {
 }
 
 export const Image = {
-    /** Create a new image filled with fully transparent black */
+    /** Create a new image filled with transparent black */
     create(width: number, height: number): Image {
         return { nColumns: width, nRows: height, items: new Uint8ClampedArray(width * height * 4) };
     },
+    /** Clear the whole image to transparent black */
+    clear(image: Image) {
+        image.items.fill(0);
+    },
+    /** Draw a filled rectangle to the image. Only use for non-overlapping rectangles!!! */
+    addRect(image: Image, xmin: number, ymin: number, xmax: number, ymax: number, fill: Color) {
+        xmin = clamp(xmin, 0, image.nColumns);
+        xmax = clamp(xmax, 0, image.nColumns);
+        ymin = clamp(ymin, 0, image.nRows);
+        ymax = clamp(ymax, 0, image.nRows);
+        const x0 = Math.floor(xmin);
+        const y0 = Math.floor(ymin);
+        const x1 = Math.ceil(xmax) - 1;
+        const y1 = Math.ceil(ymax) - 1;
+        for (let y = y0; y <= y1; y++) {
+            const yWeight = Math.min(y + 1, ymax) - Math.max(y, ymin);
+            if (yWeight < 0) throw new Error('yWeight<0');
+            for (let x = x0; x <= x1; x++) {
+                const xWeight = Math.min(x + 1, xmax) - Math.max(x, xmin);
+                if (xWeight < 0) throw new Error('xWeight<0');
+                const effectiveFill = Color.scaleAlpha(fill, xWeight * yWeight);
+                Color.addToImage(effectiveFill, image, x, y);
+            }
+        }
+    },
+    /** Convert `Image` (ARaGaBa) to regular `ImageData` (RGBA) */
+    toImageData(image: Image, out?: ImageData): ImageData {
+        out ??= new ImageData(image.nColumns, image.nRows);
+        for (let i = 0, n = image.items.length; i < n; i += 4) {
+            const color = Color.fromAragabaArray(image.items, i);
+            Color.toRgbaArray(color, out.data, i);
+        }
+        return out;
+    }
 };

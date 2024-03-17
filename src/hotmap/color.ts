@@ -93,16 +93,16 @@ export const Color = {
         const b = color & 255;
         return { r, g, b, opacity: a };
     },
-    /** Save `color` in an array represented as RGBA (i.e. quadruplet [r, g, b, a]). */
+    /** Save `color` in an array represented as RGBA (i.e. quadruplet [r, g, b, a], all in 0-255). */
     toRgbaArray(color: Color, out: WritableArrayLike<number>, offset: number) {
-        const a = INV_ALPHA_SCALE * (color >>> 24 & 255);
+        const a255 = color >>> 24 & 255;
         const r = color >>> 16 & 255;
         const g = color >>> 8 & 255;
         const b = color & 255;
         out[offset] = r;
         out[offset + 1] = g;
         out[offset + 2] = b;
-        out[offset + 3] = a;
+        out[offset + 3] = a255;
     },
     /** Save `color` in an array represented as RGB (i.e. triplet [r, g, b]), ignoring the opacity channel. */
     toRgbArray(color: Color, out: WritableArrayLike<number>, offset: number) {
@@ -125,9 +125,25 @@ export const Color = {
         out[offset + 2] = g * a;
         out[offset + 3] = b * a;
     },
+    /** Add `color` to the current value in an array represented as "ARaGaBa" (i.e. quadruplet [a*255, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. */
+    addToAragabaArray(color: Color, out: WritableArrayLike<number>, offset: number) {
+        const a255 = (color >>> 24 & 255);
+        const a = INV_ALPHA_SCALE * a255;
+        const r = color >>> 16 & 255;
+        const g = color >>> 8 & 255;
+        const b = color & 255;
+        out[offset] += a255;
+        out[offset + 1] += r * a;
+        out[offset + 2] += g * a;
+        out[offset + 3] += b * a;
+    },
     /** Set pixel `x,y` in `image` to `color` */
     toImage(color: Color, image: Image, x: number, y: number) {
         return this.toAragabaArray(color, image.items, 4 * (y * image.nColumns + x));
+    },
+    /** Add `color` to current value of pixel `x,y` in `image` */
+    addToImage(color: Color, image: Image, x: number, y: number) {
+        return this.addToAragabaArray(color, image.items, 4 * (y * image.nColumns + x));
     },
     /** Load color from an array represented as "ARaGaBa" (i.e. quadruplet [a*255, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. */
     fromAragabaArray(array: ArrayLike<number>, offset: number): Color {

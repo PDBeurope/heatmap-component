@@ -15,6 +15,7 @@ import { Refresher, attrd, formatDataItem, getSize, minimum, nextIfChanged } fro
 // TODO: Should: docs
 // TODO: Could: avoid Moire patterns and waves (perhaps needs downscaling to exact canvas size)
 // TODO: Could: various zoom modes (horizontal, vertical, both, none...)
+// TODO: Could: think about using something else than canvas '2d' context (drawing 1000x300 per-pixel takes ~100ms!). WebGL? Pixijs?
 // TODO: Would: try setting `downsamplingPixelsPerRect` dynamically, based on rendering times
 // TODO: Would: Smoothen zooming and panning with mouse wheel?
 
@@ -471,9 +472,11 @@ export class Heatmap<TX, TY, TItem> {
         }
     }
 
+    im?: Image;
+    imData?: ImageData;
     private drawThisImage(image: Image, xScale: number, yScale: number) {
         if (!this.ctx) return;
-        console.log(xScale === 1 ? 'draw full' : 'draw down')
+        // console.log(xScale === 1 ? 'draw full' : 'draw down')
         this.ctx.clearRect(0, 0, Box.width(this.boxes.canvas), Box.height(this.boxes.canvas));
         const width = scaleDistance(this.scales.worldToCanvas.x, 1) * xScale;
         const height = scaleDistance(this.scales.worldToCanvas.y, 1);
@@ -482,10 +485,19 @@ export class Heatmap<TX, TY, TItem> {
         const opacityRatio =
             (xScale === 1 ? 1 : (1 - this.getXGap(width) / width))
             * (yScale === 1 ? 1 : (1 - this.getYGap(height) / height)); // This compensates omitting gaps by lowering opacity (when scaled)
+        // TODO opacity vs gaps shouldn't be decided based on scale
         const colFrom = Math.floor(this.boxes.visWorld.xmin / xScale);
         const colTo = Math.ceil(this.boxes.visWorld.xmax / xScale); // exclusive
-        // console.time(`drawThisImage ${colTo - colFrom} ${image.nRows}`)
+        console.time(`drawThisImage ${colTo - colFrom} ${image.nRows}`)
 
+        const w = Math.floor(this.ctx.canvas.width);
+        const h = Math.floor(this.ctx.canvas.height);
+        if (this.im && this.im.nColumns === w && this.im.nRows === h) {
+            Image.clear(this.im);
+        } else {
+            this.im = Image.create(w, h);
+        }
+        const im = this.im;
         const { nRows, nColumns } = image;
         for (let iy = 0; iy < nRows; iy++) {
             if (iy < 0 || iy >= nRows) continue;
@@ -495,11 +507,11 @@ export class Heatmap<TX, TY, TItem> {
                 yFrom += yHalfGap;
                 yTo -= yHalfGap;
             } else {
-                yFrom = Math.floor(yFrom);
-                yTo = Math.floor(yTo);
+                // yFrom = Math.floor(yFrom);
+                // yTo = Math.floor(yTo);
             }
             for (let ix = colFrom; ix < colTo; ix++) {
-                if (ix < 0 || ix >= nColumns) continue;
+                if (ix < 0 || ix >= nColumns) continue; // TODO include this in the loop fromto
                 const x = this.scales.worldToCanvas.x(ix * xScale);
                 let xFrom = x, xTo = x + width;
                 if (xScale === 1) {
@@ -507,17 +519,24 @@ export class Heatmap<TX, TY, TItem> {
                     xTo -= xHalfGap;
                 } else {
                     // This magic is to fight Moire patterns
-                    xFrom = Math.floor(xFrom);
-                    xTo = Math.floor(xTo);
+                    // xFrom = Math.floor(xFrom);
+                    // xTo = Math.floor(xTo);
                 }
                 let color = Color.fromImage(image, ix, iy);
                 if (opacityRatio !== 1) color = Color.scaleAlpha(color, opacityRatio);
-                this.ctx.fillStyle = Color.toString(color); // this line is a performance bottleneck, .fillStyle only takes strings :(
-                // this.ctx.fillStyle = (ix+iy)%2?'#ff0000':'#cccccc'
-                this.ctx.fillRect(xFrom, yFrom, xTo - xFrom, yTo - yFrom);
+                // this.ctx.fillStyle = Color.toString(color); // this line is a performance bottleneck, .fillStyle only takes strings :(
+                // this.ctx.fillRect(xFrom, yFrom, xTo - xFrom, yTo - yFrom);
+                Image.addRect(im, xFrom, yFrom, xTo, yTo, color);
             }
         }
-        // console.timeEnd(`drawThisImage ${colTo - colFrom} ${image.nRows}`)
+        if (im.nColumns === this.imData?.width && im.nRows === this.imData.height) {
+            this.imData = Image.toImageData(im, this.imData); // fill in place 
+        } else {
+            this.imData = Image.toImageData(im); // allocate new
+        }
+        this.ctx.putImageData(this.imData, 0, 0);
+
+        console.timeEnd(`drawThisImage ${colTo - colFrom} ${image.nRows}`)
     }
 
     /** Return horizontal gap between rectangles, in canvas pixels */
