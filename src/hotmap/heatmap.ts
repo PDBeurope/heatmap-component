@@ -7,15 +7,14 @@ import { Domain } from './domain';
 import { Downsampler } from './downsampling';
 import { Box, Boxes, Scales, XY, scaleDistance } from './scales';
 import { Refresher, attrd, formatDataItem, getSize, minimum, nextIfChanged } from './utils';
+import { State } from './state';
 
 
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
 // TODO: Should: think in more depth what could happen when changing data type with filters, providers, etc. already set
 // TODO: Should: reasonable level of customizability
 // TODO: Should: docs
-// TODO: Could: avoid Moire patterns and waves (perhaps needs downscaling to exact canvas size)
 // TODO: Could: various zoom modes (horizontal, vertical, both, none...)
-// TODO: Could: think about using something else than canvas '2d' context (drawing 1000x300 per-pixel takes ~100ms!). WebGL? Pixijs?
 // TODO: Would: try setting `downsamplingPixelsPerRect` dynamically, based on rendering times
 // TODO: Would: Smoothen zooming and panning with mouse wheel?
 
@@ -76,10 +75,10 @@ export type DataDescription<TX, TY, TItem> = {
 type ProviderParams<TX, TY, TItem> = [d: TItem, x: TX, y: TY, xIndex: number, yIndex: number]
 
 /** A function that returns something (of type `TResult`) for a data item (such functions are passed to setTooltip, setColor etc.). */
-type Provider<TX, TY, TItem, TResult> = (...args: ProviderParams<TX, TY, TItem>) => TResult
+export type Provider<TX, TY, TItem, TResult> = (...args: ProviderParams<TX, TY, TItem>) => TResult
 
 /** Emitted on data-item-related events (hover, click...) */
-type ItemEventParam<TX, TY, TItem> = {
+export type ItemEventParam<TX, TY, TItem> = {
     datum: TItem,
     x: TX,
     y: TY,
@@ -89,7 +88,7 @@ type ItemEventParam<TX, TY, TItem> = {
 } | undefined
 
 /** Emitted on zoom event */
-type ZoomEventParam<TX, TY, TItem> = {
+export type ZoomEventParam<TX, TY, TItem> = {
     /** Continuous X index corresponding to the left edge of the viewport */
     xMinIndex: number,
     /** Continuous X index corresponding to the right edge of the viewport */
@@ -163,43 +162,9 @@ export const DefaultVisualParams = {
 
 
 export class Heatmap<TX, TY, TItem> {
-    private originalData: DataDescription<TX, TY, TItem>;
-    private data: Data<TItem>;
-    private downsampler?: Downsampler<'image'>;
-    private xDomain: Domain<TX>;
-    private yDomain: Domain<TY>;
-    private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
-    private xAlignment: XAlignmentMode = 'center';
-    private yAlignment: YAlignmentMode = 'center';
+    private readonly state: State<TX, TY, TItem> = new State();
 
-    private colorProvider: Provider<TX, TY, TItem, string | Color> = DefaultColorProvider;
-    private tooltipProvider?: Provider<TX, TY, TItem, string> = DefaultTooltipProvider;
-    private filter?: Provider<TX, TY, TItem, boolean> = undefined;
-    private visualParams: VisualParams = DefaultVisualParams;
-    public readonly events = {
-        hover: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
-        click: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
-        zoom: new BehaviorSubject<ZoomEventParam<TX, TY, TItem>>(undefined),
-        resize: new BehaviorSubject<Box | undefined>(undefined),
-    } as const;
-    /** DOM elements managed by this component */
-    private dom?: {
-        rootDiv: d3.Selection<HTMLDivElement, any, any, any>;
-        mainDiv: d3.Selection<HTMLDivElement, any, any, any>;
-        canvasDiv: d3.Selection<HTMLDivElement, any, any, any>;
-        canvas: d3.Selection<HTMLCanvasElement, any, any, any>;
-        svg: d3.Selection<SVGSVGElement, any, any, any>;
-    };
-    /** Canvas rendering context */
-    private ctx?: CanvasRenderingContext2D;
-    private boxes: Boxes;
-    private scales: Scales;
-    /** Approximate width of a rectangle in pixels, when showing downsampled data.
-     * (higher value means more responsive but lower-resolution visualization) */
-    private downsamplingPixelsPerRect = 1;
-    /** Position of the pinned tooltip, if any. In world coordinates, continuous. Use `Math.floor` to get column/row index. */
-    private pinnedTooltip?: XY = undefined;
-    private readonly lastWheelEvent = { timestamp: 0, absDelta: 0, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false };
+    get events() { return this.state.events; }
 
 
     /** Create a new `Heatmap` and set `data` */
@@ -216,8 +181,8 @@ export class Heatmap<TX, TY, TItem> {
 
     private constructor(data: DataDescription<TX, TY, TItem>) {
         this.setData(data);
-        if (this.data.isNumeric) {
-            const dataRange = Data.getRange(this.data as Data<number>);
+        if (this.state.data.isNumeric) {
+            const dataRange = Data.getRange(this.state.data as Data<number>);
             const colorProvider = DefaultNumericColorProviderFactory(dataRange.min, dataRange.max);
             (this as unknown as Heatmap<TX, TY, number>).setColor(colorProvider);
         }
@@ -226,14 +191,14 @@ export class Heatmap<TX, TY, TItem> {
 
     /** Clear all the contents of the root div. */
     remove(): void {
-        if (!this.dom) return;
-        this.dom.rootDiv.select('*').remove();
+        if (!this.state.dom) return;
+        this.state.dom.rootDiv.select('*').remove();
     }
 
     /** Render this heatmap in the given DIV element */
     render(divElementOrId: HTMLDivElement | string): this {
-        if (this.dom) {
-            console.error(`This ${this.constructor.name} has already been rendered in element`, this.dom.rootDiv.node());
+        if (this.state.dom) {
+            console.error(`This ${this.constructor.name} has already been rendered in element`, this.state.dom.rootDiv.node());
             throw new Error(`This ${this.constructor.name} has already been rendered. Cannot render again.`);
         }
         console.time('Hotmap render');
@@ -259,23 +224,23 @@ export class Heatmap<TX, TY, TItem> {
         });
 
         const ctx = canvas.node()?.getContext('2d');
-        if (ctx) this.ctx = ctx;
+        if (ctx) this.state.ctx = ctx;
         else throw new Error('Failed to initialize canvas');
 
-        this.boxes = {
-            visWorld: Box.create(0, 0, this.data.nColumns, this.data.nRows),
-            wholeWorld: Box.create(0, 0, this.data.nColumns, this.data.nRows),
+        this.state.boxes = {
+            visWorld: Box.create(0, 0, this.state.data.nColumns, this.state.data.nRows),
+            wholeWorld: Box.create(0, 0, this.state.data.nColumns, this.state.data.nRows),
             canvas: Box.create(0, 0, CANVAS_INIT_SIZE.width, CANVAS_INIT_SIZE.height), // To be changed via 'resize' event subscription
         };
 
         this.events.resize.subscribe(box => {
             if (!box) return;
-            this.boxes.canvas = box;
-            this.boxes.canvas = box;
-            this.scales = Scales(this.boxes);
-            if (this.ctx) {
-                this.ctx.canvas.width = Box.width(box);
-                this.ctx.canvas.height = Box.height(box);
+            this.state.boxes.canvas = box;
+            this.state.boxes.canvas = box;
+            this.state.scales = Scales(this.state.boxes);
+            if (this.state.ctx) {
+                this.state.ctx.canvas.width = Box.width(box);
+                this.state.ctx.canvas.height = Box.height(box);
             }
             this.requestDraw();
         });
@@ -283,7 +248,7 @@ export class Heatmap<TX, TY, TItem> {
         const svg = attrd(canvasDiv.append('svg'), {
             style: { position: 'absolute', width: '100%', height: '100%' },
         });
-        this.dom = { rootDiv, mainDiv, canvasDiv, canvas, svg };
+        this.state.dom = { rootDiv, mainDiv, canvasDiv, canvas, svg };
 
         for (const eventName in this.handlers) {
             svg.on(eventName, e => this.handlers[eventName as keyof typeof this.handlers](e));
@@ -302,12 +267,12 @@ export class Heatmap<TX, TY, TItem> {
 
     private getColorArray(): Image {
         // console.time('get all colors')
-        const image = Image.create(this.data.nColumns, this.data.nRows);
-        for (let iy = 0; iy < this.data.nRows; iy++) {
-            for (let ix = 0; ix < this.data.nColumns; ix++) {
-                const item = Data.getItem(this.data, ix, iy);
+        const image = Image.create(this.state.data.nColumns, this.state.data.nRows);
+        for (let iy = 0; iy < this.state.data.nRows; iy++) {
+            for (let ix = 0; ix < this.state.data.nColumns; ix++) {
+                const item = Data.getItem(this.state.data, ix, iy);
                 if (item === undefined) continue; // keep transparent black
-                const color = this.colorProvider(item, this.xDomain.values[ix], this.yDomain.values[iy], ix, iy);
+                const color = this.state.colorProvider(item, this.state.xDomain.values[ix], this.state.yDomain.values[iy], ix, iy);
                 const c = (typeof color === 'string') ? Color.fromString(color) : color;
                 Color.toImage(c, image, ix, iy);
             }
@@ -317,27 +282,27 @@ export class Heatmap<TX, TY, TItem> {
     }
 
     private emitResize() {
-        if (!this.dom) return;
-        const size = getSize(this.dom.canvas);
+        if (!this.state.dom) return;
+        const size = getSize(this.state.dom.canvas);
         const box = Box.create(0, 0, size.width, size.height);
         this.events.resize.next(box);
     }
 
     private setRawData(data: Data<TItem>): this {
-        this.data = data;
-        this.downsampler = undefined;
-        if (this.boxes) {
+        this.state.data = data;
+        this.state.downsampler = undefined;
+        if (this.state.boxes) {
             const newWholeWorld = Box.create(0, 0, data.nColumns, data.nRows);
-            const xScale = Box.width(newWholeWorld) / Box.width(this.boxes.wholeWorld);
-            const yScale = Box.height(newWholeWorld) / Box.height(this.boxes.wholeWorld);
-            this.boxes.wholeWorld = newWholeWorld;
-            this.boxes.visWorld = Box.clamp({
-                xmin: this.boxes.visWorld.xmin * xScale,
-                xmax: this.boxes.visWorld.xmax * xScale,
-                ymin: this.boxes.visWorld.ymin * yScale,
-                ymax: this.boxes.visWorld.ymax * yScale
+            const xScale = Box.width(newWholeWorld) / Box.width(this.state.boxes.wholeWorld);
+            const yScale = Box.height(newWholeWorld) / Box.height(this.state.boxes.wholeWorld);
+            this.state.boxes.wholeWorld = newWholeWorld;
+            this.state.boxes.visWorld = Box.clamp({
+                xmin: this.state.boxes.visWorld.xmin * xScale,
+                xmax: this.state.boxes.visWorld.xmax * xScale,
+                ymin: this.state.boxes.visWorld.ymin * yScale,
+                ymax: this.state.boxes.visWorld.ymax * yScale
             }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
-            this.scales = Scales(this.boxes);
+            this.state.scales = Scales(this.state.boxes);
         }
         this.adjustZoomExtent();
         this.requestDraw();
@@ -352,16 +317,16 @@ export class Heatmap<TX, TY, TItem> {
         const array = new Array<TItem_ | undefined>(nColumns * nRows).fill(undefined);
         const xs = (typeof x === 'function') ? items.map(x) : x;
         const ys = (typeof y === 'function') ? items.map(y) : y;
-        self.xDomain = Domain.create(xDomain);
-        self.yDomain = Domain.create(yDomain);
+        self.state.xDomain = Domain.create(xDomain);
+        self.state.yDomain = Domain.create(yDomain);
         let warnedX = false;
         let warnedY = false;
         for (let i = 0; i < items.length; i++) {
             const d = items[i];
             const x = xs[i];
             const y = ys[i];
-            const ix = self.xDomain.index.get(x);
-            const iy = self.yDomain.index.get(y);
+            const ix = self.state.xDomain.index.get(x);
+            const iy = self.state.yDomain.index.get(y);
             if (ix === undefined) {
                 if (!warnedX) {
                     console.warn('Some data items map to X values out of the X domain:', d, 'maps to X', x);
@@ -372,14 +337,14 @@ export class Heatmap<TX, TY, TItem> {
                     console.warn('Some data items map to Y values out of the Y domain:', d, 'maps to Y', y);
                     warnedY = true;
                 }
-            } else if (self.filter !== undefined && !self.filter(d, x, y, ix, iy)) {
+            } else if (self.state.filter !== undefined && !self.state.filter(d, x, y, ix, iy)) {
                 // skipping this item
             } else {
                 array[nColumns * iy + ix] = d;
             }
         }
         const isNumeric = items.every(d => typeof d === 'number') as (TItem_ extends number ? true : false);
-        self.originalData = data;
+        self.state.originalData = data;
         self.setRawData({ items: array, nRows, nColumns, isNumeric });
         return self;
     }
@@ -387,9 +352,9 @@ export class Heatmap<TX, TY, TItem> {
     /** Change X and Y domain without changing the data (can be used for reordering or hiding columns/rows). */
     setDomains(xDomain: TX[] | undefined, yDomain: TY[] | undefined): this {
         this.setData({
-            ...this.originalData,
-            xDomain: xDomain ?? this.originalData.xDomain,
-            yDomain: yDomain ?? this.originalData.yDomain,
+            ...this.state.originalData,
+            xDomain: xDomain ?? this.state.originalData.xDomain,
+            yDomain: yDomain ?? this.state.originalData.yDomain,
         });
         return this;
     }
@@ -405,36 +370,36 @@ export class Heatmap<TX, TY, TItem> {
      * ```
      */
     setColor(colorProvider: (...args: ProviderParams<TX, TY, TItem>) => string | Color): this {
-        this.colorProvider = colorProvider;
-        this.downsampler = undefined;
+        this.state.colorProvider = colorProvider;
+        this.state.downsampler = undefined;
         this.requestDraw();
         return this;
     }
 
     setTooltip(tooltipProvider: ((...args: ProviderParams<TX, TY, TItem>) => string) | 'default' | undefined): this {
         if (tooltipProvider === 'default')
-            this.tooltipProvider = DefaultTooltipProvider;
+            this.state.tooltipProvider = DefaultTooltipProvider;
         else
-            this.tooltipProvider = tooltipProvider;
+            this.state.tooltipProvider = tooltipProvider;
         return this;
     }
 
     setFilter(filter: ((...args: ProviderParams<TX, TY, TItem>) => boolean) | undefined): this {
-        this.filter = filter;
-        this.setData(this.originalData); // reapplies filter
+        this.state.filter = filter;
+        this.setData(this.state.originalData); // reapplies filter
         return this;
     }
 
     setVisualParams(params: Partial<VisualParams>): this {
-        this.visualParams = merge(cloneDeep(this.visualParams), params);
+        this.state.visualParams = merge(cloneDeep(this.state.visualParams), params);
         this.requestDraw();
         return this;
     }
 
     /** Controls how column/row indices and names map to X and Y axes. */
     setAlignment(x: XAlignmentMode | undefined, y: YAlignmentMode | undefined): this {
-        if (x) this.xAlignment = x;
-        if (y) this.yAlignment = y;
+        if (x) this.state.xAlignment = x;
+        if (y) this.state.yAlignment = y;
         this.emitZoom();
         return this;
     }
@@ -446,49 +411,49 @@ export class Heatmap<TX, TY, TItem> {
 
     /** Do not call directly! Call `requestDraw` instead to avoid browser freezing. */
     private _draw() {
-        if (!this.dom) return;
-        const xResolution = Box.width(this.boxes.canvas) / this.downsamplingPixelsPerRect;
-        const yResolution = Box.height(this.boxes.canvas) / this.downsamplingPixelsPerRect;
-        this.downsampler ??= Downsampler.fromImage(this.getColorArray());
+        if (!this.state.dom) return;
+        const xResolution = Box.width(this.state.boxes.canvas) / this.state.downsamplingPixelsPerRect;
+        const yResolution = Box.height(this.state.boxes.canvas) / this.state.downsamplingPixelsPerRect;
+        this.state.downsampler ??= Downsampler.fromImage(this.getColorArray());
         // console.time('downsample')
-        const downsampledImage = Downsampler.getDownsampled(this.downsampler, {
-            x: xResolution * Box.width(this.boxes.wholeWorld) / (Box.width(this.boxes.visWorld)),
-            // y: this.data.nRows,
-            y: yResolution * Box.height(this.boxes.wholeWorld) / (Box.height(this.boxes.visWorld)),
+        const downsampledImage = Downsampler.getDownsampled(this.state.downsampler, {
+            x: xResolution * Box.width(this.state.boxes.wholeWorld) / (Box.width(this.state.boxes.visWorld)),
+            // y: this.state.data.nRows,
+            y: yResolution * Box.height(this.state.boxes.wholeWorld) / (Box.height(this.state.boxes.visWorld)),
         });
         console.log('downsampled', downsampledImage.nColumns, downsampledImage.nRows)
         // console.timeEnd('downsample')
-        return this.drawThisImage(downsampledImage, this.data.nColumns / downsampledImage.nColumns, this.data.nRows / downsampledImage.nRows);
+        return this.drawThisImage(downsampledImage, this.state.data.nColumns / downsampledImage.nColumns, this.state.data.nRows / downsampledImage.nRows);
     }
 
     private drawTheseData(data: Data<TItem>, xScale: number) {
-        if (!this.ctx) return;
-        this.ctx.clearRect(0, 0, Box.width(this.boxes.canvas), Box.height(this.boxes.canvas));
-        const width = scaleDistance(this.scales.worldToCanvas.x, 1) * xScale;
-        const height = scaleDistance(this.scales.worldToCanvas.y, 1);
+        if (!this.state.ctx) return;
+        this.state.ctx.clearRect(0, 0, Box.width(this.state.boxes.canvas), Box.height(this.state.boxes.canvas));
+        const width = scaleDistance(this.state.scales.worldToCanvas.x, 1) * xScale;
+        const height = scaleDistance(this.state.scales.worldToCanvas.y, 1);
         const xHalfGap = xScale === 1 ? 0.5 * this.getXGap(width) : 0;
         const yHalfGap = 0.5 * this.getYGap(height);
-        const colFrom = Math.floor(this.boxes.visWorld.xmin / xScale);
-        const colTo = Math.ceil(this.boxes.visWorld.xmax / xScale); // exclusive
+        const colFrom = Math.floor(this.state.boxes.visWorld.xmin / xScale);
+        const colTo = Math.ceil(this.state.boxes.visWorld.xmax / xScale); // exclusive
 
         for (let iy = 0; iy < data.nRows; iy++) {
             for (let ix = colFrom; ix < colTo; ix++) {
                 const item = Data.getItem(data, ix, iy);
                 if (item === undefined) continue;
-                const color = this.colorProvider(item, this.xDomain.values[ix], this.yDomain.values[iy], ix, iy);
-                this.ctx.fillStyle = (typeof color === 'string') ? color : Color.toString(color);
-                const x = this.scales.worldToCanvas.x(ix * xScale);
-                const y = this.scales.worldToCanvas.y(iy);
-                this.ctx.fillRect(x + xHalfGap, y + yHalfGap, width - 2 * xHalfGap, height - 2 * yHalfGap);
+                const color = this.state.colorProvider(item, this.state.xDomain.values[ix], this.state.yDomain.values[iy], ix, iy);
+                this.state.ctx.fillStyle = (typeof color === 'string') ? color : Color.toString(color);
+                const x = this.state.scales.worldToCanvas.x(ix * xScale);
+                const y = this.state.scales.worldToCanvas.y(iy);
+                this.state.ctx.fillRect(x + xHalfGap, y + yHalfGap, width - 2 * xHalfGap, height - 2 * yHalfGap);
             }
         }
     }
 
     _canvasImage?: Image;
     private getCanvasImage(): Image {
-        if (!this.ctx) throw new Error('`getCanvasImage` should only be called when canvas is initialized');
-        const w = Math.floor(this.ctx.canvas.width);
-        const h = Math.floor(this.ctx.canvas.height);
+        if (!this.state.ctx) throw new Error('`getCanvasImage` should only be called when canvas is initialized');
+        const w = Math.floor(this.state.ctx.canvas.width);
+        const h = Math.floor(this.state.ctx.canvas.height);
         if (this._canvasImage && this._canvasImage.nColumns === w && this._canvasImage.nRows === h) {
             Image.clear(this._canvasImage);
         } else {
@@ -499,9 +464,9 @@ export class Heatmap<TX, TY, TItem> {
 
     _canvasImageData?: ImageData;
     private getCanvasImageData(): ImageData {
-        if (!this.ctx) throw new Error('`getCanvasImageData` should only be called when canvas is initialized');
-        const w = Math.floor(this.ctx.canvas.width);
-        const h = Math.floor(this.ctx.canvas.height);
+        if (!this.state.ctx) throw new Error('`getCanvasImageData` should only be called when canvas is initialized');
+        const w = Math.floor(this.state.ctx.canvas.width);
+        const h = Math.floor(this.state.ctx.canvas.height);
         if (this._canvasImageData && this._canvasImageData.width === w && this._canvasImageData.height === h) {
             return this._canvasImageData;
         } else {
@@ -510,31 +475,31 @@ export class Heatmap<TX, TY, TItem> {
         }
     }
     private drawThisImage(image: Image, xScale: number, yScale: number) {
-        if (!this.ctx || !this.dom) return;
+        if (!this.state.ctx || !this.state.dom) return;
         // console.time(`drawThisImage`)
-        this.ctx.clearRect(0, 0, Box.width(this.boxes.canvas), Box.height(this.boxes.canvas));
-        const rectWidth = scaleDistance(this.scales.worldToCanvas.x, 1) * xScale;
-        const rectHeight = scaleDistance(this.scales.worldToCanvas.y, 1) * yScale;
-        const showXGaps = Box.width(this.boxes.canvas) > MIN_PIXELS_PER_RECT_FOR_GAPS * Box.width(this.boxes.visWorld);
-        const showYGaps = Box.height(this.boxes.canvas) > MIN_PIXELS_PER_RECT_FOR_GAPS * Box.height(this.boxes.visWorld);
+        this.state.ctx.clearRect(0, 0, Box.width(this.state.boxes.canvas), Box.height(this.state.boxes.canvas));
+        const rectWidth = scaleDistance(this.state.scales.worldToCanvas.x, 1) * xScale;
+        const rectHeight = scaleDistance(this.state.scales.worldToCanvas.y, 1) * yScale;
+        const showXGaps = Box.width(this.state.boxes.canvas) > MIN_PIXELS_PER_RECT_FOR_GAPS * Box.width(this.state.boxes.visWorld);
+        const showYGaps = Box.height(this.state.boxes.canvas) > MIN_PIXELS_PER_RECT_FOR_GAPS * Box.height(this.state.boxes.visWorld);
         const xHalfGap = showXGaps ? 0.5 * this.getXGap(rectWidth) : 0;
         const yHalfGap = showYGaps ? 0.5 * this.getYGap(rectHeight) : 0;
         const globalOpacity =
             (showXGaps ? 1 : (1 - this.getXGap(rectWidth) / rectWidth))
             * (showYGaps ? 1 : (1 - this.getYGap(rectHeight) / rectHeight));
-        this.dom.canvas.style('opacity', globalOpacity); // This compensates for not showing gaps by lowering opacity (when scaled)
-        const colFrom = clamp(Math.floor(this.boxes.visWorld.xmin / xScale), 0, image.nColumns);
-        const colTo = clamp(Math.ceil(this.boxes.visWorld.xmax / xScale), 0, image.nColumns); // exclusive
-        const rowFrom = clamp(Math.floor(this.boxes.visWorld.ymin / yScale), 0, image.nRows);
-        const rowTo = clamp(Math.ceil(this.boxes.visWorld.ymax / yScale), 0, image.nRows); // exclusive
+        this.state.dom.canvas.style('opacity', globalOpacity); // This compensates for not showing gaps by lowering opacity (when scaled)
+        const colFrom = clamp(Math.floor(this.state.boxes.visWorld.xmin / xScale), 0, image.nColumns);
+        const colTo = clamp(Math.ceil(this.state.boxes.visWorld.xmax / xScale), 0, image.nColumns); // exclusive
+        const rowFrom = clamp(Math.floor(this.state.boxes.visWorld.ymin / yScale), 0, image.nRows);
+        const rowTo = clamp(Math.ceil(this.state.boxes.visWorld.ymax / yScale), 0, image.nRows); // exclusive
 
         const canvasImage = this.getCanvasImage();
         for (let iy = rowFrom; iy < rowTo; iy++) {
-            const y = this.scales.worldToCanvas.y(iy * yScale);
+            const y = this.state.scales.worldToCanvas.y(iy * yScale);
             const yFrom = y + yHalfGap;
             const yTo = y + rectHeight - yHalfGap;
             for (let ix = colFrom; ix < colTo; ix++) {
-                const x = this.scales.worldToCanvas.x(ix * xScale);
+                const x = this.state.scales.worldToCanvas.x(ix * xScale);
                 const xFrom = x + xHalfGap;
                 const xTo = x + rectWidth - xHalfGap;
                 const color = Color.fromImage(image, ix, iy);
@@ -543,71 +508,71 @@ export class Heatmap<TX, TY, TItem> {
         }
         const imageData = this.getCanvasImageData();
         Image.toImageData(canvasImage, imageData);
-        this.ctx.putImageData(imageData, 0, 0);
+        this.state.ctx.putImageData(imageData, 0, 0);
         // console.timeEnd(`drawThisImage`)
     }
 
     /** Return horizontal gap between rectangles, in canvas pixels */
     private getXGap(colWidthOnCanvas: number): number {
-        const gap1 = isNil(this.visualParams.xGapPixels) ? undefined : this.visualParams.xGapPixels;
-        const gap2 = isNil(this.visualParams.xGapRelative) ? undefined : this.visualParams.xGapRelative * colWidthOnCanvas;
+        const gap1 = isNil(this.state.visualParams.xGapPixels) ? undefined : this.state.visualParams.xGapPixels;
+        const gap2 = isNil(this.state.visualParams.xGapRelative) ? undefined : this.state.visualParams.xGapRelative * colWidthOnCanvas;
         return clamp(minimum(gap1, gap2) ?? 0, 0, colWidthOnCanvas);
     }
     /** Return vertical gap between rectangles, in canvas pixels */
     private getYGap(rowHeightOnCanvas: number): number {
-        const gap1 = isNil(this.visualParams.yGapPixels) ? undefined : this.visualParams.yGapPixels;
-        const gap2 = isNil(this.visualParams.yGapRelative) ? undefined : this.visualParams.yGapRelative * rowHeightOnCanvas;
+        const gap1 = isNil(this.state.visualParams.yGapPixels) ? undefined : this.state.visualParams.yGapPixels;
+        const gap2 = isNil(this.state.visualParams.yGapRelative) ? undefined : this.state.visualParams.yGapRelative * rowHeightOnCanvas;
         return clamp(minimum(gap1, gap2) ?? 0, 0, rowHeightOnCanvas);
     }
 
     private addZoomBehavior() {
-        if (!this.dom) return;
-        if (this.zoomBehavior) {
+        if (!this.state.dom) return;
+        if (this.state.zoomBehavior) {
             // Remove any old behavior
-            this.zoomBehavior.on('zoom', null);
+            this.state.zoomBehavior.on('zoom', null);
         }
-        this.zoomBehavior = d3.zoom();
-        this.zoomBehavior.filter(e => (e instanceof WheelEvent) ? (this.wheelAction(e).kind === 'zoom') : true);
-        this.zoomBehavior.wheelDelta(e => {
+        this.state.zoomBehavior = d3.zoom();
+        this.state.zoomBehavior.filter(e => (e instanceof WheelEvent) ? (this.wheelAction(e).kind === 'zoom') : true);
+        this.state.zoomBehavior.wheelDelta(e => {
             // Default function is: -e.deltaY * (e.deltaMode === 1 ? 0.05 : e.deltaMode ? 1 : 0.002) * (e.ctrlKey ? 10 : 1)
             const action = this.wheelAction(e);
             return action.kind === 'zoom' ? ZOOM_SENSITIVITY * action.delta : 0;
         });
-        this.zoomBehavior.on('zoom', e => {
-            this.boxes.visWorld = this.zoomTransformToVisWorld(e.transform);
-            this.scales = Scales(this.boxes);
+        this.state.zoomBehavior.on('zoom', e => {
+            this.state.boxes.visWorld = this.zoomTransformToVisWorld(e.transform);
+            this.state.scales = Scales(this.state.boxes);
             this.handleHover(e.sourceEvent);
             this.emitZoom();
             this.requestDraw();
         });
-        this.dom.svg.call(this.zoomBehavior as any);
+        this.state.dom.svg.call(this.state.zoomBehavior as any);
         // .on('wheel', e => e.preventDefault()); // Prevent fallback to normal scroll when on min/max zoom
         this.events.resize.subscribe(() => this.adjustZoomExtent());
     }
     private adjustZoomExtent() {
-        if (!this.zoomBehavior) return;
-        this.zoomBehavior.translateExtent([[this.boxes.wholeWorld.xmin, -Infinity], [this.boxes.wholeWorld.xmax, Infinity]]);
-        const canvasWidth = Box.width(this.boxes.canvas);
-        const wholeWorldWidth = Box.width(this.boxes.wholeWorld);
+        if (!this.state.zoomBehavior) return;
+        this.state.zoomBehavior.translateExtent([[this.state.boxes.wholeWorld.xmin, -Infinity], [this.state.boxes.wholeWorld.xmax, Infinity]]);
+        const canvasWidth = Box.width(this.state.boxes.canvas);
+        const wholeWorldWidth = Box.width(this.state.boxes.wholeWorld);
         const minZoom = canvasWidth / wholeWorldWidth; // zoom-out
         const maxZoom = Math.max(canvasWidth / MIN_ZOOMED_DATAPOINTS, minZoom); // zoom-in
-        this.zoomBehavior.scaleExtent([minZoom, maxZoom]);
-        this.zoomBehavior.extent([[this.boxes.canvas.xmin, this.boxes.canvas.ymin], [this.boxes.canvas.xmax, this.boxes.canvas.ymax]]);
-        const currentZoom = this.visWorldToZoomTransform(this.boxes.visWorld);
-        this.zoomBehavior.transform(this.dom?.svg as any, currentZoom);
+        this.state.zoomBehavior.scaleExtent([minZoom, maxZoom]);
+        this.state.zoomBehavior.extent([[this.state.boxes.canvas.xmin, this.state.boxes.canvas.ymin], [this.state.boxes.canvas.xmax, this.state.boxes.canvas.ymax]]);
+        const currentZoom = this.visWorldToZoomTransform(this.state.boxes.visWorld);
+        this.state.zoomBehavior.transform(this.state.dom?.svg as any, currentZoom);
     }
 
     private zoomTransformToVisWorld(transform: { k: number, x: number, y: number }): Box {
         return {
-            ...this.boxes.visWorld, // preserve Y zoom
-            xmin: (this.boxes.canvas.xmin - transform.x) / transform.k,
-            xmax: (this.boxes.canvas.xmax - transform.x) / transform.k,
+            ...this.state.boxes.visWorld, // preserve Y zoom
+            xmin: (this.state.boxes.canvas.xmin - transform.x) / transform.k,
+            xmax: (this.state.boxes.canvas.xmax - transform.x) / transform.k,
         };
     }
 
     private visWorldToZoomTransform(visWorld: Box): d3.ZoomTransform {
-        const k = (this.boxes.canvas.xmax - this.boxes.canvas.xmin) / (visWorld.xmax - visWorld.xmin);
-        const x = this.boxes.canvas.xmin - k * visWorld.xmin;
+        const k = (this.state.boxes.canvas.xmax - this.state.boxes.canvas.xmin) / (visWorld.xmax - visWorld.xmin);
+        const x = this.state.boxes.canvas.xmin - k * visWorld.xmin;
         const y = 0;
         return new d3.ZoomTransform(k, x, y);
     }
@@ -617,67 +582,67 @@ export class Heatmap<TX, TY, TItem> {
 
         const xMinIndex_ = round(box.xmin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
         const xMaxIndex_ = round(box.xmax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
-        const xFirstVisibleIndex = clamp(Math.floor(xMinIndex_), 0, this.data.nColumns - 1);
-        const xLastVisibleIndex = clamp(Math.ceil(xMaxIndex_) - 1, 0, this.data.nColumns - 1);
+        const xFirstVisibleIndex = clamp(Math.floor(xMinIndex_), 0, this.state.data.nColumns - 1);
+        const xLastVisibleIndex = clamp(Math.ceil(xMaxIndex_) - 1, 0, this.state.data.nColumns - 1);
 
         const yMinIndex_ = round(box.ymin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
         const yMaxIndex_ = round(box.ymax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
-        const yFirstVisibleIndex = clamp(Math.floor(yMinIndex_), 0, this.data.nRows - 1);
-        const yLastVisibleIndex = clamp(Math.ceil(yMaxIndex_) - 1, 0, this.data.nRows - 1);
+        const yFirstVisibleIndex = clamp(Math.floor(yMinIndex_), 0, this.state.data.nRows - 1);
+        const yLastVisibleIndex = clamp(Math.ceil(yMaxIndex_) - 1, 0, this.state.data.nRows - 1);
 
-        const xShift = indexAlignmentShift(this.xAlignment);
-        const yShift = indexAlignmentShift(this.yAlignment);
+        const xShift = indexAlignmentShift(this.state.xAlignment);
+        const yShift = indexAlignmentShift(this.state.yAlignment);
 
         return {
             xMinIndex: xMinIndex_ + xShift,
             xMaxIndex: xMaxIndex_ + xShift,
-            xMin: Domain.interpolateValue(this.xDomain, xMinIndex_ + xShift),
-            xMax: Domain.interpolateValue(this.xDomain, xMaxIndex_ + xShift),
+            xMin: Domain.interpolateValue(this.state.xDomain, xMinIndex_ + xShift),
+            xMax: Domain.interpolateValue(this.state.xDomain, xMaxIndex_ + xShift),
             xFirstVisibleIndex,
             xLastVisibleIndex,
-            xFirstVisible: this.xDomain.values[xFirstVisibleIndex],
-            xLastVisible: this.xDomain.values[xLastVisibleIndex],
+            xFirstVisible: this.state.xDomain.values[xFirstVisibleIndex],
+            xLastVisible: this.state.xDomain.values[xLastVisibleIndex],
 
             yMinIndex: yMinIndex_ + yShift,
             yMaxIndex: yMaxIndex_ + yShift,
-            yMin: Domain.interpolateValue(this.yDomain, yMinIndex_ + yShift),
-            yMax: Domain.interpolateValue(this.yDomain, yMaxIndex_ + yShift),
+            yMin: Domain.interpolateValue(this.state.yDomain, yMinIndex_ + yShift),
+            yMax: Domain.interpolateValue(this.state.yDomain, yMaxIndex_ + yShift),
             yFirstVisibleIndex,
             yLastVisibleIndex,
-            yFirstVisible: this.yDomain.values[yFirstVisibleIndex],
-            yLastVisible: this.yDomain.values[yLastVisibleIndex],
+            yFirstVisible: this.state.yDomain.values[yFirstVisibleIndex],
+            yLastVisible: this.state.yDomain.values[yLastVisibleIndex],
         };
 
     }
 
     private emitZoom(): void {
-        if (this.boxes.visWorld) {
-            nextIfChanged(this.events.zoom, this.zoomParamFromVisWorld(this.boxes.visWorld));
+        if (this.state.boxes.visWorld) {
+            nextIfChanged(this.events.zoom, this.zoomParamFromVisWorld(this.state.boxes.visWorld));
         }
     }
 
     /** Enforce change of zoom and return the zoom value after the change */
     zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined): ZoomEventParam<TX, TY, TItem> {
-        if (!this.dom || !this.zoomBehavior) return undefined;
+        if (!this.state.dom || !this.state.zoomBehavior) return undefined;
 
         const visWorldBox = Box.clamp({
-            xmin: this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.boxes.wholeWorld.xmin,
-            xmax: this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.boxes.wholeWorld.xmax,
-            ymin: this.getZoomRequestIndexMagic('y', 'Min', z) ?? this.boxes.wholeWorld.ymin,
-            ymax: this.getZoomRequestIndexMagic('y', 'Max', z) ?? this.boxes.wholeWorld.ymax,
-        }, this.boxes.wholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
+            xmin: this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.state.boxes.wholeWorld.xmin,
+            xmax: this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.state.boxes.wholeWorld.xmax,
+            ymin: this.getZoomRequestIndexMagic('y', 'Min', z) ?? this.state.boxes.wholeWorld.ymin,
+            ymax: this.getZoomRequestIndexMagic('y', 'Max', z) ?? this.state.boxes.wholeWorld.ymax,
+        }, this.state.boxes.wholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
 
-        const xScale = Box.width(this.boxes.canvas) / Box.width(visWorldBox);
-        const yScale = Box.height(this.boxes.canvas) / Box.height(visWorldBox);
+        const xScale = Box.width(this.state.boxes.canvas) / Box.width(visWorldBox);
+        const yScale = Box.height(this.state.boxes.canvas) / Box.height(visWorldBox);
 
         const transform = d3.zoomIdentity.scale(xScale).translate(-visWorldBox.xmin, 0);
-        this.zoomBehavior.transform(this.dom.svg as any, transform);
+        this.state.zoomBehavior.transform(this.state.dom.svg as any, transform);
         return this.zoomParamFromVisWorld(visWorldBox);
     }
 
     /** Return current zoom */
     getZoom(): ZoomEventParam<TX, TY, TItem> {
-        return this.zoomParamFromVisWorld(this.boxes.visWorld);
+        return this.zoomParamFromVisWorld(this.state.boxes.visWorld);
     }
 
     private getZoomRequestIndexMagic(axis: 'x' | 'y', end: 'Min' | 'Max', z: Partial<ZoomEventParam<TX, TY, TItem>>): number | undefined {
@@ -688,8 +653,8 @@ export class Heatmap<TX, TY, TItem> {
         const value = z[`${axis}${end}`] as TX | TY | undefined;
         const visIndex = z[`${axis}${fl}VisibleIndex`];
         const visValue = z[`${axis}${fl}Visible`];
-        const domain = this[`${axis}Domain`];
-        const alignment = this[`${axis}Alignment`];
+        const domain = this.state[`${axis}Domain`];
+        const alignment = this.state[`${axis}Alignment`];
 
         if ([index, value, visIndex, visValue].filter(v => !isNil(v)).length > 1) {
             console.warn(`You called zoom function with more that one of these conflicting options: ${axis}${end}Index, ${axis}${end}, ${axis}${fl}VisibleIndex, ${axis}${fl}Visible. Only the first one (in this order of precedence) will be considered.`);
@@ -727,14 +692,14 @@ export class Heatmap<TX, TY, TItem> {
         if (!event) {
             return undefined;
         }
-        const xIndex = Math.floor(this.scales.canvasToWorld.x(event.offsetX));
-        const yIndex = Math.floor(this.scales.canvasToWorld.y(event.offsetY));
-        const datum = Data.getItem(this.data, xIndex, yIndex);
+        const xIndex = Math.floor(this.state.scales.canvasToWorld.x(event.offsetX));
+        const yIndex = Math.floor(this.state.scales.canvasToWorld.y(event.offsetY));
+        const datum = Data.getItem(this.state.data, xIndex, yIndex);
         if (!datum) {
             return undefined;
         }
-        const x = this.xDomain.values[xIndex];
-        const y = this.yDomain.values[yIndex];
+        const x = this.state.xDomain.values[xIndex];
+        const y = this.state.yDomain.values[yIndex];
         return { datum, x, y, xIndex, yIndex, sourceEvent: event };
     }
 
@@ -746,52 +711,52 @@ export class Heatmap<TX, TY, TItem> {
     }
 
     private drawMarkers(pointed: ItemEventParam<TX, TY, TItem>) {
-        if (!this.dom) return;
+        if (!this.state.dom) return;
         if (pointed) {
-            const x = this.scales.worldToCanvas.x(pointed.xIndex);
-            const y = this.scales.worldToCanvas.y(pointed.yIndex);
-            const width = scaleDistance(this.scales.worldToCanvas.x, 1);
-            const height = scaleDistance(this.scales.worldToCanvas.y, 1);
-            const commonAttrs = { rx: this.visualParams.markerCornerRadius, ry: this.visualParams.markerCornerRadius };
+            const x = this.state.scales.worldToCanvas.x(pointed.xIndex);
+            const y = this.state.scales.worldToCanvas.y(pointed.yIndex);
+            const width = scaleDistance(this.state.scales.worldToCanvas.x, 1);
+            const height = scaleDistance(this.state.scales.worldToCanvas.y, 1);
+            const commonAttrs = { rx: this.state.visualParams.markerCornerRadius, ry: this.state.visualParams.markerCornerRadius };
             this.addOrUpdateMarker(Class.MarkerX, commonAttrs, {
                 x,
-                y: this.boxes.canvas.ymin,
+                y: this.state.boxes.canvas.ymin,
                 width,
-                height: Box.height(this.boxes.canvas),
+                height: Box.height(this.state.boxes.canvas),
             });
             this.addOrUpdateMarker(Class.MarkerY, commonAttrs, {
-                x: this.boxes.canvas.xmin,
+                x: this.state.boxes.canvas.xmin,
                 y,
-                width: Box.width(this.boxes.canvas),
+                width: Box.width(this.state.boxes.canvas),
                 height,
             });
             this.addOrUpdateMarker(Class.Marker, commonAttrs, {
                 x, y, width, height
             });
         } else {
-            this.dom.svg.selectAll('.' + Class.Marker).remove();
-            this.dom.svg.selectAll('.' + Class.MarkerX).remove();
-            this.dom.svg.selectAll('.' + Class.MarkerY).remove();
+            this.state.dom.svg.selectAll('.' + Class.Marker).remove();
+            this.state.dom.svg.selectAll('.' + Class.MarkerX).remove();
+            this.state.dom.svg.selectAll('.' + Class.MarkerY).remove();
         }
     }
 
     private addOrUpdateMarker(className: string, staticAttrs: Parameters<typeof attrd>[1], dynamicAttrs: Parameters<typeof attrd>[1]) {
-        if (!this.dom) return;
-        const marker = this.dom.svg.selectAll('.' + className).data([1]);
+        if (!this.state.dom) return;
+        const marker = this.state.dom.svg.selectAll('.' + className).data([1]);
         attrd(marker.enter().append('rect'), { class: className, ...staticAttrs, ...dynamicAttrs });
         attrd(marker, dynamicAttrs);
     }
 
     private drawTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
-        if (!this.dom) return;
-        const thisTooltipPinned = pointed && this.pinnedTooltip && pointed.xIndex === Math.floor(this.pinnedTooltip.x) && pointed.yIndex === Math.floor(this.pinnedTooltip.y);
-        if (pointed && !thisTooltipPinned && this.tooltipProvider) {
+        if (!this.state.dom) return;
+        const thisTooltipPinned = pointed && this.state.pinnedTooltip && pointed.xIndex === Math.floor(this.state.pinnedTooltip.x) && pointed.yIndex === Math.floor(this.state.pinnedTooltip.y);
+        if (pointed && !thisTooltipPinned && this.state.tooltipProvider) {
             const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
-            const tooltipText = this.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
-            let tooltip = this.dom.canvasDiv.selectAll<HTMLDivElement, any>('.' + Class.TooltipBox);
+            const tooltipText = this.state.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
+            let tooltip = this.state.dom.canvasDiv.selectAll<HTMLDivElement, any>('.' + Class.TooltipBox);
             if (tooltip.empty()) {
                 // Create tooltip if doesn't exist
-                tooltip = attrd(this.dom.canvasDiv.append('div'), {
+                tooltip = attrd(this.state.dom.canvasDiv.append('div'), {
                     class: Class.TooltipBox,
                     style: { position: 'absolute', ...tooltipPosition }
                 });
@@ -804,19 +769,19 @@ export class Heatmap<TX, TY, TItem> {
                     .html(tooltipText);
             }
         } else {
-            this.dom.canvasDiv.selectAll('.' + Class.TooltipBox).remove();
+            this.state.dom.canvasDiv.selectAll('.' + Class.TooltipBox).remove();
         }
     }
 
     private drawPinnedTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
-        if (!this.dom) return;
-        this.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
-        if (pointed && this.tooltipProvider) {
-            this.pinnedTooltip = { x: this.scales.canvasToWorld.x(pointed.sourceEvent.offsetX), y: this.scales.canvasToWorld.y(pointed.sourceEvent.offsetY) };
+        if (!this.state.dom) return;
+        this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
+        if (pointed && this.state.tooltipProvider) {
+            this.state.pinnedTooltip = { x: this.state.scales.canvasToWorld.x(pointed.sourceEvent.offsetX), y: this.state.scales.canvasToWorld.y(pointed.sourceEvent.offsetY) };
             const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
-            const tooltipText = this.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
+            const tooltipText = this.state.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
 
-            const tooltip = attrd(this.dom.canvasDiv.append('div'), {
+            const tooltip = attrd(this.state.dom.canvasDiv.append('div'), {
                 class: Class.PinnedTooltipBox,
                 style: { position: 'absolute', ...tooltipPosition },
             });
@@ -844,19 +809,19 @@ export class Heatmap<TX, TY, TItem> {
             // Remove any non-pinned tooltip
             this.drawTooltip(undefined);
         } else {
-            this.pinnedTooltip = undefined;
+            this.state.pinnedTooltip = undefined;
         }
     }
 
     private addPinnedTooltipBehavior() {
         this.events.click.subscribe(pointed => this.drawPinnedTooltip(pointed));
         const updatePinnedTooltipPosition = () => {
-            if (this.dom && this.pinnedTooltip) {
+            if (this.state.dom && this.state.pinnedTooltip) {
                 const domPosition = {
-                    offsetX: this.scales.worldToCanvas.x(this.pinnedTooltip.x),
-                    offsetY: this.scales.worldToCanvas.y(this.pinnedTooltip.y),
+                    offsetX: this.state.scales.worldToCanvas.x(this.state.pinnedTooltip.x),
+                    offsetY: this.state.scales.worldToCanvas.y(this.state.pinnedTooltip.y),
                 };
-                attrd(this.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox), { style: this.getTooltipPosition(domPosition) });
+                attrd(this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox), { style: this.getTooltipPosition(domPosition) });
             }
         };
         this.events.zoom.subscribe(updatePinnedTooltipPosition);
@@ -866,16 +831,16 @@ export class Heatmap<TX, TY, TItem> {
     /** Return tooltip position as CSS style parameters (for position:absolute within this.canvasDiv) for mouse event `e` triggered on this.svg.  */
     private getTooltipPosition(e: MouseEvent | { offsetX: number, offsetY: number }) {
         const left = `${(e.offsetX ?? 0)}px`;
-        const bottom = `${Box.height(this.boxes.canvas) - (e.offsetY ?? 0)}px`;
-        const display = Box.containsPoint(this.boxes.canvas, { x: e.offsetX, y: e.offsetY }) ? 'unset' : 'none';
+        const bottom = `${Box.height(this.state.boxes.canvas) - (e.offsetY ?? 0)}px`;
+        const display = Box.containsPoint(this.state.boxes.canvas, { x: e.offsetX, y: e.offsetY }) ? 'unset' : 'none';
         return { left, bottom, display };
     }
 
     private showScrollingMessage() {
-        if (!this.dom) return;
-        if (!this.dom.mainDiv.selectAll(`.${Class.Overlay}`).empty()) return;
+        if (!this.state.dom) return;
+        if (!this.state.dom.mainDiv.selectAll(`.${Class.Overlay}`).empty()) return;
 
-        const overlay = attrd(this.dom.mainDiv.append('div'), { class: Class.Overlay });
+        const overlay = attrd(this.state.dom.mainDiv.append('div'), { class: Class.Overlay });
         attrd(overlay.append('div'), { class: Class.OverlayShade });
         attrd(overlay.append('div'), { class: Class.OverlayMessage })
             .text('Press Ctrl and scroll to apply zoom');
@@ -887,17 +852,17 @@ export class Heatmap<TX, TY, TItem> {
         const isVertical = Math.abs(e.deltaX) < Math.abs(e.deltaY);
 
         const modeSpeed = (e.deltaMode === 1) ? 25 : e.deltaMode ? 500 : 1; // scroll in lines vs pages vs pixels
-        const speedup = ZOOM_REQUIRE_CTRL ? 1 : (this.lastWheelEvent.ctrlKey || this.lastWheelEvent.metaKey ? 10 : 1);
+        const speedup = ZOOM_REQUIRE_CTRL ? 1 : (this.state.lastWheelEvent.ctrlKey || this.state.lastWheelEvent.metaKey ? 10 : 1);
 
         if (isHorizontal) {
             return { kind: 'pan', deltaX: -e.deltaX * modeSpeed * speedup, deltaY: 0 };
         }
 
         if (isVertical) {
-            if (this.lastWheelEvent.shiftKey) {
+            if (this.state.lastWheelEvent.shiftKey) {
                 return { kind: 'pan', deltaX: -e.deltaY * modeSpeed * speedup, deltaY: 0 };
             }
-            if (ZOOM_REQUIRE_CTRL && !this.lastWheelEvent.ctrlKey && !this.lastWheelEvent.metaKey) {
+            if (ZOOM_REQUIRE_CTRL && !this.state.lastWheelEvent.ctrlKey && !this.state.lastWheelEvent.metaKey) {
                 return (Math.abs(e.deltaY) * modeSpeed >= 5) ? { kind: 'showHelp' } : { kind: 'ignore' };
             }
             return { kind: 'zoom', delta: -e.deltaY * 0.002 * modeSpeed * speedup };
@@ -912,27 +877,27 @@ export class Heatmap<TX, TY, TItem> {
         mouseleave: (e: MouseEvent) => this.handleHover(undefined),
         click: (e: MouseEvent) => this.events.click.next(this.getPointedItem(e)),
         wheel: (e: WheelEvent) => {
-            if (!this.dom) return;
+            if (!this.state.dom) return;
             e.preventDefault(); // TODO ???
 
             // Magic to handle touchpad scrolling on Mac (when user lifts fingers from touchpad, but the browser is still getting wheel events)
             const now = Date.now();
             const absDelta = Math.max(Math.abs(e.deltaX), Math.abs(e.deltaY));
-            if (now > this.lastWheelEvent.timestamp + 150 || absDelta > this.lastWheelEvent.absDelta + 1) {
+            if (now > this.state.lastWheelEvent.timestamp + 150 || absDelta > this.state.lastWheelEvent.absDelta + 1) {
                 // Starting a new gesture
-                this.lastWheelEvent.ctrlKey = e.ctrlKey;
-                this.lastWheelEvent.shiftKey = e.shiftKey;
-                this.lastWheelEvent.altKey = e.altKey;
-                this.lastWheelEvent.metaKey = e.metaKey;
+                this.state.lastWheelEvent.ctrlKey = e.ctrlKey;
+                this.state.lastWheelEvent.shiftKey = e.shiftKey;
+                this.state.lastWheelEvent.altKey = e.altKey;
+                this.state.lastWheelEvent.metaKey = e.metaKey;
             }
-            this.lastWheelEvent.timestamp = now;
-            this.lastWheelEvent.absDelta = absDelta;
+            this.state.lastWheelEvent.timestamp = now;
+            this.state.lastWheelEvent.absDelta = absDelta;
 
-            if (this.zoomBehavior) {
+            if (this.state.zoomBehavior) {
                 const action = this.wheelAction(e);
                 if (action.kind === 'pan') {
-                    const shiftX = PAN_SENSITIVITY * scaleDistance(this.scales.canvasToWorld.x, action.deltaX);
-                    this.zoomBehavior.duration(1000).translateBy(this.dom.svg as any, shiftX, 0);
+                    const shiftX = PAN_SENSITIVITY * scaleDistance(this.state.scales.canvasToWorld.x, action.deltaX);
+                    this.state.zoomBehavior.duration(1000).translateBy(this.state.dom.svg as any, shiftX, 0);
                 }
                 if (action.kind === 'showHelp') {
                     this.showScrollingMessage();
