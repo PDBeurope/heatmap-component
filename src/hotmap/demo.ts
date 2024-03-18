@@ -1,14 +1,12 @@
 import * as d3 from 'd3';
 import { Heatmap } from './heatmap';
 import { formatDataItem } from './utils';
-import { resamplingCoefficients } from './downsampling';
-import { sum } from 'lodash';
 
 
 export function demo(divElementOrId: HTMLDivElement | string) {
     const hm = Heatmap.createDummy(2e5, 20); // Heatmap<number, number, number>
-    // hm.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
-    hm.setVisualParams({ yGapRelative: 0 });
+    hm.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
+    // hm.setVisualParams({ yGapRelative: 0 });
     // hm.setColor(Color.createScale([0, 0.5, 1], ['#00d', '#ddd', '#d00']));
     // hm.setColor(d3.scaleLinear([0, 0.5, 1], ['#00d', '#ddd', '#d00']));
     hm.render(divElementOrId);

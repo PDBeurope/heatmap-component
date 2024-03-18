@@ -445,12 +445,17 @@ export class Heatmap<TX, TY, TItem> {
     private _draw() {
         if (!this.dom) return;
         const xResolution = Box.width(this.boxes.canvas) / this.downsamplingPixelsPerRect;
+        const yResolution = Box.height(this.boxes.canvas) / this.downsamplingPixelsPerRect;
         this.downsampler ??= Downsampler.fromImage(this.getColorArray());
         // console.time('downsample')
-        const downsampledImage = Downsampler.getDownsampled(this.downsampler, { x: xResolution * Box.width(this.boxes.wholeWorld) / (Box.width(this.boxes.visWorld)), y: this.data.nRows });
+        const downsampledImage = Downsampler.getDownsampled(this.downsampler, {
+            x: xResolution * Box.width(this.boxes.wholeWorld) / (Box.width(this.boxes.visWorld)),
+            // y: this.data.nRows,
+            y: yResolution * Box.height(this.boxes.wholeWorld) / (Box.height(this.boxes.visWorld)),
+        });
+        console.log('downsampled', downsampledImage.nColumns, downsampledImage.nRows)
         // console.timeEnd('downsample')
-        // return this.drawThisImage(downsampledImage, this.data.nColumns / downsampledImage.nColumns + 0.000001, 1); // debug TODO remove 0.000001
-        return this.drawThisImage(downsampledImage, this.data.nColumns / downsampledImage.nColumns, 1);
+        return this.drawThisImage(downsampledImage, this.data.nColumns / downsampledImage.nColumns, this.data.nRows / downsampledImage.nRows);
     }
 
     private drawTheseData(data: Data<TItem>, xScale: number) {
@@ -503,6 +508,7 @@ export class Heatmap<TX, TY, TItem> {
     }
     private drawThisImage(image: Image, xScale: number, yScale: number) {
         if (!this.ctx || !this.dom) return;
+        // console.time(`drawThisImage`)
         this.ctx.clearRect(0, 0, Box.width(this.boxes.canvas), Box.height(this.boxes.canvas));
         const rectWidth = scaleDistance(this.scales.worldToCanvas.x, 1) * xScale;
         const rectHeight = scaleDistance(this.scales.worldToCanvas.y, 1) * yScale;
@@ -516,13 +522,12 @@ export class Heatmap<TX, TY, TItem> {
         this.dom.canvas.style('opacity', globalOpacity); // This compensates for not showing gaps by lowering opacity (when scaled)
         const colFrom = clamp(Math.floor(this.boxes.visWorld.xmin / xScale), 0, image.nColumns);
         const colTo = clamp(Math.ceil(this.boxes.visWorld.xmax / xScale), 0, image.nColumns); // exclusive
-        console.time(`drawThisImage`)
-        // console.log(showXGaps ? 'draw full' : 'draw down', Box.width(this.boxes.canvas) / Box.width(this.boxes.visWorld))
+        const rowFrom = clamp(Math.floor(this.boxes.visWorld.ymin / yScale), 0, image.nRows);
+        const rowTo = clamp(Math.ceil(this.boxes.visWorld.ymax / yScale), 0, image.nRows); // exclusive
 
         const canvasImage = this.getCanvasImage();
-        const { nRows } = image;
-        for (let iy = 0; iy < nRows; iy++) {
-            const y = this.scales.worldToCanvas.y(iy);
+        for (let iy = rowFrom; iy < rowTo; iy++) {
+            const y = this.scales.worldToCanvas.y(iy * yScale);
             const yFrom = y + yHalfGap;
             const yTo = y + rectHeight - yHalfGap;
             for (let ix = colFrom; ix < colTo; ix++) {
@@ -534,10 +539,9 @@ export class Heatmap<TX, TY, TItem> {
             }
         }
         const imageData = this.getCanvasImageData();
-        Image.toImageData(canvasImage, imageData)
+        Image.toImageData(canvasImage, imageData);
         this.ctx.putImageData(imageData, 0, 0);
-
-        console.timeEnd(`drawThisImage`)
+        // console.timeEnd(`drawThisImage`)
     }
 
     /** Return horizontal gap between rectangles, in canvas pixels */
