@@ -77,13 +77,13 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
     //         console.log('hovering', e.datum, e.x, e.y, e.xIndex, e.yIndex, e.sourceEvent);
     //     }
     // });
-    // hm.events.click.subscribe(e => {
-    //     if (!e) {
-    //         console.log('clicking nothing');
-    //     } else {
-    //         console.log('clicking', e.datum, e.x, e.y, e.xIndex, e.yIndex, e.sourceEvent);
-    //     }
-    // });
+    hm.events.click.subscribe(e => {
+        if (!e) {
+            console.log('clicking nothing');
+        } else {
+            console.log('clicking', e.datum, e.x, e.y, e.xIndex, e.yIndex, e.sourceEvent);
+        }
+    });
     // hm.events.zoom.subscribe(e => {
     //     if (!e) {
     //         console.log('zooming nothing');

@@ -118,3 +118,7 @@ export function removeElement<T>(array: T[], element: T): void {
     const i = array.indexOf(element);
     if (i >= 0) array.splice(i);
 }
+
+export function shallowMerge<T>(old: T, new_?: Partial<T>): T {
+    return { ...old, ...new_ }; // TODO ignore udefineds in new_?
+}

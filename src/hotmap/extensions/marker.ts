@@ -6,9 +6,12 @@ import { HotmapExtension, HotmapExtensionBase } from './extension';
 
 
 interface MarkerExtensionParams { }
+const DefaultMarkerExtensionParams: MarkerExtensionParams = {};
 
-export const MarkerExtension = HotmapExtension(
-    class extends HotmapExtensionBase<MarkerExtensionParams> {
+export const MarkerExtension = HotmapExtension.fromClass({
+    name: 'builtin.marker',
+    defaultParams: DefaultMarkerExtensionParams,
+    class: class extends HotmapExtensionBase<MarkerExtensionParams> {
         register() {
             super.register();
             this.subscribe(this.state.events.hover, pointed => {
@@ -52,6 +55,5 @@ export const MarkerExtension = HotmapExtension(
             attrd(marker.enter().append('rect'), { class: className, ...staticAttrs, ...dynamicAttrs });
             attrd(marker, dynamicAttrs);
         }
-
     }
-);
+});

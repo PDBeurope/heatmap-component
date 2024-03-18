@@ -11,32 +11,34 @@ function DefaultTooltipProvider(dataItem: unknown, x: unknown, y: unknown, xInde
 
 export interface TooltipExtensionParams<TX, TY, TItem> {
     tooltipProvider: Provider<TX, TY, TItem, string> | null;
-    // pinnable: boolean,
+    pinnable: boolean,
 }
 
 export const DefaultTooltipExtensionParams: TooltipExtensionParams<any, any, any> = {
     tooltipProvider: DefaultTooltipProvider,
-    // pinnable: true,
-}
+    pinnable: true,
+};
 
 
 // TODO implement infrastructure for default params
 // TODO html vs text mode?
 // TODO pinning
 
-export const TooltipExtension = HotmapExtension(
-    class <TX, TY, TItem> extends HotmapExtensionBase<TooltipExtensionParams<TX, TY, TItem>, TX, TY, TItem> {
+export const TooltipExtension = HotmapExtension.fromClass<TooltipExtensionParams<any, any, any>>({
+    name: 'builtin.tooltip',
+    defaultParams: DefaultTooltipExtensionParams,
+    class: class <TX, TY, TItem> extends HotmapExtensionBase<TooltipExtensionParams<TX, TY, TItem>, TX, TY, TItem> {
         register() {
             super.register();
-            console.log('Registering Blabla')
+            console.log('TooltipExtension', this.params)
             this.subscribe(this.state.events.hover, pointed => {
                 this.drawTooltip(pointed);
             });
             this.addPinnedTooltipBehavior();
         }
         // update(params: TooltipExtensionParams<TX, TY, TItem>) {
-        //     super.update(params);
         //     console.log('Updating Blabla')
+        //     super.update(params);
         // }
         // unregister() {
         //     console.log('Unregistering Blabla')
@@ -72,7 +74,8 @@ export const TooltipExtension = HotmapExtension(
         private drawPinnedTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
             if (!this.state.dom) return;
             this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
-            if (pointed && this.params.tooltipProvider) {
+            console.log('drawPinnedTooltip', this.params)
+            if (pointed && this.params.tooltipProvider && this.params.pinnable) {
                 this.state.pinnedTooltip = { x: this.state.scales.canvasToWorld.x(pointed.sourceEvent.offsetX), y: this.state.scales.canvasToWorld.y(pointed.sourceEvent.offsetY) };
                 const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
                 const tooltipText = this.params.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
@@ -132,6 +135,5 @@ export const TooltipExtension = HotmapExtension(
             return { left, bottom, display };
         }
 
-
     }
-);
+});

@@ -165,14 +165,13 @@ export class Heatmap<TX, TY, TItem> {
     get events() { return this.state.events; }
 
     private readonly _behaviors: ExtensionInstance<any>[] = [];
-    registerBehavior<TParams extends {}>(behavior: HotmapExtension<TParams>, params: TParams): ExtensionInstanceRegistration<TParams> {
+    registerBehavior<TParams extends {}>(behavior: HotmapExtension<TParams>, params?: Partial<TParams>): ExtensionInstanceRegistration<TParams> {
         const behaviors = this._behaviors;
         const behaviorInstance: ExtensionInstance<TParams> = behavior.create(this.state, params);
         behaviorInstance.register();
         behaviors.push(behaviorInstance);
         return {
-            update(newParams: TParams) {
-                console.log('registerBehavior.update', newParams)
+            update(newParams: Partial<TParams>) {
                 behaviorInstance.update(newParams);
             },
             unregister() {
@@ -205,8 +204,10 @@ export class Heatmap<TX, TY, TItem> {
             const colorProvider = DefaultNumericColorProviderFactory(dataRange.min, dataRange.max);
             (this as unknown as Heatmap<TX, TY, number>).setColor(colorProvider);
         }
-        this.registerBehavior(MarkerExtension, {});
-        this.extensions.tooltip = this.registerBehavior(TooltipExtension, { tooltipProvider: DefaultTooltipExtensionParams.tooltipProvider });
+        this.registerBehavior(MarkerExtension);
+        this.extensions.tooltip = this.registerBehavior(TooltipExtension);
+        // setTimeout(() => this.extensions.tooltip?.update({ pinnable: false }), 5000);
+        // setTimeout(() => this.extensions.tooltip?.update({ tooltipProvider: ()=>'ahoj' }), 5000);
     }
 
 
@@ -399,8 +400,7 @@ export class Heatmap<TX, TY, TItem> {
     setTooltip(tooltipProvider: ((...args: ProviderParams<TX, TY, TItem>) => string) | 'default' | null): this {
         if (tooltipProvider === 'default') {
             this.extensions.tooltip?.update({ tooltipProvider: DefaultTooltipExtensionParams.tooltipProvider });
-        }
-        else {
+        } else {
             this.extensions.tooltip?.update({ tooltipProvider });
 
         }
