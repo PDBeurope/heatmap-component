@@ -1,13 +1,31 @@
-import { Class, ItemEventParam } from '../heatmap';
+import { Class, ItemEventParam, Provider } from '../heatmap';
 import { Box } from '../scales';
-import { attrd } from '../utils';
+import { attrd, formatDataItem } from '../utils';
 import { HotmapExtension, HotmapExtensionBase } from './extension';
 
 
-interface TooltipExtensionParams { }
+function DefaultTooltipProvider(dataItem: unknown, x: unknown, y: unknown, xIndex: number, yIndex: number): string {
+    return `x index: ${xIndex}<br>y index: ${yIndex}<br>x value: ${x}<br>y value: ${y}<br>item: ${formatDataItem(dataItem)}`;
+}
+
+
+export interface TooltipExtensionParams<TX, TY, TItem> {
+    tooltipProvider: Provider<TX, TY, TItem, string> | null;
+    // pinnable: boolean,
+}
+
+export const DefaultTooltipExtensionParams: TooltipExtensionParams<any, any, any> = {
+    tooltipProvider: DefaultTooltipProvider,
+    // pinnable: true,
+}
+
+
+// TODO implement infrastructure for default params
+// TODO html vs text mode?
+// TODO pinning
 
 export const TooltipExtension = HotmapExtension(
-    class <TX, TY, TItem> extends HotmapExtensionBase<TooltipExtensionParams, TX, TY, TItem> {
+    class <TX, TY, TItem> extends HotmapExtensionBase<TooltipExtensionParams<TX, TY, TItem>, TX, TY, TItem> {
         register() {
             super.register();
             console.log('Registering Blabla')
@@ -15,23 +33,22 @@ export const TooltipExtension = HotmapExtension(
                 this.drawTooltip(pointed);
             });
             this.addPinnedTooltipBehavior();
-
         }
-        update(params: TooltipExtensionParams) {
-            super.update(params);
-            console.log('Updating Blabla')
-        }
-        unregister() {
-            console.log('Unregistering Blabla')
-            super.unregister();
-        }
+        // update(params: TooltipExtensionParams<TX, TY, TItem>) {
+        //     super.update(params);
+        //     console.log('Updating Blabla')
+        // }
+        // unregister() {
+        //     console.log('Unregistering Blabla')
+        //     super.unregister();
+        // }
 
         private drawTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
             if (!this.state.dom) return;
             const thisTooltipPinned = pointed && this.state.pinnedTooltip && pointed.xIndex === Math.floor(this.state.pinnedTooltip.x) && pointed.yIndex === Math.floor(this.state.pinnedTooltip.y);
-            if (pointed && !thisTooltipPinned && this.state.tooltipProvider) {
+            if (pointed && !thisTooltipPinned && this.params.tooltipProvider) {
                 const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
-                const tooltipText = this.state.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
+                const tooltipText = this.params.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
                 let tooltip = this.state.dom.canvasDiv.selectAll<HTMLDivElement, any>('.' + Class.TooltipBox);
                 if (tooltip.empty()) {
                     // Create tooltip if doesn't exist
@@ -55,10 +72,10 @@ export const TooltipExtension = HotmapExtension(
         private drawPinnedTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
             if (!this.state.dom) return;
             this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
-            if (pointed && this.state.tooltipProvider) {
+            if (pointed && this.params.tooltipProvider) {
                 this.state.pinnedTooltip = { x: this.state.scales.canvasToWorld.x(pointed.sourceEvent.offsetX), y: this.state.scales.canvasToWorld.y(pointed.sourceEvent.offsetY) };
                 const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
-                const tooltipText = this.state.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
+                const tooltipText = this.params.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
 
                 const tooltip = attrd(this.state.dom.canvasDiv.append('div'), {
                     class: Class.PinnedTooltipBox,

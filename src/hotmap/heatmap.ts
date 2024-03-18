@@ -9,7 +9,7 @@ import { MarkerExtension } from './extensions/marker';
 import { Box, Scales, scaleDistance } from './scales';
 import { State } from './state';
 import { Refresher, attrd, formatDataItem, getSize, minimum, nextIfChanged, removeElement } from './utils';
-import { TooltipExtension } from './extensions/tooltip';
+import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 
 
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
@@ -133,10 +133,6 @@ const DefaultColor = Color.fromString('#888888');
 export const DefaultColorProvider = () => DefaultColor;
 export const DefaultNumericColorProviderFactory = (min: number, max: number) => Color.createScale('YlOrRd', [min, max]);
 
-export function DefaultTooltipProvider(dataItem: unknown, x: unknown, y: unknown, xIndex: number, yIndex: number): string {
-    return `x index: ${xIndex}<br>y index: ${yIndex}<br>x value: ${x}<br>y value: ${y}<br>item: ${formatDataItem(dataItem)}`;
-}
-
 /** Controls how X axis values align with the columns when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on X axis can be aligned to the left edge/center/right edge of the column showing that value) */
 export type XAlignmentMode = 'left' | 'center' | 'right'
 /** Controls how Y axis values align with the rows when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on Y axis is aligned to the top edge/center/bottom edge of the row showing that value) */
@@ -175,8 +171,9 @@ export class Heatmap<TX, TY, TItem> {
         behaviorInstance.register();
         behaviors.push(behaviorInstance);
         return {
-            update(params: TParams) {
-                behaviorInstance.update(params);
+            update(newParams: TParams) {
+                console.log('registerBehavior.update', newParams)
+                behaviorInstance.update(newParams);
             },
             unregister() {
                 removeElement(behaviors, behaviorInstance);
@@ -184,6 +181,10 @@ export class Heatmap<TX, TY, TItem> {
             },
         };
     }
+
+    private readonly extensions: {
+        tooltip?: ExtensionInstanceRegistration<TooltipExtensionParams<TX, TY, TItem>>,
+    } = {};
 
     /** Create a new `Heatmap` and set `data` */
     static create<TX, TY, TItem>(data: DataDescription<TX, TY, TItem>): Heatmap<TX, TY, TItem> {
@@ -204,6 +205,8 @@ export class Heatmap<TX, TY, TItem> {
             const colorProvider = DefaultNumericColorProviderFactory(dataRange.min, dataRange.max);
             (this as unknown as Heatmap<TX, TY, number>).setColor(colorProvider);
         }
+        this.registerBehavior(MarkerExtension, {});
+        this.extensions.tooltip = this.registerBehavior(TooltipExtension, { tooltipProvider: DefaultTooltipExtensionParams.tooltipProvider });
     }
 
 
@@ -279,11 +282,6 @@ export class Heatmap<TX, TY, TItem> {
         this.addZoomBehavior();
 
         console.timeEnd('Hotmap render');
-        const reg = this.registerBehavior(SampleExtension, {});
-        reg.update({});
-        reg.unregister();
-        this.registerBehavior(MarkerExtension, {});
-        this.registerBehavior(TooltipExtension, {});
         return this;
     }
 
@@ -398,11 +396,14 @@ export class Heatmap<TX, TY, TItem> {
         return this;
     }
 
-    setTooltip(tooltipProvider: ((...args: ProviderParams<TX, TY, TItem>) => string) | 'default' | undefined): this {
-        if (tooltipProvider === 'default')
-            this.state.tooltipProvider = DefaultTooltipProvider;
-        else
-            this.state.tooltipProvider = tooltipProvider;
+    setTooltip(tooltipProvider: ((...args: ProviderParams<TX, TY, TItem>) => string) | 'default' | null): this {
+        if (tooltipProvider === 'default') {
+            this.extensions.tooltip?.update({ tooltipProvider: DefaultTooltipExtensionParams.tooltipProvider });
+        }
+        else {
+            this.extensions.tooltip?.update({ tooltipProvider });
+
+        }
         return this;
     }
 

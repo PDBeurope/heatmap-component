@@ -3,7 +3,7 @@ import { Color } from './color';
 import { Data } from './data';
 import { Domain } from './domain';
 import { Downsampler } from './downsampling';
-import { DataDescription, DefaultColorProvider, DefaultTooltipProvider, DefaultVisualParams, ItemEventParam, Provider, VisualParams, XAlignmentMode, YAlignmentMode, ZoomEventParam } from './heatmap';
+import { DataDescription, DefaultColorProvider, DefaultVisualParams, ItemEventParam, Provider, VisualParams, XAlignmentMode, YAlignmentMode, ZoomEventParam } from './heatmap';
 import { Box, Boxes, Scales, XY } from './scales';
 
 
@@ -18,7 +18,6 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
     yAlignment: YAlignmentMode = 'center';
 
     colorProvider: Provider<TX, TY, TItem, string | Color> = DefaultColorProvider;
-    tooltipProvider?: Provider<TX, TY, TItem, string> = DefaultTooltipProvider;
     filter?: Provider<TX, TY, TItem, boolean> = undefined;
     visualParams: VisualParams = DefaultVisualParams;
     /** DOM elements managed by this component */
