@@ -1,13 +1,14 @@
 import * as d3 from 'd3';
 import { clamp, cloneDeep, isNil, merge, round } from 'lodash';
-import { BehaviorSubject } from 'rxjs';
 import { Color } from './color';
 import { Data, Image } from './data';
 import { Domain } from './domain';
 import { Downsampler } from './downsampling';
-import { Box, Boxes, Scales, XY, scaleDistance } from './scales';
-import { Refresher, attrd, formatDataItem, getSize, minimum, nextIfChanged } from './utils';
+import { ExtensionInstance, ExtensionInstanceRegistration, Blabla, HotmapExtension } from './extensions/extension';
+import { MarkerExtension } from './extensions/marker';
+import { Box, Scales, scaleDistance } from './scales';
 import { State } from './state';
+import { Refresher, attrd, formatDataItem, getSize, minimum, nextIfChanged, removeElement } from './utils';
 
 
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
@@ -166,6 +167,22 @@ export class Heatmap<TX, TY, TItem> {
 
     get events() { return this.state.events; }
 
+    private readonly _behaviors: ExtensionInstance<any>[] = [];
+    registerBehavior<TParams extends {}>(behavior: HotmapExtension<TParams>, params: TParams): ExtensionInstanceRegistration<TParams> {
+        const behaviors = this._behaviors;
+        const behaviorInstance: ExtensionInstance<TParams> = behavior.create(this.state, params);
+        behaviorInstance.register();
+        behaviors.push(behaviorInstance);
+        return {
+            update(params: TParams) {
+                behaviorInstance.update(params);
+            },
+            unregister() {
+                removeElement(behaviors, behaviorInstance);
+                behaviorInstance.unregister();
+            },
+        };
+    }
 
     /** Create a new `Heatmap` and set `data` */
     static create<TX, TY, TItem>(data: DataDescription<TX, TY, TItem>): Heatmap<TX, TY, TItem> {
@@ -262,6 +279,10 @@ export class Heatmap<TX, TY, TItem> {
         this.addPinnedTooltipBehavior();
 
         console.timeEnd('Hotmap render');
+        const reg = this.registerBehavior(Blabla, {});
+        reg.update({});
+        reg.unregister();
+        this.registerBehavior(MarkerExtension, {});
         return this;
     }
 
@@ -421,7 +442,7 @@ export class Heatmap<TX, TY, TItem> {
             // y: this.state.data.nRows,
             y: yResolution * Box.height(this.state.boxes.wholeWorld) / (Box.height(this.state.boxes.visWorld)),
         });
-        console.log('downsampled', downsampledImage.nColumns, downsampledImage.nRows)
+        console.log('downsampled', downsampledImage.nColumns, downsampledImage.nRows);
         // console.timeEnd('downsample')
         return this.drawThisImage(downsampledImage, this.state.data.nColumns / downsampledImage.nColumns, this.state.data.nRows / downsampledImage.nRows);
     }

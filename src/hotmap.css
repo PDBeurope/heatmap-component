@@ -98,3 +98,16 @@
     border: solid black 1px;
     box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.75);
 }
+
+.hotmap-marker {
+    stroke: black;
+    stroke-width: 4;
+    fill: none;
+}
+
+.hotmap-marker-x,
+.hotmap-marker-y {
+    stroke: black;
+    stroke-width: 2;
+    fill: none;
+}

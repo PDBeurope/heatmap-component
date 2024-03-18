@@ -1,6 +1,6 @@
 import * as d3 from 'd3';
 import { isEqual, isNil } from 'lodash';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, elementAt } from 'rxjs';
 import { BoxSize } from './scales';
 
 
@@ -110,4 +110,11 @@ export function Refresher(refresh: () => any) {
     return {
         requestRefresh,
     };
+}
+
+/** Remove specific `element` from `array` if present, in place.
+ * (Doesn't handle multiple occurrences of the same element.) */
+export function removeElement<T>(array: T[], element: T): void {
+    const i = array.indexOf(element);
+    if (i >= 0) array.splice(i);
 }

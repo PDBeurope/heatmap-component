@@ -63,38 +63,38 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
     //     y: d => d.row,
     // }), 3000);
     hm.setVisualParams({ xGapPixels: 0, yGapPixels: 0 });
-    hm.events.resize.subscribe(e => {
-        if (!e) {
-            console.log('resizing nothing');
-        } else {
-            console.log('resizing', e);
-        }
-    });
-    hm.events.hover.subscribe(e => {
-        if (!e) {
-            console.log('hovering nothing');
-        } else {
-            console.log('hovering', e.datum, e.x, e.y, e.xIndex, e.yIndex, e.sourceEvent);
-        }
-    });
-    hm.events.click.subscribe(e => {
-        if (!e) {
-            console.log('clicking nothing');
-        } else {
-            console.log('clicking', e.datum, e.x, e.y, e.xIndex, e.yIndex, e.sourceEvent);
-        }
-    });
-    hm.events.zoom.subscribe(e => {
-        if (!e) {
-            console.log('zooming nothing');
-        } else {
-            console.log('zooming', e.xMinIndex, e.xMaxIndex, 'values', e.xMin, e.xMax, e);
-            d3.select('#xminindex').text(e.xMinIndex);
-            d3.select('#xmaxindex').text(e.xMaxIndex);
-            d3.select('#xmin').text(e.xMin);
-            d3.select('#xmax').text(e.xMax);
-        }
-    });
+    // hm.events.resize.subscribe(e => {
+    //     if (!e) {
+    //         console.log('resizing nothing');
+    //     } else {
+    //         console.log('resizing', e);
+    //     }
+    // });
+    // hm.events.hover.subscribe(e => {
+    //     if (!e) {
+    //         console.log('hovering nothing');
+    //     } else {
+    //         console.log('hovering', e.datum, e.x, e.y, e.xIndex, e.yIndex, e.sourceEvent);
+    //     }
+    // });
+    // hm.events.click.subscribe(e => {
+    //     if (!e) {
+    //         console.log('clicking nothing');
+    //     } else {
+    //         console.log('clicking', e.datum, e.x, e.y, e.xIndex, e.yIndex, e.sourceEvent);
+    //     }
+    // });
+    // hm.events.zoom.subscribe(e => {
+    //     if (!e) {
+    //         console.log('zooming nothing');
+    //     } else {
+    //         console.log('zooming', e.xMinIndex, e.xMaxIndex, 'values', e.xMin, e.xMax, e);
+    //         d3.select('#xminindex').text(e.xMinIndex);
+    //         d3.select('#xmaxindex').text(e.xMaxIndex);
+    //         d3.select('#xmin').text(e.xMin);
+    //         d3.select('#xmax').text(e.xMax);
+    //     }
+    // });
     hm.render(divElementOrId);
     (window as any).hm = hm;
 }
