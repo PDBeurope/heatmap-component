@@ -51,8 +51,6 @@ export class HotmapExtensionBase<TParams extends {}, TX = any, TY = any, TItem =
     };
 }
 
-
-
 export function HotmapExtension<TParams extends {}>(cls: typeof HotmapExtensionBase<TParams>): HotmapExtension<TParams> {
     return {
         create: (state, params) => new cls(state, params),
@@ -60,16 +58,21 @@ export function HotmapExtension<TParams extends {}>(cls: typeof HotmapExtensionB
 }
 
 
-export const Blabla = HotmapExtension(
-    class extends HotmapExtensionBase<{}> {
-        register(): void {
-            console.log('Registering Blabla')
+interface SampleExtensionParams { }
+
+export const SampleExtension = HotmapExtension(
+    class extends HotmapExtensionBase<SampleExtensionParams> {
+        register() {
+            super.register();
+            console.log('Registering SampleExtension', this.state, this.params)
         }
-        update(): void {
-            console.log('Updating Blabla')
+        update(params: SampleExtensionParams) {
+            super.update(params);
+            console.log('Updating SampleExtension with params', params)
         }
-        unregister(): void {
-            console.log('Unregistering Blabla')
+        unregister() {
+            console.log('Unregistering SampleExtension')
+            super.unregister();
         }
     }
 );

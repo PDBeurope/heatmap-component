@@ -9,7 +9,7 @@ interface MarkerExtensionParams { }
 
 export const MarkerExtension = HotmapExtension(
     class extends HotmapExtensionBase<MarkerExtensionParams> {
-        register(): void {
+        register() {
             super.register();
             this.subscribe(this.state.events.hover, pointed => {
                 this.drawMarkers(pointed);

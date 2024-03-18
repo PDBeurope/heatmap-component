@@ -4,11 +4,12 @@ import { Color } from './color';
 import { Data, Image } from './data';
 import { Domain } from './domain';
 import { Downsampler } from './downsampling';
-import { ExtensionInstance, ExtensionInstanceRegistration, Blabla, HotmapExtension } from './extensions/extension';
+import { ExtensionInstance, ExtensionInstanceRegistration, SampleExtension, HotmapExtension } from './extensions/extension';
 import { MarkerExtension } from './extensions/marker';
 import { Box, Scales, scaleDistance } from './scales';
 import { State } from './state';
 import { Refresher, attrd, formatDataItem, getSize, minimum, nextIfChanged, removeElement } from './utils';
+import { TooltipExtension } from './extensions/tooltip';
 
 
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
@@ -276,13 +277,13 @@ export class Heatmap<TX, TY, TItem> {
         d3.select(window).on('resize.resizehotmapcanvas', () => this.emitResize());
 
         this.addZoomBehavior();
-        this.addPinnedTooltipBehavior();
 
         console.timeEnd('Hotmap render');
-        const reg = this.registerBehavior(Blabla, {});
+        const reg = this.registerBehavior(SampleExtension, {});
         reg.update({});
         reg.unregister();
         this.registerBehavior(MarkerExtension, {});
+        this.registerBehavior(TooltipExtension, {});
         return this;
     }
 
@@ -562,7 +563,7 @@ export class Heatmap<TX, TY, TItem> {
         this.state.zoomBehavior.on('zoom', e => {
             this.state.boxes.visWorld = this.zoomTransformToVisWorld(e.transform);
             this.state.scales = Scales(this.state.boxes);
-            this.handleHover(e.sourceEvent);
+            this.events.hover.next(this.getPointedItem(e.sourceEvent));
             this.emitZoom();
             this.requestDraw();
         });
@@ -724,101 +725,6 @@ export class Heatmap<TX, TY, TItem> {
         return { datum, x, y, xIndex, yIndex, sourceEvent: event };
     }
 
-    private handleHover(event: MouseEvent | undefined) {
-        const pointed = this.getPointedItem(event);
-        nextIfChanged(this.events.hover, pointed, v => ({ ...v, sourceEvent: undefined }));
-        this.drawTooltip(pointed);
-    }
-
-    private drawTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
-        if (!this.state.dom) return;
-        const thisTooltipPinned = pointed && this.state.pinnedTooltip && pointed.xIndex === Math.floor(this.state.pinnedTooltip.x) && pointed.yIndex === Math.floor(this.state.pinnedTooltip.y);
-        if (pointed && !thisTooltipPinned && this.state.tooltipProvider) {
-            const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
-            const tooltipText = this.state.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
-            let tooltip = this.state.dom.canvasDiv.selectAll<HTMLDivElement, any>('.' + Class.TooltipBox);
-            if (tooltip.empty()) {
-                // Create tooltip if doesn't exist
-                tooltip = attrd(this.state.dom.canvasDiv.append('div'), {
-                    class: Class.TooltipBox,
-                    style: { position: 'absolute', ...tooltipPosition }
-                });
-                attrd(tooltip.append('div'), { class: Class.TooltipContent })
-                    .html(tooltipText);
-            } else {
-                // Update tooltip position and content if exists
-                attrd(tooltip, { style: tooltipPosition })
-                    .select('.' + Class.TooltipContent)
-                    .html(tooltipText);
-            }
-        } else {
-            this.state.dom.canvasDiv.selectAll('.' + Class.TooltipBox).remove();
-        }
-    }
-
-    private drawPinnedTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
-        if (!this.state.dom) return;
-        this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
-        if (pointed && this.state.tooltipProvider) {
-            this.state.pinnedTooltip = { x: this.state.scales.canvasToWorld.x(pointed.sourceEvent.offsetX), y: this.state.scales.canvasToWorld.y(pointed.sourceEvent.offsetY) };
-            const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
-            const tooltipText = this.state.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
-
-            const tooltip = attrd(this.state.dom.canvasDiv.append('div'), {
-                class: Class.PinnedTooltipBox,
-                style: { position: 'absolute', ...tooltipPosition },
-            });
-
-            // Tooltip content
-            attrd(tooltip.append('div'), { class: Class.PinnedTooltipContent })
-                .html(tooltipText);
-
-            // Tooltip close button
-            attrd(tooltip.append('div'), { class: Class.PinnedTooltipClose })
-                .on('click', () => this.events.click.next(undefined))
-                .append('svg')
-                .attr('viewBox', '0 0 24 24')
-                .attr('preserveAspectRatio', 'none')
-                .append('path')
-                .attr('d', 'M19,6.41 L17.59,5 L12,10.59 L6.41,5 L5,6.41 L10.59,12 L5,17.59 L6.41,19 L12,13.41 L17.59,19 L19,17.59 L13.41,12 L19,6.41 Z');
-
-            // Tooltip pin
-            attrd(tooltip.append('svg'), { class: Class.PinnedTooltipPin })
-                .attr('viewBox', '0 0 100 100')
-                .attr('preserveAspectRatio', 'none')
-                .append('path')
-                .attr('d', 'M0,100 L100,40 L60,0 Z');
-
-            // Remove any non-pinned tooltip
-            this.drawTooltip(undefined);
-        } else {
-            this.state.pinnedTooltip = undefined;
-        }
-    }
-
-    private addPinnedTooltipBehavior() {
-        this.events.click.subscribe(pointed => this.drawPinnedTooltip(pointed));
-        const updatePinnedTooltipPosition = () => {
-            if (this.state.dom && this.state.pinnedTooltip) {
-                const domPosition = {
-                    offsetX: this.state.scales.worldToCanvas.x(this.state.pinnedTooltip.x),
-                    offsetY: this.state.scales.worldToCanvas.y(this.state.pinnedTooltip.y),
-                };
-                attrd(this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox), { style: this.getTooltipPosition(domPosition) });
-            }
-        };
-        this.events.zoom.subscribe(updatePinnedTooltipPosition);
-        this.events.resize.subscribe(updatePinnedTooltipPosition);
-    }
-
-    /** Return tooltip position as CSS style parameters (for position:absolute within this.canvasDiv) for mouse event `e` triggered on this.svg.  */
-    private getTooltipPosition(e: MouseEvent | { offsetX: number, offsetY: number }) {
-        const left = `${(e.offsetX ?? 0)}px`;
-        const bottom = `${Box.height(this.state.boxes.canvas) - (e.offsetY ?? 0)}px`;
-        const display = Box.containsPoint(this.state.boxes.canvas, { x: e.offsetX, y: e.offsetY }) ? 'unset' : 'none';
-        return { left, bottom, display };
-    }
-
     private showScrollingMessage() {
         if (!this.state.dom) return;
         if (!this.state.dom.mainDiv.selectAll(`.${Class.Overlay}`).empty()) return;
@@ -856,8 +762,8 @@ export class Heatmap<TX, TY, TItem> {
     }
 
     private readonly handlers = {
-        mousemove: (e: MouseEvent) => this.handleHover(e),
-        mouseleave: (e: MouseEvent) => this.handleHover(undefined),
+        mousemove: (e: MouseEvent) => this.events.hover.next(this.getPointedItem(e)),
+        mouseleave: (e: MouseEvent) => this.events.hover.next(undefined),
         click: (e: MouseEvent) => this.events.click.next(this.getPointedItem(e)),
         wheel: (e: WheelEvent) => {
             if (!this.state.dom) return;
