@@ -153,6 +153,9 @@ export const DefaultVisualParams = {
     /** Vertical gap between neighboring rows relative to (row height + gap). If both `yGapPixels` and `yGapRelative` are non-null, the smaller final gap value will be used. The margin before the first and after the last row is half of the gap between rows. */
     yGapRelative: 0.1 as number | null,
 
+    /** Radius for round corners of the "markers" (rectangles outlining currently hovered data item, column, and row), in pixels. */
+    markerCornerRadius: 1 as number,
+
     // More config via CSS:
     // .hotmap-canvas-div { background-color: none; }...
 };
@@ -749,20 +752,21 @@ export class Heatmap<TX, TY, TItem> {
             const y = this.scales.worldToCanvas.y(pointed.yIndex);
             const width = scaleDistance(this.scales.worldToCanvas.x, 1);
             const height = scaleDistance(this.scales.worldToCanvas.y, 1);
-            this.addOrUpdateMarker(Class.Marker, { stroke: 'black', strokeWidth: 4, rx: 1, ry: 1, fill: 'none' }, {
-                x, y, width, height
-            });
-            this.addOrUpdateMarker(Class.MarkerX, { stroke: 'black', strokeWidth: 2, rx: 1, ry: 1, fill: 'none' }, {
+            const commonAttrs = { rx: this.visualParams.markerCornerRadius, ry: this.visualParams.markerCornerRadius };
+            this.addOrUpdateMarker(Class.MarkerX, commonAttrs, {
                 x,
                 y: this.boxes.canvas.ymin,
                 width,
                 height: Box.height(this.boxes.canvas),
             });
-            this.addOrUpdateMarker(Class.MarkerY, { stroke: 'black', strokeWidth: 2, rx: 1, ry: 1, fill: 'none' }, {
+            this.addOrUpdateMarker(Class.MarkerY, commonAttrs, {
                 x: this.boxes.canvas.xmin,
                 y,
                 width: Box.width(this.boxes.canvas),
                 height,
+            });
+            this.addOrUpdateMarker(Class.Marker, commonAttrs, {
+                x, y, width, height
             });
         } else {
             this.dom.svg.selectAll('.' + Class.Marker).remove();
