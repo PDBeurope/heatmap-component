@@ -1,5 +1,5 @@
-import * as d3 from 'd3';
-import { clamp } from 'lodash';
+import { clamp, range } from 'lodash';
+import * as d3 from './d3-modules';
 import { Image } from './data';
 import { Domain } from './domain';
 
@@ -434,13 +434,13 @@ function createScaleFromColors(domain: number[], colors: (Color | string)[]) {
     };
 }
 
-function createScaleFromScheme(schemeName: D3ColorSchemeName, domain: [number, number] = [0, 1], range: [number, number] = [0, 1]): ((x: number) => Color) {
+function createScaleFromScheme(schemeName: D3ColorSchemeName, domain: [number, number] = [0, 1], range_: [number, number] = [0, 1]): ((x: number) => Color) {
     const colorInterpolator = d3[`interpolate${schemeName}`];
     const n = 100;
     const domSc = d3.scaleLinear([0, n], domain);
-    const ranSc = d3.scaleLinear([0, n], range);
-    const dom = d3.range(n + 1).map(i => domSc(i));
-    const cols = d3.range(n + 1).map(i => Color.fromString(colorInterpolator(ranSc(i))));
+    const ranSc = d3.scaleLinear([0, n], range_);
+    const dom = range(n + 1).map(i => domSc(i));
+    const cols = range(n + 1).map(i => Color.fromString(colorInterpolator(ranSc(i))));
     return createScaleFromColors(dom, cols);
 }
 

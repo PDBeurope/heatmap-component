@@ -1,5 +1,5 @@
-import * as d3 from 'd3';
 import { clamp } from 'lodash';
+import * as d3 from './d3-modules';
 
 
 export interface XY { x: number, y: number }

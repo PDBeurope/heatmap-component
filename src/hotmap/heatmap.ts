@@ -1,15 +1,15 @@
-import * as d3 from 'd3';
-import { clamp, cloneDeep, isNil, merge, round } from 'lodash';
+import { clamp, cloneDeep, isNil, merge, range, round } from 'lodash';
 import { Color } from './color';
+import * as d3 from './d3-modules';
 import { Data, Image } from './data';
 import { Domain } from './domain';
 import { Downsampler } from './downsampling';
-import { ExtensionInstance, ExtensionInstanceRegistration, SampleExtension, HotmapExtension } from './extensions/extension';
+import { ExtensionInstance, ExtensionInstanceRegistration, HotmapExtension } from './extensions/extension';
 import { MarkerExtension } from './extensions/marker';
+import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 import { Box, Scales, scaleDistance } from './scales';
 import { State } from './state';
-import { Refresher, attrd, formatDataItem, getSize, minimum, nextIfChanged, removeElement } from './utils';
-import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
+import { Refresher, attrd, getSize, minimum, nextIfChanged, removeElement } from './utils';
 
 
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
@@ -804,8 +804,8 @@ function makeRandomData(nColumns: number, nRows: number): DataDescription<number
         items: raw.items as number[],
         x: (d, i) => i % nColumns,
         y: (d, i) => Math.floor(i / nColumns),
-        xDomain: d3.range(nColumns),
-        yDomain: d3.range(nRows),
+        xDomain: range(nColumns),
+        yDomain: range(nRows),
     };
 }
 

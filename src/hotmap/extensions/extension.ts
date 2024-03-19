@@ -1,7 +1,6 @@
 import { Observable, Observer, Unsubscribable } from 'rxjs';
 import { State } from '../state';
 import { removeElement, shallowMerge } from '../utils';
-import { assign, clone, cloneDeep, merge } from 'lodash';
 
 
 export interface ExtensionInstance<TParams extends {}> {
@@ -94,12 +93,3 @@ export const SampleExtension = HotmapExtension.fromClass({
         }
     }
 });
-
-function foo(f: HotmapExtensionBase<SampleExtensionParams>) {
-    f.update({})
-}
-
-
-
-
-// const f: { c: (xy: Partial<XY>) => void } = { c: (xy: XY) => { } }

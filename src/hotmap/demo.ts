@@ -1,4 +1,4 @@
-import * as d3 from 'd3';
+import * as d3 from './d3-modules';
 import { Heatmap } from './heatmap';
 import { formatDataItem } from './utils';
 

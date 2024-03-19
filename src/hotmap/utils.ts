@@ -1,6 +1,6 @@
-import * as d3 from 'd3';
 import { isEqual, isNil } from 'lodash';
-import { BehaviorSubject, elementAt } from 'rxjs';
+import { BehaviorSubject } from 'rxjs';
+import * as d3 from './d3-modules';
 import { BoxSize } from './scales';
 
 

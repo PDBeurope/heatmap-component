@@ -1,6 +1,5 @@
 import { Class, ItemEventParam } from '../heatmap';
 import { Box, scaleDistance } from '../scales';
-import { State } from '../state';
 import { attrd } from '../utils';
 import { HotmapExtension, HotmapExtensionBase } from './extension';
 
