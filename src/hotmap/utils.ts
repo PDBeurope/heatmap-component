@@ -119,6 +119,24 @@ export function removeElement<T>(array: T[], element: T): void {
     if (i >= 0) array.splice(i);
 }
 
+/** Create a copy of `old` and overwrite properties with `new_`.
+ * Ignore properties in `new_` with value `undefined` (`null` behaves as normal value). */
 export function shallowMerge<T>(old: T, new_?: Partial<T>): T {
-    return { ...old, ...new_ }; // TODO ignore udefineds in new_?
+    const result: T = { ...old };
+    for (const key in new_) {
+        const newValue = new_[key];
+        if (newValue !== undefined) {
+            result[key] = newValue;
+        }
+    }
+    return result;
+}
+
+/** Create a copy of object `object`, fill in missing/undefined keys using `defaults` */
+export function addDefaults<T extends {}>(new_: Partial<T> | undefined, old: T): T {
+    const result: Partial<T> = { ...new_ };
+    for (const key in old) {
+        result[key] ??= old[key];
+    }
+    return result as T;
 }

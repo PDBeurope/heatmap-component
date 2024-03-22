@@ -7,6 +7,7 @@ export interface ExtensionInstance<TParams extends {}> {
     register: () => void,
     update: (params: Partial<TParams>) => void,
     unregister: () => void,
+    // params: TParams,
 }
 
 export interface ExtensionInstanceRegistration<TParams extends {}> {
@@ -16,14 +17,16 @@ export interface ExtensionInstanceRegistration<TParams extends {}> {
 
 export type ScopeExtensionName = `${string}.${string}`
 
-export interface Extension<TState, TParams extends {}> {
+export interface Extension<TState, TParams extends {}, TDefaults extends TParams> {
     /** Unique name of the extension, prefixed by scope, e.g. builtin.tooltip, spamextensions.spam */
     name: ScopeExtensionName,
-    defaultParams: TParams,
-    create(state: TState, params?: Partial<TParams>): ExtensionInstance<TParams>,
+    defaultParams: TDefaults,
+    create<P extends TParams>(state: TState, params?: Partial<P>): ExtensionInstance<P>,
 }
 
-export type HotmapExtension<TParams extends {}> = Extension<State<any, any, any>, TParams>
+
+
+export type HotmapExtension<TParams extends {}, TDefaults extends TParams> = Extension<State<any, any, any>, TParams, TDefaults> // TODO: State<unknown...> once State is covariant
 
 
 export class HotmapExtensionBase<TParams extends {}, TX = any, TY = any, TItem = any> implements ExtensionInstance<TParams> {
@@ -56,18 +59,18 @@ export class HotmapExtensionBase<TParams extends {}, TX = any, TY = any, TItem =
     };
 }
 
-type HotmapExtensionCreationParam<TParams extends {}> = {
+type HotmapExtensionCreationParam<TParams extends {}, TDefaults extends TParams> = {
     name: ScopeExtensionName,
-    defaultParams: TParams,
+    defaultParams: TDefaults,
     class: typeof HotmapExtensionBase<TParams>,
 }
 
 export const HotmapExtension = {
-    fromClass<TParams extends {}>(p: HotmapExtensionCreationParam<TParams>): HotmapExtension<TParams> {
+    fromClass<TParams extends {}, TDefaults extends TParams>(p: HotmapExtensionCreationParam<TParams, TDefaults>): HotmapExtension<TParams, TDefaults> {
         return {
             name: p.name,
             defaultParams: p.defaultParams,
-            create: (state, params) => new p.class(state, shallowMerge(p.defaultParams, params)),
+            create: (state, params) => new p.class(state, shallowMerge<TParams>(p.defaultParams, params)),
         };
     },
 };

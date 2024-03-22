@@ -164,8 +164,8 @@ export class Heatmap<TX, TY, TItem> {
 
     get events() { return this.state.events; }
 
-    private readonly _behaviors: ExtensionInstance<any>[] = [];
-    registerBehavior<TParams extends {}>(behavior: HotmapExtension<TParams>, params?: Partial<TParams>): ExtensionInstanceRegistration<TParams> {
+    private readonly _behaviors: ExtensionInstance<{}>[] = [];
+    registerBehavior<TParams extends {}, TDefaults extends TParams>(behavior: HotmapExtension<TParams, TDefaults>, params?: Partial<TParams>): ExtensionInstanceRegistration<TParams> {
         const behaviors = this._behaviors;
         const behaviorInstance: ExtensionInstance<TParams> = behavior.create(this.state, params);
         behaviorInstance.register();
@@ -206,8 +206,6 @@ export class Heatmap<TX, TY, TItem> {
         }
         this.registerBehavior(MarkerExtension);
         this.extensions.tooltip = this.registerBehavior(TooltipExtension);
-        // setTimeout(() => this.extensions.tooltip?.update({ pinnable: false }), 5000);
-        // setTimeout(() => this.extensions.tooltip?.update({ tooltipProvider: ()=>'ahoj' }), 5000);
     }
 
 
@@ -500,7 +498,6 @@ export class Heatmap<TX, TY, TItem> {
     private drawThisImage(image: Image, xScale: number, yScale: number) {
         if (!this.state.ctx || !this.state.dom) return;
         // console.time(`drawThisImage`)
-        this.state.ctx.clearRect(0, 0, Box.width(this.state.boxes.canvas), Box.height(this.state.boxes.canvas));
         const rectWidth = scaleDistance(this.state.scales.worldToCanvas.x, 1) * xScale;
         const rectHeight = scaleDistance(this.state.scales.worldToCanvas.y, 1) * yScale;
         const showXGaps = Box.width(this.state.boxes.canvas) > MIN_PIXELS_PER_RECT_FOR_GAPS * Box.width(this.state.boxes.visWorld);
@@ -531,6 +528,7 @@ export class Heatmap<TX, TY, TItem> {
         }
         const imageData = this.getCanvasImageData();
         Image.toImageData(canvasImage, imageData);
+        this.state.ctx.clearRect(0, 0, Box.width(this.state.boxes.canvas), Box.height(this.state.boxes.canvas));
         this.state.ctx.putImageData(imageData, 0, 0);
         // console.timeEnd(`drawThisImage`)
     }
