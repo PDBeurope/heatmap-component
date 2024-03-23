@@ -1,5 +1,5 @@
 import { Class, ItemEventParam, Provider } from '../heatmap';
-import { Box } from '../scales';
+import { Box, XY } from '../scales';
 import { attrd, formatDataItem } from '../utils';
 import { HotmapExtension, HotmapExtensionBase } from './extension';
 
@@ -27,12 +27,15 @@ export const TooltipExtension: HotmapExtension<TooltipExtensionParams<never, nev
         name: 'builtin.tooltip',
         defaultParams: DefaultTooltipExtensionParams,
         class: class <TX, TY, TItem> extends HotmapExtensionBase<TooltipExtensionParams<TX, TY, TItem>, TX, TY, TItem> {
+            /** Position of the pinned tooltip, if any. In world coordinates, continuous. Use `Math.floor` to get column/row index. */
+            private pinnedTooltip?: XY = undefined;
+
             register() {
                 super.register();
-                this.subscribe(this.state.events.hover, pointed => {
-                    this.drawTooltip(pointed);
-                });
-                this.addPinnedTooltipBehavior();
+                this.subscribe(this.state.events.hover, pointed => this.drawTooltip(pointed));
+                this.subscribe(this.state.events.click, pointed => this.drawPinnedTooltip(pointed));
+                this.subscribe(this.state.events.zoom, () => this.updatePinnedTooltipPosition());
+                this.subscribe(this.state.events.resize, () => this.updatePinnedTooltipPosition());
             }
             // update(params: TooltipExtensionParams<TX, TY, TItem>) {
             //     console.log('Updating Blabla')
@@ -45,7 +48,7 @@ export const TooltipExtension: HotmapExtension<TooltipExtensionParams<never, nev
 
             private drawTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
                 if (!this.state.dom) return;
-                const thisTooltipPinned = pointed && this.state.pinnedTooltip && pointed.xIndex === Math.floor(this.state.pinnedTooltip.x) && pointed.yIndex === Math.floor(this.state.pinnedTooltip.y);
+                const thisTooltipPinned = pointed && this.pinnedTooltip && pointed.xIndex === Math.floor(this.pinnedTooltip.x) && pointed.yIndex === Math.floor(this.pinnedTooltip.y);
                 if (pointed && !thisTooltipPinned && this.params.tooltipProvider) {
                     const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
                     const tooltipText = this.params.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
@@ -73,7 +76,7 @@ export const TooltipExtension: HotmapExtension<TooltipExtensionParams<never, nev
                 if (!this.state.dom) return;
                 this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
                 if (pointed && this.params.tooltipProvider && this.params.pinnable) {
-                    this.state.pinnedTooltip = { x: this.state.scales.canvasToWorld.x(pointed.sourceEvent.offsetX), y: this.state.scales.canvasToWorld.y(pointed.sourceEvent.offsetY) };
+                    this.pinnedTooltip = { x: this.state.scales.canvasToWorld.x(pointed.sourceEvent.offsetX), y: this.state.scales.canvasToWorld.y(pointed.sourceEvent.offsetY) };
                     const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
                     const tooltipText = this.params.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
 
@@ -105,24 +108,21 @@ export const TooltipExtension: HotmapExtension<TooltipExtensionParams<never, nev
                     // Remove any non-pinned tooltip
                     this.drawTooltip(undefined);
                 } else {
-                    this.state.pinnedTooltip = undefined;
+                    this.pinnedTooltip = undefined;
                 }
             }
 
-            private addPinnedTooltipBehavior() {
-                this.state.events.click.subscribe(pointed => this.drawPinnedTooltip(pointed));
-                const updatePinnedTooltipPosition = () => {
-                    if (this.state.dom && this.state.pinnedTooltip) {
-                        const domPosition = {
-                            offsetX: this.state.scales.worldToCanvas.x(this.state.pinnedTooltip.x),
-                            offsetY: this.state.scales.worldToCanvas.y(this.state.pinnedTooltip.y),
-                        };
-                        attrd(this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox), { style: this.getTooltipPosition(domPosition) });
-                    }
-                };
-                this.state.events.zoom.subscribe(updatePinnedTooltipPosition);
-                this.state.events.resize.subscribe(updatePinnedTooltipPosition);
-            }
+            private updatePinnedTooltipPosition() {
+                if (this.state.dom && this.pinnedTooltip) {
+                    const domPosition = {
+                        offsetX: this.state.scales.worldToCanvas.x(this.pinnedTooltip.x),
+                        offsetY: this.state.scales.worldToCanvas.y(this.pinnedTooltip.y),
+                    };
+                    attrd(this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox), {
+                        style: this.getTooltipPosition(domPosition),
+                    });
+                }
+            };
 
             /** Return tooltip position as CSS style parameters (for position:absolute within this.canvasDiv) for mouse event `e` triggered on this.svg.  */
             private getTooltipPosition(e: MouseEvent | { offsetX: number, offsetY: number }) {

@@ -16,12 +16,28 @@ export const DefaultColorProvider = () => DefaultColor;
 export const DefaultNumericColorProviderFactory = (min: number, max: number) => Color.createScale('YlOrRd', [min, max]);
 
 
-export interface DrawExtensionParams<TX, TY, TItem> {
-    colorProvider: Provider<TX, TY, TItem, string | Color>
+export interface VisualParams {
+    /** Horizontal gap between neighboring columns in pixels. If both `xGapPixels` and `xGapRelative` are non-null, the smaller final gap value will be used. The margin before the first and after the last column is half of the gap between columns. */
+    xGapPixels: number | null,
+    /** Horizontal gap between neighboring columns relative to (column width + gap). If both `xGapPixels` and `xGapRelative` are non-null, the smaller final gap value will be used. The margin before the first and after the last column is half of the gap between columns. */
+    xGapRelative: number | null,
+    /** Vertical gap between neighboring rows in pixels. If both `yGapPixels` and `yGapRelative` are non-null, the smaller final gap value will be used. The margin before the first and after the last row is half of the gap between rows. */
+    yGapPixels: number | null,
+    /** Vertical gap between neighboring rows relative to (row height + gap). If both `yGapPixels` and `yGapRelative` are non-null, the smaller final gap value will be used. The margin before the first and after the last row is half of the gap between rows. */
+    yGapRelative: number | null,
+}
+
+export interface DrawExtensionParams<TX, TY, TItem> extends VisualParams {
+    /** Function that returns color for each data item */
+    colorProvider: Provider<TX, TY, TItem, string | Color>,
 }
 
 export const DefaultDrawExtensionParams: DrawExtensionParams<unknown, unknown, unknown> = {
     colorProvider: DefaultColorProvider,
+    xGapPixels: 2,
+    xGapRelative: 0.1,
+    yGapPixels: 2,
+    yGapRelative: 0.1,
 };
 
 
@@ -29,19 +45,38 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
     name: 'builtin.sample',
     defaultParams: DefaultDrawExtensionParams,
     class: class <TX, TY, TItem> extends HotmapExtensionBase<DrawExtensionParams<TX, TY, TItem>> {
+        /** Canvas rendering context */
+        private ctx?: CanvasRenderingContext2D;
+        /** Manager for downsampled images */
+        private downsampler?: Downsampler<'image'>;
+        /** Approximate width of a rectangle in pixels, when showing downsampled data.
+         * (higher value means more responsive but lower-resolution visualization) */
+        private downsamplingPixelsPerRect = 1;
+
         register() {
             super.register();
             console.log('Registering DrawExtension', this.state, this.params);
-            this.state.events.draw.subscribe(() => this.requestDraw());
+            this.subscribe(this.state.events.render, () => {
+                if (!this.state.dom) return;
+                const ctx = this.state.dom.canvas.node()?.getContext('2d');
+                if (ctx) this.ctx = ctx;
+                else throw new Error('Failed to initialize canvas');
+            });
+            this.subscribe(this.state.events.zoom, () => {
+                this.requestDraw();
+            });
+            this.subscribe(this.state.events.data, () => {
+                this.downsampler = undefined;
+                this.requestDraw();
+            });
         }
         update(params: Partial<DrawExtensionParams<TX, TY, TItem>>) {
-            const colorChange = params.colorProvider !== this.params.colorProvider;
-            super.update(params);
-            console.log('Updating DrawExtension with params', params, '->', this.params);
-            if (colorChange) {
-                this.state.downsampler = undefined;
-                this.requestDraw();
+            console.log('Updating DrawExtension with params', params);
+            if (params.colorProvider !== this.params.colorProvider) {
+                this.downsampler = undefined;
             }
+            super.update(params);
+            this.requestDraw();
         }
         unregister() {
             console.log('Unregistering DrawExtension');
@@ -72,11 +107,11 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
         /** Do not call directly! Call `requestDraw` instead to avoid browser freezing. */
         private _draw() {
             if (!this.state.dom) return;
-            const xResolution = Box.width(this.state.boxes.canvas) / this.state.downsamplingPixelsPerRect;
-            const yResolution = Box.height(this.state.boxes.canvas) / this.state.downsamplingPixelsPerRect;
-            this.state.downsampler ??= Downsampler.fromImage(this.getColorArray());
+            const xResolution = Box.width(this.state.boxes.canvas) / this.downsamplingPixelsPerRect;
+            const yResolution = Box.height(this.state.boxes.canvas) / this.downsamplingPixelsPerRect;
+            this.downsampler ??= Downsampler.fromImage(this.getColorArray());
             // console.time('downsample')
-            const downsampledImage = Downsampler.getDownsampled(this.state.downsampler, {
+            const downsampledImage = Downsampler.getDownsampled(this.downsampler, {
                 x: xResolution * Box.width(this.state.boxes.wholeWorld) / (Box.width(this.state.boxes.visWorld)),
                 // y: this.state.data.nRows,
                 y: yResolution * Box.height(this.state.boxes.wholeWorld) / (Box.height(this.state.boxes.visWorld)),
@@ -86,11 +121,11 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
             return this.drawThisImage(downsampledImage, this.state.data.nColumns / downsampledImage.nColumns, this.state.data.nRows / downsampledImage.nRows);
         }
 
-        _canvasImage?: Image;
+        private _canvasImage?: Image;
         private getCanvasImage(): Image {
-            if (!this.state.ctx) throw new Error('`getCanvasImage` should only be called when canvas is initialized');
-            const w = Math.floor(this.state.ctx.canvas.width);
-            const h = Math.floor(this.state.ctx.canvas.height);
+            if (!this.ctx) throw new Error('`getCanvasImage` should only be called when canvas is initialized');
+            const w = Math.floor(this.ctx.canvas.width);
+            const h = Math.floor(this.ctx.canvas.height);
             if (this._canvasImage && this._canvasImage.nColumns === w && this._canvasImage.nRows === h) {
                 Image.clear(this._canvasImage);
             } else {
@@ -99,11 +134,11 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
             return this._canvasImage;
         }
 
-        _canvasImageData?: ImageData;
+        private _canvasImageData?: ImageData;
         private getCanvasImageData(): ImageData {
-            if (!this.state.ctx) throw new Error('`getCanvasImageData` should only be called when canvas is initialized');
-            const w = Math.floor(this.state.ctx.canvas.width);
-            const h = Math.floor(this.state.ctx.canvas.height);
+            if (!this.ctx) throw new Error('`getCanvasImageData` should only be called when canvas is initialized');
+            const w = Math.floor(this.ctx.canvas.width);
+            const h = Math.floor(this.ctx.canvas.height);
             if (this._canvasImageData && this._canvasImageData.width === w && this._canvasImageData.height === h) {
                 return this._canvasImageData;
             } else {
@@ -112,7 +147,8 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
             }
         }
         private drawThisImage(image: Image, xScale: number, yScale: number) {
-            if (!this.state.ctx || !this.state.dom) return;
+            if (!this.state.dom || !this.ctx) return;
+            this.resizeCanvas(); // Doing this here rather than in 'resize' event handler, to avoid flickering on resize ;)
             // console.time(`drawThisImage`)
             const rectWidth = scaleDistance(this.state.scales.worldToCanvas.x, 1) * xScale;
             const rectHeight = scaleDistance(this.state.scales.worldToCanvas.y, 1) * yScale;
@@ -144,21 +180,33 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
             }
             const imageData = this.getCanvasImageData();
             Image.toImageData(canvasImage, imageData);
-            this.state.ctx.clearRect(0, 0, Box.width(this.state.boxes.canvas), Box.height(this.state.boxes.canvas));
-            this.state.ctx.putImageData(imageData, 0, 0);
+            this.ctx.clearRect(0, 0, Box.width(this.state.boxes.canvas), Box.height(this.state.boxes.canvas));
+            this.ctx.putImageData(imageData, 0, 0);
             // console.timeEnd(`drawThisImage`)
+        }
+
+        private resizeCanvas() {
+            if (!this.ctx) return;
+            const width = Math.floor(Box.width(this.state.boxes.canvas)); // Canvas context would round it down anyway
+            const height = Math.floor(Box.height(this.state.boxes.canvas)); // Canvas context would round it down anyway
+            if (this.ctx.canvas.width !== width) {
+                this.ctx.canvas.width = width;
+            }
+            if (this.ctx.canvas.height !== height) {
+                this.ctx.canvas.height = height;
+            }
         }
 
         /** Return horizontal gap between rectangles, in canvas pixels */
         private getXGap(colWidthOnCanvas: number): number {
-            const gap1 = isNil(this.state.visualParams.xGapPixels) ? undefined : this.state.visualParams.xGapPixels;
-            const gap2 = isNil(this.state.visualParams.xGapRelative) ? undefined : this.state.visualParams.xGapRelative * colWidthOnCanvas;
+            const gap1 = isNil(this.params.xGapPixels) ? undefined : this.params.xGapPixels;
+            const gap2 = isNil(this.params.xGapRelative) ? undefined : this.params.xGapRelative * colWidthOnCanvas;
             return clamp(minimum(gap1, gap2) ?? 0, 0, colWidthOnCanvas);
         }
         /** Return vertical gap between rectangles, in canvas pixels */
         private getYGap(rowHeightOnCanvas: number): number {
-            const gap1 = isNil(this.state.visualParams.yGapPixels) ? undefined : this.state.visualParams.yGapPixels;
-            const gap2 = isNil(this.state.visualParams.yGapRelative) ? undefined : this.state.visualParams.yGapRelative * rowHeightOnCanvas;
+            const gap1 = isNil(this.params.yGapPixels) ? undefined : this.params.yGapPixels;
+            const gap2 = isNil(this.params.yGapRelative) ? undefined : this.params.yGapRelative * rowHeightOnCanvas;
             return clamp(minimum(gap1, gap2) ?? 0, 0, rowHeightOnCanvas);
         }
 

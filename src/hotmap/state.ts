@@ -1,15 +1,13 @@
 import { BehaviorSubject } from 'rxjs';
 import { Data } from './data';
 import { Domain } from './domain';
-import { Downsampler } from './downsampling';
-import { DataDescription, DefaultVisualParams, ItemEventParam, Provider, VisualParams, XAlignmentMode, YAlignmentMode, ZoomEventParam } from './heatmap';
-import { Box, Boxes, Scales, XY } from './scales';
+import { DataDescription, ItemEventParam, Provider, XAlignmentMode, YAlignmentMode, ZoomEventParam } from './heatmap';
+import { Box, Boxes, Scales } from './scales';
 
 
 export class State<TX, TY, TItem> { // TODO: try to convert to object if makes sense, ensure mandatory props are set in constructor
     originalData: DataDescription<TX, TY, TItem>;
     data: Data<TItem>;
-    downsampler?: Downsampler<'image'>;
     xDomain: Domain<TX>;
     yDomain: Domain<TY>;
     zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
@@ -17,32 +15,26 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
     yAlignment: YAlignmentMode = 'center';
 
     filter?: Provider<TX, TY, TItem, boolean> = undefined;
-    visualParams: VisualParams = DefaultVisualParams;
     /** DOM elements managed by this component */
     dom?: {
         rootDiv: d3.Selection<HTMLDivElement, any, any, any>;
         mainDiv: d3.Selection<HTMLDivElement, any, any, any>;
         canvasDiv: d3.Selection<HTMLDivElement, any, any, any>;
-        canvas: d3.Selection<HTMLCanvasElement, any, any, any>;
+        canvas: d3.Selection<HTMLCanvasElement, any, any, any>; // TODO move to DrawExtension, create on render event
         svg: d3.Selection<SVGSVGElement, any, any, any>;
     };
-    /** Canvas rendering context */
-    ctx?: CanvasRenderingContext2D;
     boxes: Boxes;
     scales: Scales;
-    /** Approximate width of a rectangle in pixels, when showing downsampled data.
-     * (higher value means more responsive but lower-resolution visualization) */
-    downsamplingPixelsPerRect = 1;
-    /** Position of the pinned tooltip, if any. In world coordinates, continuous. Use `Math.floor` to get column/row index. */
-    pinnedTooltip?: XY = undefined;
     readonly lastWheelEvent = { timestamp: 0, absDelta: 0, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false };
-
 
     public readonly events = {
         hover: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
         click: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
         zoom: new BehaviorSubject<ZoomEventParam<TX, TY, TItem>>(undefined),
         resize: new BehaviorSubject<Box | undefined>(undefined),
-        draw: new BehaviorSubject<undefined>(undefined), // TODO: replace by combination of other events
+        /** Fires when the visualized data change (including filter or domain change) */
+        data: new BehaviorSubject<Data<TItem> | undefined>(undefined),
+        /** Fires when the component is initially render in a div */
+        render: new BehaviorSubject<undefined>(undefined),
     } as const;
 }

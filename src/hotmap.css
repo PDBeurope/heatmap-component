@@ -43,6 +43,7 @@
     background-color: black;
     border: solid black 1px;
     pointer-events: initial;
+    cursor: pointer;
 }
 
 .hotmap-pinned-tooltip-close svg {

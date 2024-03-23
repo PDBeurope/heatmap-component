@@ -4,8 +4,13 @@ import { attrd } from '../utils';
 import { HotmapExtension, HotmapExtensionBase } from './extension';
 
 
-interface MarkerExtensionParams { }
-const DefaultMarkerExtensionParams: MarkerExtensionParams = {};
+export interface MarkerExtensionParams {
+    markerCornerRadius: number,
+}
+
+export const DefaultMarkerExtensionParams: MarkerExtensionParams = {
+    markerCornerRadius: 1,
+};
 
 export const MarkerExtension = HotmapExtension.fromClass({
     name: 'builtin.marker',
@@ -25,20 +30,20 @@ export const MarkerExtension = HotmapExtension.fromClass({
                 const y = this.state.scales.worldToCanvas.y(pointed.yIndex);
                 const width = scaleDistance(this.state.scales.worldToCanvas.x, 1);
                 const height = scaleDistance(this.state.scales.worldToCanvas.y, 1);
-                const commonAttrs = { rx: this.state.visualParams.markerCornerRadius, ry: this.state.visualParams.markerCornerRadius };
-                this.addOrUpdateMarker(Class.MarkerX, commonAttrs, {
+                const staticAttrs = { rx: this.params.markerCornerRadius, ry: this.params.markerCornerRadius };
+                this.addOrUpdateMarker(Class.MarkerX, staticAttrs, {
                     x,
                     y: this.state.boxes.canvas.ymin,
                     width,
                     height: Box.height(this.state.boxes.canvas),
                 });
-                this.addOrUpdateMarker(Class.MarkerY, commonAttrs, {
+                this.addOrUpdateMarker(Class.MarkerY, staticAttrs, {
                     x: this.state.boxes.canvas.xmin,
                     y,
                     width: Box.width(this.state.boxes.canvas),
                     height,
                 });
-                this.addOrUpdateMarker(Class.Marker, commonAttrs, {
+                this.addOrUpdateMarker(Class.Marker, staticAttrs, {
                     x, y, width, height
                 });
             } else {
