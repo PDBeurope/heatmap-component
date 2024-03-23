@@ -75,8 +75,8 @@ export const HotmapExtension = {
     },
 };
 
-interface SampleExtensionParams { x: number }
-const DefaultSampleExtensionParams: SampleExtensionParams = { x: 7 };
+interface SampleExtensionParams { }
+const DefaultSampleExtensionParams: SampleExtensionParams = {};
 
 export const SampleExtension = HotmapExtension.fromClass({
     name: 'builtin.sample',

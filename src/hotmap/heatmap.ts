@@ -1,15 +1,15 @@
 import { clamp, cloneDeep, isNil, merge, range, round } from 'lodash';
 import { Color } from './color';
 import * as d3 from './d3-modules';
-import { Data, Image } from './data';
+import { Data } from './data';
 import { Domain } from './domain';
-import { Downsampler } from './downsampling';
+import { DefaultNumericColorProviderFactory, DrawExtension, DrawExtensionParams } from './extensions/draw';
 import { ExtensionInstance, ExtensionInstanceRegistration, HotmapExtension } from './extensions/extension';
 import { MarkerExtension } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 import { Box, Scales, scaleDistance } from './scales';
 import { State } from './state';
-import { Refresher, attrd, getSize, minimum, nextIfChanged, removeElement } from './utils';
+import { attrd, getSize, nextIfChanged, removeElement } from './utils';
 
 
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
@@ -55,9 +55,6 @@ const PAN_SENSITIVITY = 0.6;
 
 /** Initial size set to canvas (doesn't really matter because it will be immediately resized to the real size) */
 const CANVAS_INIT_SIZE = { width: 100, height: 100 };
-
-/** Size of rectangle in pixels, when showing gaps is switched on (for smaller sizes off, to avoid Moire patterns) */
-const MIN_PIXELS_PER_RECT_FOR_GAPS = 2;
 
 
 export type DataDescription<TX, TY, TItem> = {
@@ -129,9 +126,6 @@ export type ZoomEventParam<TX, TY, TItem> = {
 } | undefined
 
 
-const DefaultColor = Color.fromString('#888888');
-export const DefaultColorProvider = () => DefaultColor;
-export const DefaultNumericColorProviderFactory = (min: number, max: number) => Color.createScale('YlOrRd', [min, max]);
 
 /** Controls how X axis values align with the columns when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on X axis can be aligned to the left edge/center/right edge of the column showing that value) */
 export type XAlignmentMode = 'left' | 'center' | 'right'
@@ -181,8 +175,9 @@ export class Heatmap<TX, TY, TItem> {
         };
     }
 
-    private readonly extensions: {
+    readonly extensions: {
         tooltip?: ExtensionInstanceRegistration<TooltipExtensionParams<TX, TY, TItem>>,
+        draw?: ExtensionInstanceRegistration<DrawExtensionParams<TX, TY, TItem>>,
     } = {};
 
     /** Create a new `Heatmap` and set `data` */
@@ -199,13 +194,15 @@ export class Heatmap<TX, TY, TItem> {
 
     private constructor(data: DataDescription<TX, TY, TItem>) {
         this.setData(data);
+        let colorProvider: Provider<TX, TY, TItem, Color> | undefined = undefined;
         if (this.state.data.isNumeric) {
             const dataRange = Data.getRange(this.state.data as Data<number>);
-            const colorProvider = DefaultNumericColorProviderFactory(dataRange.min, dataRange.max);
-            (this as unknown as Heatmap<TX, TY, number>).setColor(colorProvider);
+            colorProvider = DefaultNumericColorProviderFactory(dataRange.min, dataRange.max) as Provider<TX, TY, TItem, Color>;
+            // (this as unknown as Heatmap<TX, TY, number>).setColor(colorProvider);
         }
         this.registerBehavior(MarkerExtension);
         this.extensions.tooltip = this.registerBehavior(TooltipExtension);
+        this.extensions.draw = this.registerBehavior(DrawExtension, { colorProvider });
     }
 
 
@@ -282,22 +279,6 @@ export class Heatmap<TX, TY, TItem> {
 
         console.timeEnd('Hotmap render');
         return this;
-    }
-
-    private getColorArray(): Image {
-        // console.time('get all colors')
-        const image = Image.create(this.state.data.nColumns, this.state.data.nRows);
-        for (let iy = 0; iy < this.state.data.nRows; iy++) {
-            for (let ix = 0; ix < this.state.data.nColumns; ix++) {
-                const item = Data.getItem(this.state.data, ix, iy);
-                if (item === undefined) continue; // keep transparent black
-                const color = this.state.colorProvider(item, this.state.xDomain.values[ix], this.state.yDomain.values[iy], ix, iy);
-                const c = (typeof color === 'string') ? Color.fromString(color) : color;
-                Color.toImage(c, image, ix, iy);
-            }
-        }
-        // console.timeEnd('get all colors')
-        return image;
     }
 
     private emitResize() {
@@ -389,19 +370,14 @@ export class Heatmap<TX, TY, TItem> {
      * ```
      */
     setColor(colorProvider: (...args: ProviderParams<TX, TY, TItem>) => string | Color): this {
-        this.state.colorProvider = colorProvider;
-        this.state.downsampler = undefined;
-        this.requestDraw();
+        this.extensions.draw?.update({ colorProvider });
         return this;
     }
 
     setTooltip(tooltipProvider: ((...args: ProviderParams<TX, TY, TItem>) => string) | 'default' | null): this {
-        if (tooltipProvider === 'default') {
-            this.extensions.tooltip?.update({ tooltipProvider: DefaultTooltipExtensionParams.tooltipProvider });
-        } else {
-            this.extensions.tooltip?.update({ tooltipProvider });
-
-        }
+        this.extensions.tooltip?.update({
+            tooltipProvider: (tooltipProvider === 'default') ? DefaultTooltipExtensionParams.tooltipProvider : tooltipProvider,
+        });
         return this;
     }
 
@@ -416,6 +392,9 @@ export class Heatmap<TX, TY, TItem> {
         this.requestDraw();
         return this;
     }
+    private requestDraw() {
+        this.state.events.draw.next(undefined);
+    }
 
     /** Controls how column/row indices and names map to X and Y axes. */
     setAlignment(x: XAlignmentMode | undefined, y: YAlignmentMode | undefined): this {
@@ -423,127 +402,6 @@ export class Heatmap<TX, TY, TItem> {
         if (y) this.state.yAlignment = y;
         this.emitZoom();
         return this;
-    }
-
-    private readonly drawer = Refresher(() => this._draw());
-    private requestDraw() {
-        this.drawer.requestRefresh();
-    }
-
-    /** Do not call directly! Call `requestDraw` instead to avoid browser freezing. */
-    private _draw() {
-        if (!this.state.dom) return;
-        const xResolution = Box.width(this.state.boxes.canvas) / this.state.downsamplingPixelsPerRect;
-        const yResolution = Box.height(this.state.boxes.canvas) / this.state.downsamplingPixelsPerRect;
-        this.state.downsampler ??= Downsampler.fromImage(this.getColorArray());
-        // console.time('downsample')
-        const downsampledImage = Downsampler.getDownsampled(this.state.downsampler, {
-            x: xResolution * Box.width(this.state.boxes.wholeWorld) / (Box.width(this.state.boxes.visWorld)),
-            // y: this.state.data.nRows,
-            y: yResolution * Box.height(this.state.boxes.wholeWorld) / (Box.height(this.state.boxes.visWorld)),
-        });
-        console.log('downsampled', downsampledImage.nColumns, downsampledImage.nRows);
-        // console.timeEnd('downsample')
-        return this.drawThisImage(downsampledImage, this.state.data.nColumns / downsampledImage.nColumns, this.state.data.nRows / downsampledImage.nRows);
-    }
-
-    private drawTheseData(data: Data<TItem>, xScale: number) {
-        if (!this.state.ctx) return;
-        this.state.ctx.clearRect(0, 0, Box.width(this.state.boxes.canvas), Box.height(this.state.boxes.canvas));
-        const width = scaleDistance(this.state.scales.worldToCanvas.x, 1) * xScale;
-        const height = scaleDistance(this.state.scales.worldToCanvas.y, 1);
-        const xHalfGap = xScale === 1 ? 0.5 * this.getXGap(width) : 0;
-        const yHalfGap = 0.5 * this.getYGap(height);
-        const colFrom = Math.floor(this.state.boxes.visWorld.xmin / xScale);
-        const colTo = Math.ceil(this.state.boxes.visWorld.xmax / xScale); // exclusive
-
-        for (let iy = 0; iy < data.nRows; iy++) {
-            for (let ix = colFrom; ix < colTo; ix++) {
-                const item = Data.getItem(data, ix, iy);
-                if (item === undefined) continue;
-                const color = this.state.colorProvider(item, this.state.xDomain.values[ix], this.state.yDomain.values[iy], ix, iy);
-                this.state.ctx.fillStyle = (typeof color === 'string') ? color : Color.toString(color);
-                const x = this.state.scales.worldToCanvas.x(ix * xScale);
-                const y = this.state.scales.worldToCanvas.y(iy);
-                this.state.ctx.fillRect(x + xHalfGap, y + yHalfGap, width - 2 * xHalfGap, height - 2 * yHalfGap);
-            }
-        }
-    }
-
-    _canvasImage?: Image;
-    private getCanvasImage(): Image {
-        if (!this.state.ctx) throw new Error('`getCanvasImage` should only be called when canvas is initialized');
-        const w = Math.floor(this.state.ctx.canvas.width);
-        const h = Math.floor(this.state.ctx.canvas.height);
-        if (this._canvasImage && this._canvasImage.nColumns === w && this._canvasImage.nRows === h) {
-            Image.clear(this._canvasImage);
-        } else {
-            this._canvasImage = Image.create(w, h);
-        }
-        return this._canvasImage;
-    }
-
-    _canvasImageData?: ImageData;
-    private getCanvasImageData(): ImageData {
-        if (!this.state.ctx) throw new Error('`getCanvasImageData` should only be called when canvas is initialized');
-        const w = Math.floor(this.state.ctx.canvas.width);
-        const h = Math.floor(this.state.ctx.canvas.height);
-        if (this._canvasImageData && this._canvasImageData.width === w && this._canvasImageData.height === h) {
-            return this._canvasImageData;
-        } else {
-            this._canvasImageData = new ImageData(w, h);
-            return this._canvasImageData;
-        }
-    }
-    private drawThisImage(image: Image, xScale: number, yScale: number) {
-        if (!this.state.ctx || !this.state.dom) return;
-        // console.time(`drawThisImage`)
-        const rectWidth = scaleDistance(this.state.scales.worldToCanvas.x, 1) * xScale;
-        const rectHeight = scaleDistance(this.state.scales.worldToCanvas.y, 1) * yScale;
-        const showXGaps = Box.width(this.state.boxes.canvas) > MIN_PIXELS_PER_RECT_FOR_GAPS * Box.width(this.state.boxes.visWorld);
-        const showYGaps = Box.height(this.state.boxes.canvas) > MIN_PIXELS_PER_RECT_FOR_GAPS * Box.height(this.state.boxes.visWorld);
-        const xHalfGap = showXGaps ? 0.5 * this.getXGap(rectWidth) : 0;
-        const yHalfGap = showYGaps ? 0.5 * this.getYGap(rectHeight) : 0;
-        const globalOpacity =
-            (showXGaps ? 1 : (1 - this.getXGap(rectWidth) / rectWidth))
-            * (showYGaps ? 1 : (1 - this.getYGap(rectHeight) / rectHeight));
-        this.state.dom.canvas.style('opacity', globalOpacity); // This compensates for not showing gaps by lowering opacity (when scaled)
-        const colFrom = clamp(Math.floor(this.state.boxes.visWorld.xmin / xScale), 0, image.nColumns);
-        const colTo = clamp(Math.ceil(this.state.boxes.visWorld.xmax / xScale), 0, image.nColumns); // exclusive
-        const rowFrom = clamp(Math.floor(this.state.boxes.visWorld.ymin / yScale), 0, image.nRows);
-        const rowTo = clamp(Math.ceil(this.state.boxes.visWorld.ymax / yScale), 0, image.nRows); // exclusive
-
-        const canvasImage = this.getCanvasImage();
-        for (let iy = rowFrom; iy < rowTo; iy++) {
-            const y = this.state.scales.worldToCanvas.y(iy * yScale);
-            const yFrom = y + yHalfGap;
-            const yTo = y + rectHeight - yHalfGap;
-            for (let ix = colFrom; ix < colTo; ix++) {
-                const x = this.state.scales.worldToCanvas.x(ix * xScale);
-                const xFrom = x + xHalfGap;
-                const xTo = x + rectWidth - xHalfGap;
-                const color = Color.fromImage(image, ix, iy);
-                Image.addRect(canvasImage, xFrom, yFrom, xTo, yTo, color);
-            }
-        }
-        const imageData = this.getCanvasImageData();
-        Image.toImageData(canvasImage, imageData);
-        this.state.ctx.clearRect(0, 0, Box.width(this.state.boxes.canvas), Box.height(this.state.boxes.canvas));
-        this.state.ctx.putImageData(imageData, 0, 0);
-        // console.timeEnd(`drawThisImage`)
-    }
-
-    /** Return horizontal gap between rectangles, in canvas pixels */
-    private getXGap(colWidthOnCanvas: number): number {
-        const gap1 = isNil(this.state.visualParams.xGapPixels) ? undefined : this.state.visualParams.xGapPixels;
-        const gap2 = isNil(this.state.visualParams.xGapRelative) ? undefined : this.state.visualParams.xGapRelative * colWidthOnCanvas;
-        return clamp(minimum(gap1, gap2) ?? 0, 0, colWidthOnCanvas);
-    }
-    /** Return vertical gap between rectangles, in canvas pixels */
-    private getYGap(rowHeightOnCanvas: number): number {
-        const gap1 = isNil(this.state.visualParams.yGapPixels) ? undefined : this.state.visualParams.yGapPixels;
-        const gap2 = isNil(this.state.visualParams.yGapRelative) ? undefined : this.state.visualParams.yGapRelative * rowHeightOnCanvas;
-        return clamp(minimum(gap1, gap2) ?? 0, 0, rowHeightOnCanvas);
     }
 
     private addZoomBehavior() {

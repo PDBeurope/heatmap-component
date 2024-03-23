@@ -1,9 +1,8 @@
 import { BehaviorSubject } from 'rxjs';
-import { Color } from './color';
 import { Data } from './data';
 import { Domain } from './domain';
 import { Downsampler } from './downsampling';
-import { DataDescription, DefaultColorProvider, DefaultVisualParams, ItemEventParam, Provider, VisualParams, XAlignmentMode, YAlignmentMode, ZoomEventParam } from './heatmap';
+import { DataDescription, DefaultVisualParams, ItemEventParam, Provider, VisualParams, XAlignmentMode, YAlignmentMode, ZoomEventParam } from './heatmap';
 import { Box, Boxes, Scales, XY } from './scales';
 
 
@@ -17,7 +16,6 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
     xAlignment: XAlignmentMode = 'center';
     yAlignment: YAlignmentMode = 'center';
 
-    colorProvider: Provider<TX, TY, TItem, string | Color> = DefaultColorProvider;
     filter?: Provider<TX, TY, TItem, boolean> = undefined;
     visualParams: VisualParams = DefaultVisualParams;
     /** DOM elements managed by this component */
@@ -45,5 +43,6 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
         click: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
         zoom: new BehaviorSubject<ZoomEventParam<TX, TY, TItem>>(undefined),
         resize: new BehaviorSubject<Box | undefined>(undefined),
+        draw: new BehaviorSubject<undefined>(undefined), // TODO: replace by combination of other events
     } as const;
 }

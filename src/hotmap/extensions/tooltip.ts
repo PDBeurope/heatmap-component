@@ -29,7 +29,6 @@ export const TooltipExtension: HotmapExtension<TooltipExtensionParams<never, nev
         class: class <TX, TY, TItem> extends HotmapExtensionBase<TooltipExtensionParams<TX, TY, TItem>, TX, TY, TItem> {
             register() {
                 super.register();
-                console.log('TooltipExtension', this.params)
                 this.subscribe(this.state.events.hover, pointed => {
                     this.drawTooltip(pointed);
                 });
@@ -73,7 +72,6 @@ export const TooltipExtension: HotmapExtension<TooltipExtensionParams<never, nev
             private drawPinnedTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
                 if (!this.state.dom) return;
                 this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
-                console.log('drawPinnedTooltip', this.params)
                 if (pointed && this.params.tooltipProvider && this.params.pinnable) {
                     this.state.pinnedTooltip = { x: this.state.scales.canvasToWorld.x(pointed.sourceEvent.offsetX), y: this.state.scales.canvasToWorld.y(pointed.sourceEvent.offsetY) };
                     const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
