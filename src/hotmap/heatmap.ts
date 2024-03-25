@@ -238,10 +238,9 @@ export class Heatmap<TX, TY, TItem> {
         });
         this.state.dom = { rootDiv, mainDiv, canvasDiv, canvas, svg };
 
-        for (const eventName in this.handlers) {
-            svg.on(eventName, e => this.handlers[eventName as keyof typeof this.handlers](e));
-            // wheel event must be subscribed before setting zoom
-        }
+        svg.on('mousemove', (e: MouseEvent) => this.events.hover.next(this.getPointedItem(e)));
+        svg.on('mouseleave', (e: MouseEvent) => this.events.hover.next(undefined));
+        svg.on('click', (e: MouseEvent) => this.events.click.next(this.getPointedItem(e)));
 
         this.events.render.next(undefined);
         this.emitResize();
@@ -371,6 +370,7 @@ export class Heatmap<TX, TY, TItem> {
         return this;
     }
 
+    // TODO move to ZoomExtension
     private addZoomBehavior() {
         if (!this.state.dom) return;
         if (this.state.zoomBehavior) {
@@ -390,10 +390,13 @@ export class Heatmap<TX, TY, TItem> {
             this.events.hover.next(this.getPointedItem(e.sourceEvent));
             this.emitZoom();
         });
+        this.state.dom.svg.on('wheel', (e: WheelEvent) => this.handleWheel(e));
+        // wheel event must be subscribed before setting zoom. or must it?
         this.state.dom.svg.call(this.state.zoomBehavior as any);
         // .on('wheel', e => e.preventDefault()); // Prevent fallback to normal scroll when on min/max zoom
         this.events.resize.subscribe(() => this.adjustZoomExtent());
     }
+    // TODO move to ZoomExtension
     private adjustZoomExtent() {
         if (!this.state.zoomBehavior) return;
         this.state.zoomBehavior.translateExtent([[this.state.boxes.wholeWorld.xmin, -Infinity], [this.state.boxes.wholeWorld.xmax, Infinity]]);
@@ -407,6 +410,7 @@ export class Heatmap<TX, TY, TItem> {
         this.state.zoomBehavior.transform(this.state.dom?.svg as any, currentZoom);
     }
 
+    // TODO move to ZoomExtension
     private zoomTransformToVisWorld(transform: { k: number, x: number, y: number }): Box {
         return {
             ...this.state.boxes.visWorld, // preserve Y zoom
@@ -415,12 +419,82 @@ export class Heatmap<TX, TY, TItem> {
         };
     }
 
+    // TODO move to ZoomExtension
     private visWorldToZoomTransform(visWorld: Box): d3.ZoomTransform {
         const k = (this.state.boxes.canvas.xmax - this.state.boxes.canvas.xmin) / (visWorld.xmax - visWorld.xmin);
         const x = this.state.boxes.canvas.xmin - k * visWorld.xmin;
         const y = 0;
         return new d3.ZoomTransform(k, x, y);
     }
+
+    // TODO move to ZoomExtension
+    private showScrollingMessage() {
+        if (!this.state.dom) return;
+        if (!this.state.dom.mainDiv.selectAll(`.${Class.Overlay}`).empty()) return;
+
+        const overlay = attrd(this.state.dom.mainDiv.append('div'), { class: Class.Overlay });
+        attrd(overlay.append('div'), { class: Class.OverlayShade });
+        attrd(overlay.append('div'), { class: Class.OverlayMessage })
+            .text('Press Ctrl and scroll to apply zoom');
+        setTimeout(() => overlay.remove(), 750);
+    }
+
+    // TODO move to ZoomExtension
+    private wheelAction(e: WheelEvent): { kind: 'ignore' } | { kind: 'showHelp' } | { kind: 'zoom', delta: number } | { kind: 'pan', deltaX: number, deltaY: number } {
+        const isHorizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
+        const isVertical = Math.abs(e.deltaX) < Math.abs(e.deltaY);
+
+        const modeSpeed = (e.deltaMode === 1) ? 25 : e.deltaMode ? 500 : 1; // scroll in lines vs pages vs pixels
+        const speedup = ZOOM_REQUIRE_CTRL ? 1 : (this.state.lastWheelEvent.ctrlKey || this.state.lastWheelEvent.metaKey ? 10 : 1);
+
+        if (isHorizontal) {
+            return { kind: 'pan', deltaX: -e.deltaX * modeSpeed * speedup, deltaY: 0 };
+        }
+
+        if (isVertical) {
+            if (this.state.lastWheelEvent.shiftKey) {
+                return { kind: 'pan', deltaX: -e.deltaY * modeSpeed * speedup, deltaY: 0 };
+            }
+            if (ZOOM_REQUIRE_CTRL && !this.state.lastWheelEvent.ctrlKey && !this.state.lastWheelEvent.metaKey) {
+                return (Math.abs(e.deltaY) * modeSpeed >= 5) ? { kind: 'showHelp' } : { kind: 'ignore' };
+            }
+            return { kind: 'zoom', delta: -e.deltaY * 0.002 * modeSpeed * speedup };
+            // Default function for zoom behavior is: -e.deltaY * (e.deltaMode === 1 ? 0.05 : e.deltaMode ? 1 : 0.002) * (e.ctrlKey ? 10 : 1)
+        }
+
+        return { kind: 'ignore' };
+    }
+
+    // TODO move to ZoomExtension
+    private handleWheel(e: WheelEvent) {
+        if (!this.state.dom) return;
+        e.preventDefault(); // TODO ???
+
+        // Magic to handle touchpad scrolling on Mac (when user lifts fingers from touchpad, but the browser is still getting wheel events)
+        const now = Date.now();
+        const absDelta = Math.max(Math.abs(e.deltaX), Math.abs(e.deltaY));
+        if (now > this.state.lastWheelEvent.timestamp + 150 || absDelta > this.state.lastWheelEvent.absDelta + 1) {
+            // Starting a new gesture
+            this.state.lastWheelEvent.ctrlKey = e.ctrlKey;
+            this.state.lastWheelEvent.shiftKey = e.shiftKey;
+            this.state.lastWheelEvent.altKey = e.altKey;
+            this.state.lastWheelEvent.metaKey = e.metaKey;
+        }
+        this.state.lastWheelEvent.timestamp = now;
+        this.state.lastWheelEvent.absDelta = absDelta;
+
+        if (this.state.zoomBehavior) {
+            const action = this.wheelAction(e);
+            if (action.kind === 'pan') {
+                const shiftX = PAN_SENSITIVITY * scaleDistance(this.state.scales.canvasToWorld.x, action.deltaX);
+                this.state.zoomBehavior.duration(1000).translateBy(this.state.dom.svg as any, shiftX, 0);
+            }
+            if (action.kind === 'showHelp') {
+                this.showScrollingMessage();
+            }
+        }
+    }
+
 
     private zoomParamFromVisWorld(box: Box | undefined): ZoomEventParam<TX, TY, TItem> {
         if (!box) return undefined;
@@ -548,75 +622,6 @@ export class Heatmap<TX, TY, TItem> {
         return { datum, x, y, xIndex, yIndex, sourceEvent: event };
     }
 
-    private showScrollingMessage() {
-        if (!this.state.dom) return;
-        if (!this.state.dom.mainDiv.selectAll(`.${Class.Overlay}`).empty()) return;
-
-        const overlay = attrd(this.state.dom.mainDiv.append('div'), { class: Class.Overlay });
-        attrd(overlay.append('div'), { class: Class.OverlayShade });
-        attrd(overlay.append('div'), { class: Class.OverlayMessage })
-            .text('Press Ctrl and scroll to apply zoom');
-        setTimeout(() => overlay.remove(), 750);
-    }
-
-    private wheelAction(e: WheelEvent): { kind: 'ignore' } | { kind: 'showHelp' } | { kind: 'zoom', delta: number } | { kind: 'pan', deltaX: number, deltaY: number } {
-        const isHorizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
-        const isVertical = Math.abs(e.deltaX) < Math.abs(e.deltaY);
-
-        const modeSpeed = (e.deltaMode === 1) ? 25 : e.deltaMode ? 500 : 1; // scroll in lines vs pages vs pixels
-        const speedup = ZOOM_REQUIRE_CTRL ? 1 : (this.state.lastWheelEvent.ctrlKey || this.state.lastWheelEvent.metaKey ? 10 : 1);
-
-        if (isHorizontal) {
-            return { kind: 'pan', deltaX: -e.deltaX * modeSpeed * speedup, deltaY: 0 };
-        }
-
-        if (isVertical) {
-            if (this.state.lastWheelEvent.shiftKey) {
-                return { kind: 'pan', deltaX: -e.deltaY * modeSpeed * speedup, deltaY: 0 };
-            }
-            if (ZOOM_REQUIRE_CTRL && !this.state.lastWheelEvent.ctrlKey && !this.state.lastWheelEvent.metaKey) {
-                return (Math.abs(e.deltaY) * modeSpeed >= 5) ? { kind: 'showHelp' } : { kind: 'ignore' };
-            }
-            return { kind: 'zoom', delta: -e.deltaY * 0.002 * modeSpeed * speedup };
-            // Default function for zoom behavior is: -e.deltaY * (e.deltaMode === 1 ? 0.05 : e.deltaMode ? 1 : 0.002) * (e.ctrlKey ? 10 : 1)
-        }
-
-        return { kind: 'ignore' };
-    }
-
-    private readonly handlers = {
-        mousemove: (e: MouseEvent) => this.events.hover.next(this.getPointedItem(e)),
-        mouseleave: (e: MouseEvent) => this.events.hover.next(undefined),
-        click: (e: MouseEvent) => this.events.click.next(this.getPointedItem(e)),
-        wheel: (e: WheelEvent) => {
-            if (!this.state.dom) return;
-            e.preventDefault(); // TODO ???
-
-            // Magic to handle touchpad scrolling on Mac (when user lifts fingers from touchpad, but the browser is still getting wheel events)
-            const now = Date.now();
-            const absDelta = Math.max(Math.abs(e.deltaX), Math.abs(e.deltaY));
-            if (now > this.state.lastWheelEvent.timestamp + 150 || absDelta > this.state.lastWheelEvent.absDelta + 1) {
-                // Starting a new gesture
-                this.state.lastWheelEvent.ctrlKey = e.ctrlKey;
-                this.state.lastWheelEvent.shiftKey = e.shiftKey;
-                this.state.lastWheelEvent.altKey = e.altKey;
-                this.state.lastWheelEvent.metaKey = e.metaKey;
-            }
-            this.state.lastWheelEvent.timestamp = now;
-            this.state.lastWheelEvent.absDelta = absDelta;
-
-            if (this.state.zoomBehavior) {
-                const action = this.wheelAction(e);
-                if (action.kind === 'pan') {
-                    const shiftX = PAN_SENSITIVITY * scaleDistance(this.state.scales.canvasToWorld.x, action.deltaX);
-                    this.state.zoomBehavior.duration(1000).translateBy(this.state.dom.svg as any, shiftX, 0);
-                }
-                if (action.kind === 'showHelp') {
-                    this.showScrollingMessage();
-                }
-            }
-        },
-    } satisfies Record<string, (e: any) => any>;
 }
 
 
