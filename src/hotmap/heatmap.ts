@@ -8,8 +8,9 @@ import { ExtensionInstance, ExtensionInstanceRegistration, HotmapExtension } fro
 import { MarkerExtension } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 import { Box, Scales, scaleDistance } from './scales';
-import { State } from './state';
+import { MIN_ZOOMED_DATAPOINTS_HARD, State } from './state';
 import { attrd, getSize, nextIfChanged, removeElement } from './utils';
+import { ZoomExtension } from './extensions/zoom';
 
 
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
@@ -40,18 +41,7 @@ export const Class = {
     OverlayMessage: 'hotmap-overlay-message',
 } as const;
 
-const MIN_ZOOMED_DATAPOINTS = 1;
-const MIN_ZOOMED_DATAPOINTS_HARD = 1;
 
-/** Avoid zooming to things like 0.4999999999999998 */
-const ZOOM_EVENT_ROUNDING_PRECISION = 9;
-
-/** Only allow zooming with scrolling gesture when Ctrl key (or Meta key, i.e. Command/Windows) is pressed.
- * If `false`, zooming is allowed always, but Ctrl or Meta key makes it faster. */
-const ZOOM_REQUIRE_CTRL = false;
-
-const ZOOM_SENSITIVITY = 1;
-const PAN_SENSITIVITY = 0.6;
 
 /** Initial size set to canvas (doesn't really matter because it will be immediately resized to the real size) */
 const CANVAS_INIT_SIZE = { width: 100, height: 100 };
@@ -196,6 +186,7 @@ export class Heatmap<TX, TY, TItem> {
         this.registerBehavior(MarkerExtension);
         this.extensions.tooltip = this.registerBehavior(TooltipExtension);
         this.extensions.draw = this.registerBehavior(DrawExtension, { colorProvider });
+        this.registerBehavior(ZoomExtension);
     }
 
 
@@ -238,15 +229,15 @@ export class Heatmap<TX, TY, TItem> {
         });
         this.state.dom = { rootDiv, mainDiv, canvasDiv, canvas, svg };
 
-        svg.on('mousemove', (e: MouseEvent) => this.events.hover.next(this.getPointedItem(e)));
+        svg.on('mousemove', (e: MouseEvent) => this.events.hover.next(this.state.getPointedItem(e)));
         svg.on('mouseleave', (e: MouseEvent) => this.events.hover.next(undefined));
-        svg.on('click', (e: MouseEvent) => this.events.click.next(this.getPointedItem(e)));
+        svg.on('click', (e: MouseEvent) => this.events.click.next(this.state.getPointedItem(e)));
 
         this.events.render.next(undefined);
         this.emitResize();
         d3.select(window).on('resize.resizehotmapcanvas', () => this.emitResize());
 
-        this.addZoomBehavior();
+        // this.addZoomBehavior();
 
         console.timeEnd('Hotmap render');
         return this;
@@ -271,10 +262,10 @@ export class Heatmap<TX, TY, TItem> {
                 xmax: this.state.boxes.visWorld.xmax * xScale,
                 ymin: this.state.boxes.visWorld.ymin * yScale,
                 ymax: this.state.boxes.visWorld.ymax * yScale
-            }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
+            }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD); // TODO factor this out with zoom-related helpers
             this.state.scales = Scales(this.state.boxes);
         }
-        this.adjustZoomExtent();
+        // this.adjustZoomExtent();
         this.events.data.next(data);
         return this;
     }
@@ -366,260 +357,34 @@ export class Heatmap<TX, TY, TItem> {
     setAlignment(x: XAlignmentMode | undefined, y: YAlignmentMode | undefined): this {
         if (x) this.state.xAlignment = x;
         if (y) this.state.yAlignment = y;
-        this.emitZoom();
+        this.state.emitZoom();
         return this;
-    }
-
-    // TODO move to ZoomExtension
-    private addZoomBehavior() {
-        if (!this.state.dom) return;
-        if (this.state.zoomBehavior) {
-            // Remove any old behavior
-            this.state.zoomBehavior.on('zoom', null);
-        }
-        this.state.zoomBehavior = d3.zoom();
-        this.state.zoomBehavior.filter(e => (e instanceof WheelEvent) ? (this.wheelAction(e).kind === 'zoom') : true);
-        this.state.zoomBehavior.wheelDelta(e => {
-            // Default function is: -e.deltaY * (e.deltaMode === 1 ? 0.05 : e.deltaMode ? 1 : 0.002) * (e.ctrlKey ? 10 : 1)
-            const action = this.wheelAction(e);
-            return action.kind === 'zoom' ? ZOOM_SENSITIVITY * action.delta : 0;
-        });
-        this.state.zoomBehavior.on('zoom', e => {
-            this.state.boxes.visWorld = this.zoomTransformToVisWorld(e.transform);
-            this.state.scales = Scales(this.state.boxes);
-            this.events.hover.next(this.getPointedItem(e.sourceEvent));
-            this.emitZoom();
-        });
-        this.state.dom.svg.on('wheel', (e: WheelEvent) => this.handleWheel(e));
-        // wheel event must be subscribed before setting zoom. or must it?
-        this.state.dom.svg.call(this.state.zoomBehavior as any);
-        // .on('wheel', e => e.preventDefault()); // Prevent fallback to normal scroll when on min/max zoom
-        this.events.resize.subscribe(() => this.adjustZoomExtent());
-    }
-    // TODO move to ZoomExtension
-    private adjustZoomExtent() {
-        if (!this.state.zoomBehavior) return;
-        this.state.zoomBehavior.translateExtent([[this.state.boxes.wholeWorld.xmin, -Infinity], [this.state.boxes.wholeWorld.xmax, Infinity]]);
-        const canvasWidth = Box.width(this.state.boxes.canvas);
-        const wholeWorldWidth = Box.width(this.state.boxes.wholeWorld);
-        const minZoom = canvasWidth / wholeWorldWidth; // zoom-out
-        const maxZoom = Math.max(canvasWidth / MIN_ZOOMED_DATAPOINTS, minZoom); // zoom-in
-        this.state.zoomBehavior.scaleExtent([minZoom, maxZoom]);
-        this.state.zoomBehavior.extent([[this.state.boxes.canvas.xmin, this.state.boxes.canvas.ymin], [this.state.boxes.canvas.xmax, this.state.boxes.canvas.ymax]]);
-        const currentZoom = this.visWorldToZoomTransform(this.state.boxes.visWorld);
-        this.state.zoomBehavior.transform(this.state.dom?.svg as any, currentZoom);
-    }
-
-    // TODO move to ZoomExtension
-    private zoomTransformToVisWorld(transform: { k: number, x: number, y: number }): Box {
-        return {
-            ...this.state.boxes.visWorld, // preserve Y zoom
-            xmin: (this.state.boxes.canvas.xmin - transform.x) / transform.k,
-            xmax: (this.state.boxes.canvas.xmax - transform.x) / transform.k,
-        };
-    }
-
-    // TODO move to ZoomExtension
-    private visWorldToZoomTransform(visWorld: Box): d3.ZoomTransform {
-        const k = (this.state.boxes.canvas.xmax - this.state.boxes.canvas.xmin) / (visWorld.xmax - visWorld.xmin);
-        const x = this.state.boxes.canvas.xmin - k * visWorld.xmin;
-        const y = 0;
-        return new d3.ZoomTransform(k, x, y);
-    }
-
-    // TODO move to ZoomExtension
-    private showScrollingMessage() {
-        if (!this.state.dom) return;
-        if (!this.state.dom.mainDiv.selectAll(`.${Class.Overlay}`).empty()) return;
-
-        const overlay = attrd(this.state.dom.mainDiv.append('div'), { class: Class.Overlay });
-        attrd(overlay.append('div'), { class: Class.OverlayShade });
-        attrd(overlay.append('div'), { class: Class.OverlayMessage })
-            .text('Press Ctrl and scroll to apply zoom');
-        setTimeout(() => overlay.remove(), 750);
-    }
-
-    // TODO move to ZoomExtension
-    private wheelAction(e: WheelEvent): { kind: 'ignore' } | { kind: 'showHelp' } | { kind: 'zoom', delta: number } | { kind: 'pan', deltaX: number, deltaY: number } {
-        const isHorizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY);
-        const isVertical = Math.abs(e.deltaX) < Math.abs(e.deltaY);
-
-        const modeSpeed = (e.deltaMode === 1) ? 25 : e.deltaMode ? 500 : 1; // scroll in lines vs pages vs pixels
-        const speedup = ZOOM_REQUIRE_CTRL ? 1 : (this.state.lastWheelEvent.ctrlKey || this.state.lastWheelEvent.metaKey ? 10 : 1);
-
-        if (isHorizontal) {
-            return { kind: 'pan', deltaX: -e.deltaX * modeSpeed * speedup, deltaY: 0 };
-        }
-
-        if (isVertical) {
-            if (this.state.lastWheelEvent.shiftKey) {
-                return { kind: 'pan', deltaX: -e.deltaY * modeSpeed * speedup, deltaY: 0 };
-            }
-            if (ZOOM_REQUIRE_CTRL && !this.state.lastWheelEvent.ctrlKey && !this.state.lastWheelEvent.metaKey) {
-                return (Math.abs(e.deltaY) * modeSpeed >= 5) ? { kind: 'showHelp' } : { kind: 'ignore' };
-            }
-            return { kind: 'zoom', delta: -e.deltaY * 0.002 * modeSpeed * speedup };
-            // Default function for zoom behavior is: -e.deltaY * (e.deltaMode === 1 ? 0.05 : e.deltaMode ? 1 : 0.002) * (e.ctrlKey ? 10 : 1)
-        }
-
-        return { kind: 'ignore' };
-    }
-
-    // TODO move to ZoomExtension
-    private handleWheel(e: WheelEvent) {
-        if (!this.state.dom) return;
-        e.preventDefault(); // TODO ???
-
-        // Magic to handle touchpad scrolling on Mac (when user lifts fingers from touchpad, but the browser is still getting wheel events)
-        const now = Date.now();
-        const absDelta = Math.max(Math.abs(e.deltaX), Math.abs(e.deltaY));
-        if (now > this.state.lastWheelEvent.timestamp + 150 || absDelta > this.state.lastWheelEvent.absDelta + 1) {
-            // Starting a new gesture
-            this.state.lastWheelEvent.ctrlKey = e.ctrlKey;
-            this.state.lastWheelEvent.shiftKey = e.shiftKey;
-            this.state.lastWheelEvent.altKey = e.altKey;
-            this.state.lastWheelEvent.metaKey = e.metaKey;
-        }
-        this.state.lastWheelEvent.timestamp = now;
-        this.state.lastWheelEvent.absDelta = absDelta;
-
-        if (this.state.zoomBehavior) {
-            const action = this.wheelAction(e);
-            if (action.kind === 'pan') {
-                const shiftX = PAN_SENSITIVITY * scaleDistance(this.state.scales.canvasToWorld.x, action.deltaX);
-                this.state.zoomBehavior.duration(1000).translateBy(this.state.dom.svg as any, shiftX, 0);
-            }
-            if (action.kind === 'showHelp') {
-                this.showScrollingMessage();
-            }
-        }
-    }
-
-
-    private zoomParamFromVisWorld(box: Box | undefined): ZoomEventParam<TX, TY, TItem> {
-        if (!box) return undefined;
-
-        const xMinIndex_ = round(box.xmin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
-        const xMaxIndex_ = round(box.xmax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
-        const xFirstVisibleIndex = clamp(Math.floor(xMinIndex_), 0, this.state.data.nColumns - 1);
-        const xLastVisibleIndex = clamp(Math.ceil(xMaxIndex_) - 1, 0, this.state.data.nColumns - 1);
-
-        const yMinIndex_ = round(box.ymin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
-        const yMaxIndex_ = round(box.ymax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
-        const yFirstVisibleIndex = clamp(Math.floor(yMinIndex_), 0, this.state.data.nRows - 1);
-        const yLastVisibleIndex = clamp(Math.ceil(yMaxIndex_) - 1, 0, this.state.data.nRows - 1);
-
-        const xShift = indexAlignmentShift(this.state.xAlignment);
-        const yShift = indexAlignmentShift(this.state.yAlignment);
-
-        return {
-            xMinIndex: xMinIndex_ + xShift,
-            xMaxIndex: xMaxIndex_ + xShift,
-            xMin: Domain.interpolateValue(this.state.xDomain, xMinIndex_ + xShift),
-            xMax: Domain.interpolateValue(this.state.xDomain, xMaxIndex_ + xShift),
-            xFirstVisibleIndex,
-            xLastVisibleIndex,
-            xFirstVisible: this.state.xDomain.values[xFirstVisibleIndex],
-            xLastVisible: this.state.xDomain.values[xLastVisibleIndex],
-
-            yMinIndex: yMinIndex_ + yShift,
-            yMaxIndex: yMaxIndex_ + yShift,
-            yMin: Domain.interpolateValue(this.state.yDomain, yMinIndex_ + yShift),
-            yMax: Domain.interpolateValue(this.state.yDomain, yMaxIndex_ + yShift),
-            yFirstVisibleIndex,
-            yLastVisibleIndex,
-            yFirstVisible: this.state.yDomain.values[yFirstVisibleIndex],
-            yLastVisible: this.state.yDomain.values[yLastVisibleIndex],
-        };
-
-    }
-
-    private emitZoom(): void {
-        if (this.state.boxes.visWorld) {
-            nextIfChanged(this.events.zoom, this.zoomParamFromVisWorld(this.state.boxes.visWorld));
-        }
     }
 
     /** Enforce change of zoom and return the zoom value after the change */
     zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined): ZoomEventParam<TX, TY, TItem> {
-        if (!this.state.dom || !this.state.zoomBehavior) return undefined;
+        return this.state.zoom(z);
+        // if (!this.state.dom || !this.state.zoomBehavior) return undefined;
 
-        const visWorldBox = Box.clamp({
-            xmin: this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.state.boxes.wholeWorld.xmin,
-            xmax: this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.state.boxes.wholeWorld.xmax,
-            ymin: this.getZoomRequestIndexMagic('y', 'Min', z) ?? this.state.boxes.wholeWorld.ymin,
-            ymax: this.getZoomRequestIndexMagic('y', 'Max', z) ?? this.state.boxes.wholeWorld.ymax,
-        }, this.state.boxes.wholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
+        // const visWorldBox = Box.clamp({
+        //     xmin: this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.state.boxes.wholeWorld.xmin,
+        //     xmax: this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.state.boxes.wholeWorld.xmax,
+        //     ymin: this.getZoomRequestIndexMagic('y', 'Min', z) ?? this.state.boxes.wholeWorld.ymin,
+        //     ymax: this.getZoomRequestIndexMagic('y', 'Max', z) ?? this.state.boxes.wholeWorld.ymax,
+        // }, this.state.boxes.wholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
 
-        const xScale = Box.width(this.state.boxes.canvas) / Box.width(visWorldBox);
-        const yScale = Box.height(this.state.boxes.canvas) / Box.height(visWorldBox);
+        // const xScale = Box.width(this.state.boxes.canvas) / Box.width(visWorldBox);
+        // const yScale = Box.height(this.state.boxes.canvas) / Box.height(visWorldBox);
 
-        const transform = d3.zoomIdentity.scale(xScale).translate(-visWorldBox.xmin, 0);
-        this.state.zoomBehavior.transform(this.state.dom.svg as any, transform);
-        return this.zoomParamFromVisWorld(visWorldBox);
+        // const transform = d3.zoomIdentity.scale(xScale).translate(-visWorldBox.xmin, 0);
+        // this.state.zoomBehavior.transform(this.state.dom.svg as any, transform);
+        // return this.zoomParamFromVisWorld(visWorldBox);
     }
 
     /** Return current zoom */
     getZoom(): ZoomEventParam<TX, TY, TItem> {
-        return this.zoomParamFromVisWorld(this.state.boxes.visWorld);
-    }
-
-    private getZoomRequestIndexMagic(axis: 'x' | 'y', end: 'Min' | 'Max', z: Partial<ZoomEventParam<TX, TY, TItem>>): number | undefined {
-        if (isNil(z)) return undefined;
-
-        const fl = end === 'Min' ? 'First' : 'Last';
-        const index = z[`${axis}${end}Index`];
-        const value = z[`${axis}${end}`] as TX | TY | undefined;
-        const visIndex = z[`${axis}${fl}VisibleIndex`];
-        const visValue = z[`${axis}${fl}Visible`];
-        const domain = this.state[`${axis}Domain`];
-        const alignment = this.state[`${axis}Alignment`];
-
-        if ([index, value, visIndex, visValue].filter(v => !isNil(v)).length > 1) {
-            console.warn(`You called zoom function with more that one of these conflicting options: ${axis}${end}Index, ${axis}${end}, ${axis}${fl}VisibleIndex, ${axis}${fl}Visible. Only the first one (in this order of precedence) will be considered.`);
-        }
-
-        if (!isNil(index)) {
-            return index - indexAlignmentShift(alignment);
-        }
-        if (!isNil(value)) {
-            const interpolatedIndex = Domain.interpolateIndex(domain, value);
-            if (!isNil(interpolatedIndex)) {
-                return interpolatedIndex - indexAlignmentShift(alignment);
-            } else {
-                throw new Error(`${axis}${end} option is not applicable for zoom function, because the ${axis.toUpperCase()} domain is not numeric or not sorted. Use one of these options instead: ${axis}${end}Index, ${axis}${fl}VisibleIndex, ${axis}${fl}Visible.`);
-            }
-        }
-        if (!isNil(visIndex)) {
-            if (Math.floor(visIndex) !== visIndex) throw new Error(`${axis}${fl}VisibleIndex must be an integer, not ${visIndex}`);
-            return fl === 'First' ? visIndex : visIndex + 1;
-        }
-        if (!isNil(visValue)) {
-            const foundIndex = domain.index.get(visValue as any);
-            if (!isNil(foundIndex)) {
-                return fl === 'First' ? foundIndex : foundIndex + 1;
-            } else {
-                console.warn(`The provided value of ${axis}${fl}Visible (${visValue}) is not in the ${axis.toUpperCase()} domain.`);
-
-                return undefined;
-            }
-        }
-        return undefined;
-    }
-
-    private getPointedItem(event: MouseEvent | undefined): ItemEventParam<TX, TY, TItem> {
-        if (!event) {
-            return undefined;
-        }
-        const xIndex = Math.floor(this.state.scales.canvasToWorld.x(event.offsetX));
-        const yIndex = Math.floor(this.state.scales.canvasToWorld.y(event.offsetY));
-        const datum = Data.getItem(this.state.data, xIndex, yIndex);
-        if (!datum) {
-            return undefined;
-        }
-        const x = this.state.xDomain.values[xIndex];
-        const y = this.state.yDomain.values[yIndex];
-        return { datum, x, y, xIndex, yIndex, sourceEvent: event };
+        return this.state.getZoom();
+        // return this.zoomParamFromVisWorld(this.state.boxes.visWorld);
     }
 
 }
@@ -642,10 +407,4 @@ function makeRandomData2(nColumns: number, nRows: number): DataDescription<numbe
         ...data,
         items: data.items.map((d, i) => (d * 0.5) + (i % nColumns / nColumns * 0.5)),
     };
-}
-
-function indexAlignmentShift(alignment: XAlignmentMode | YAlignmentMode) {
-    if (alignment === 'left' || alignment === 'top') return 0;
-    if (alignment === 'center') return -0.5;
-    return -1;
 }
