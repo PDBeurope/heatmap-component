@@ -1,10 +1,15 @@
 import { clamp, sortedIndex, sortedIndexBy } from 'lodash';
 import { IsNumeric, sortDirection } from './utils';
 
+
 export interface Domain<T> {
+    /** Values in the domain */
     values: T[],
+    /** Mapping of values to their index in the domain */
     index: Map<T, number>,
+    /** Flags whether all values within the domain are numbers */
     isNumeric: IsNumeric<T>,
+    /** Flags whether the values in the domain are sorted (strictly ascending or strictly descending) */
     sortDirection: 'asc' | 'desc' | 'none',
 }
 
@@ -15,7 +20,7 @@ export const Domain = {
             values,
             isNumeric,
             sortDirection: isNumeric ? sortDirection(values as number[]) : 'none',
-            index: new Map(values.map((v, i) => [v, i])), // TODO avoid creating array of arrays
+            index: _createIndex(values),
         };
     },
 
@@ -60,3 +65,13 @@ function _getIndexWithInterpolation(domain: Domain<number>, value: number): numb
     const nextValue = domain.values[nextIndex];
     return (value - previousValue) / (nextValue - previousValue) + previousIndex;
 };
+
+/** Create a mapping of values to their index in the array */
+function _createIndex<T>(values: T[]): Map<T, number> {
+    const map = new Map<T, number>();
+    const n = values.length;
+    for (let i = 0; i < n; i++) {
+        map.set(values[i], i);
+    }
+    return map;
+}

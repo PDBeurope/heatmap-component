@@ -20,7 +20,6 @@ export const DefaultTooltipExtensionParams: TooltipExtensionParams<unknown, unkn
     pinnable: true,
 };
 
-// TODO html vs text mode?
 
 export const TooltipExtension: HotmapExtension<TooltipExtensionParams<never, never, never>, typeof DefaultTooltipExtensionParams>
     = HotmapExtension.fromClass({

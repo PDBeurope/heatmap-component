@@ -25,8 +25,7 @@ export interface Extension<TState, TParams extends {}, TDefaults extends TParams
 }
 
 
-
-export type HotmapExtension<TParams extends {}, TDefaults extends TParams> = Extension<State<any, any, any>, TParams, TDefaults> // TODO: State<unknown...> once State is covariant
+export type HotmapExtension<TParams extends {}, TDefaults extends TParams> = Extension<State<any, any, any>, TParams, TDefaults>
 
 
 export class HotmapExtensionBase<TParams extends {}, TX = any, TY = any, TItem = any> implements ExtensionInstance<TParams> {
