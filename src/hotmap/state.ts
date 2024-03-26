@@ -18,7 +18,6 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
     data: Data<TItem>;
     xDomain: Domain<TX>;
     yDomain: Domain<TY>;
-    zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
     xAlignment: XAlignmentMode = 'center';
     yAlignment: YAlignmentMode = 'center';
 
@@ -62,14 +61,14 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
         return { datum, x, y, xIndex, yIndex, sourceEvent: event };
     }
 
-    emitZoom(): void {
-        console.log('emitZoom')
+    emitZoom(origin?: string): void {
+        console.log('emitZoom', origin)
         if (this.boxes.visWorld) {
-            nextIfChanged(this.events.zoom, this.zoomParamFromVisWorld(this.boxes.visWorld));
+            nextIfChanged(this.events.zoom, this.zoomParamFromVisWorld(this.boxes.visWorld, origin));
         }
     }
 
-    private zoomParamFromVisWorld(box: Box | undefined): ZoomEventParam<TX, TY, TItem> {
+    private zoomParamFromVisWorld(box: Box | undefined, origin?: string): ZoomEventParam<TX, TY, TItem> {
         if (!box) return undefined;
 
         const xMinIndex_ = round(box.xmin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
@@ -103,6 +102,8 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
             yLastVisibleIndex,
             yFirstVisible: this.yDomain.values[yFirstVisibleIndex],
             yLastVisible: this.yDomain.values[yLastVisibleIndex],
+
+            origin: origin,
         };
 
     }
@@ -151,9 +152,8 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
     }
 
     /** Enforce change of zoom and return the zoom value after the change */
-    zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined): ZoomEventParam<TX, TY, TItem> {
-        console.log('zoom')
-        if (!this.dom || !this.zoomBehavior) return undefined;
+    zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined, origin?: string): ZoomEventParam<TX, TY, TItem> {
+        // if (!this.dom || !this.zoomBehavior) return undefined;
 
         const visWorldBox = Box.clamp({
             xmin: this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.boxes.wholeWorld.xmin,
@@ -162,17 +162,26 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
             ymax: this.getZoomRequestIndexMagic('y', 'Max', z) ?? this.boxes.wholeWorld.ymax,
         }, this.boxes.wholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
 
-        const xScale = Box.width(this.boxes.canvas) / Box.width(visWorldBox);
-        const yScale = Box.height(this.boxes.canvas) / Box.height(visWorldBox);
+        this.zoomToVisWorld(visWorldBox, origin);
 
-        const transform = d3.zoomIdentity.scale(xScale).translate(-visWorldBox.xmin, 0);
-        this.zoomBehavior.transform(this.dom.svg as any, transform);
-        return this.zoomParamFromVisWorld(visWorldBox);
+        // const xScale = Box.width(this.boxes.canvas) / Box.width(visWorldBox);
+        // const yScale = Box.height(this.boxes.canvas) / Box.height(visWorldBox);
+        // const transform = d3.zoomIdentity.scale(xScale).translate(-visWorldBox.xmin, 0);
+        // this.zoomBehavior.transform(this.dom.svg as any, transform);
+
+        return this.zoomParamFromVisWorld(visWorldBox, origin);
+    }
+
+    zoomToVisWorld(visWorldBox: Box, origin?: string): void {
+        console.log('zoom', origin)
+        this.boxes.visWorld = visWorldBox;
+        this.scales = Scales(this.boxes);
+        this.emitZoom(origin);
     }
 
     /** Return current zoom */
     getZoom(): ZoomEventParam<TX, TY, TItem> {
-        return this.zoomParamFromVisWorld(this.boxes.visWorld);
+        return this.zoomParamFromVisWorld(this.boxes.visWorld, undefined);
     }
 
 }

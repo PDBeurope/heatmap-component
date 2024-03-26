@@ -116,7 +116,7 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
                 // y: this.state.data.nRows,
                 y: yResolution * Box.height(this.state.boxes.wholeWorld) / (Box.height(this.state.boxes.visWorld)),
             });
-            console.log('downsampled', downsampledImage.nColumns, downsampledImage.nRows);
+            // console.log('downsampled', downsampledImage.nColumns, downsampledImage.nRows);
             // console.timeEnd('downsample')
             return this.drawThisImage(downsampledImage, this.state.data.nColumns / downsampledImage.nColumns, this.state.data.nRows / downsampledImage.nRows);
         }

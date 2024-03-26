@@ -113,6 +113,9 @@ export type ZoomEventParam<TX, TY, TItem> = {
     yFirstVisible: TY,
     /** Y value of the last (at least partially) visible row` */
     yLastVisible: TY,
+
+    /** Identifies the originator of the zoom event (this is to avoid infinite loop when multiple component listen to zoom and change it) */
+    origin?: string,
 } | undefined
 
 
@@ -357,28 +360,13 @@ export class Heatmap<TX, TY, TItem> {
     setAlignment(x: XAlignmentMode | undefined, y: YAlignmentMode | undefined): this {
         if (x) this.state.xAlignment = x;
         if (y) this.state.yAlignment = y;
-        this.state.emitZoom();
+        this.state.emitZoom('setAlignment');
         return this;
     }
 
     /** Enforce change of zoom and return the zoom value after the change */
-    zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined): ZoomEventParam<TX, TY, TItem> {
-        return this.state.zoom(z);
-        // if (!this.state.dom || !this.state.zoomBehavior) return undefined;
-
-        // const visWorldBox = Box.clamp({
-        //     xmin: this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.state.boxes.wholeWorld.xmin,
-        //     xmax: this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.state.boxes.wholeWorld.xmax,
-        //     ymin: this.getZoomRequestIndexMagic('y', 'Min', z) ?? this.state.boxes.wholeWorld.ymin,
-        //     ymax: this.getZoomRequestIndexMagic('y', 'Max', z) ?? this.state.boxes.wholeWorld.ymax,
-        // }, this.state.boxes.wholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
-
-        // const xScale = Box.width(this.state.boxes.canvas) / Box.width(visWorldBox);
-        // const yScale = Box.height(this.state.boxes.canvas) / Box.height(visWorldBox);
-
-        // const transform = d3.zoomIdentity.scale(xScale).translate(-visWorldBox.xmin, 0);
-        // this.state.zoomBehavior.transform(this.state.dom.svg as any, transform);
-        // return this.zoomParamFromVisWorld(visWorldBox);
+    zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined, origin?: string): ZoomEventParam<TX, TY, TItem> {
+        return this.state.zoom(z, origin);
     }
 
     /** Return current zoom */

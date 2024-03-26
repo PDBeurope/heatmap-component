@@ -13,6 +13,7 @@ const PAN_SENSITIVITY = 0.6;
 const MIN_ZOOMED_DATAPOINTS = 1;
 // TODO move consts to params
 
+
 export interface ZoomExtensionParams {
     /** Only interpret scrolling as zoom when the Control key is pressed. */
     scrollRequireCtrl: boolean,
@@ -22,54 +23,78 @@ export const DefaultZoomExtensionParams: ZoomExtensionParams = {
     scrollRequireCtrl: false,
 };
 
+
+// TODO continue here refactoring ZoomExtension
 export const ZoomExtension = HotmapExtension.fromClass({
     name: 'builtin.zoom',
     defaultParams: DefaultZoomExtensionParams,
     class: class extends HotmapExtensionBase<ZoomExtensionParams> {
+        private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
+
         register() {
             super.register();
             this.subscribe(this.state.events.render, () => this.addZoomBehavior());
-            this.subscribe(this.state.events.data, () => this.adjustZoomExtent());
+            this.subscribe(this.state.events.data, () => {
+                this.adjustZoomExtent('data');
+                this.adjustZoom();
+            });
+            this.subscribe(this.state.events.resize, e => {
+                console.log('resize', e)
+                this.adjustZoomExtent('resize');
+                this.adjustZoom();
+            });
+            this.subscribe(this.state.events.zoom, e => {
+                if (e?.origin !== ZoomExtension.name) { // ignore own events
+                    this.adjustZoom();
+                }
+            });
         }
 
         private addZoomBehavior() {
             if (!this.state.dom) return;
-            if (this.state.zoomBehavior) {
+            if (this.zoomBehavior) {
                 // Remove any old behavior
-                this.state.zoomBehavior.on('zoom', null);
+                this.zoomBehavior.on('zoom', null);
             }
-            this.state.zoomBehavior = d3.zoom();
-            this.state.zoomBehavior.filter(e => (e instanceof WheelEvent) ? (this.wheelAction(e).kind === 'zoom') : true);
-            this.state.zoomBehavior.wheelDelta(e => {
+            this.zoomBehavior = d3.zoom();
+            this.zoomBehavior.filter(e => (e instanceof WheelEvent) ? (this.wheelAction(e).kind === 'zoom') : true);
+            this.zoomBehavior.wheelDelta(e => {
                 // Default function is: -e.deltaY * (e.deltaMode === 1 ? 0.05 : e.deltaMode ? 1 : 0.002) * (e.ctrlKey ? 10 : 1)
                 const action = this.wheelAction(e);
                 return action.kind === 'zoom' ? ZOOM_SENSITIVITY * action.delta : 0;
             });
-            this.state.zoomBehavior.on('zoom', e => {
-                console.log('onzoom')
-                this.state.boxes.visWorld = this.zoomTransformToVisWorld(e.transform);
-                this.state.scales = Scales(this.state.boxes);
-                this.state.events.hover.next(this.state.getPointedItem(e.sourceEvent));
-                this.state.emitZoom();
+            this.zoomBehavior.on('zoom', e => {
+                const real = !!e.sourceEvent;
+                const visWorld = this.zoomTransformToVisWorld(e.transform);
+                console.log('onzoom', real, visWorld.xmin, visWorld.xmax, visWorld.ymin, visWorld.ymax);
+                if (real) {
+                    this.state.zoomToVisWorld(visWorld, ZoomExtension.name);
+                    this.state.events.hover.next(this.state.getPointedItem(e.sourceEvent));
+                }
             });
             this.state.dom.svg.on('wheel', (e: WheelEvent) => this.handleWheel(e));
             // wheel event must be subscribed before setting zoom. or must it?
-            this.state.dom.svg.call(this.state.zoomBehavior as any);
+            this.state.dom.svg.call(this.zoomBehavior as any);
             // .on('wheel', e => e.preventDefault()); // Prevent fallback to normal scroll when on min/max zoom
-            this.state.events.resize.subscribe(() => this.adjustZoomExtent());
         }
 
-        private adjustZoomExtent() {
-            if (!this.state.zoomBehavior) return;
-            this.state.zoomBehavior.translateExtent([[this.state.boxes.wholeWorld.xmin, -Infinity], [this.state.boxes.wholeWorld.xmax, Infinity]]);
+        private adjustZoomExtent(debugCause: string) {
+            console.log('adjustZoomExtent', debugCause, !!this.zoomBehavior)
+            if (!this.state.dom) return;
+            if (!this.zoomBehavior) return;
+            this.zoomBehavior.translateExtent([[this.state.boxes.wholeWorld.xmin, -Infinity], [this.state.boxes.wholeWorld.xmax, Infinity]]);
             const canvasWidth = Box.width(this.state.boxes.canvas);
             const wholeWorldWidth = Box.width(this.state.boxes.wholeWorld);
             const minZoom = canvasWidth / wholeWorldWidth; // zoom-out
             const maxZoom = Math.max(canvasWidth / MIN_ZOOMED_DATAPOINTS, minZoom); // zoom-in
-            this.state.zoomBehavior.scaleExtent([minZoom, maxZoom]);
-            this.state.zoomBehavior.extent([[this.state.boxes.canvas.xmin, this.state.boxes.canvas.ymin], [this.state.boxes.canvas.xmax, this.state.boxes.canvas.ymax]]);
+            this.zoomBehavior.scaleExtent([minZoom, maxZoom]);
+            this.zoomBehavior.extent([[this.state.boxes.canvas.xmin, this.state.boxes.canvas.ymin], [this.state.boxes.canvas.xmax, this.state.boxes.canvas.ymax]]);
+        }
+
+        private adjustZoom() {
+            if (!this.zoomBehavior) return;
             const currentZoom = this.visWorldToZoomTransform(this.state.boxes.visWorld);
-            this.state.zoomBehavior.transform(this.state.dom?.svg as any, currentZoom);
+            this.zoomBehavior.transform(this.state.dom?.svg as any, currentZoom);
         }
 
         private zoomTransformToVisWorld(transform: { k: number, x: number, y: number }): Box {
@@ -140,11 +165,11 @@ export const ZoomExtension = HotmapExtension.fromClass({
             this.state.lastWheelEvent.timestamp = now;
             this.state.lastWheelEvent.absDelta = absDelta;
 
-            if (this.state.zoomBehavior) {
+            if (this.zoomBehavior) {
                 const action = this.wheelAction(e);
                 if (action.kind === 'pan') {
                     const shiftX = PAN_SENSITIVITY * scaleDistance(this.state.scales.canvasToWorld.x, action.deltaX);
-                    this.state.zoomBehavior.duration(1000).translateBy(this.state.dom.svg as any, shiftX, 0);
+                    this.zoomBehavior.duration(1000).translateBy(this.state.dom.svg as any, shiftX, 0);
                 }
                 if (action.kind === 'showHelp') {
                     this.showScrollingMessage();
