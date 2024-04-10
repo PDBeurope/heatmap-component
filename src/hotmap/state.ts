@@ -34,9 +34,13 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
     scales: Scales;
 
     public readonly events = {
+        /** Fires when the user hovers over the component */
         hover: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
+        /** Fires when the user selects/deselects a data item (e.g. by clicking on it) */
         click: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
+        /** Fires when the component is zoomed in or out, or panned (translated) */
         zoom: new BehaviorSubject<ZoomEventParam<TX, TY, TItem>>(undefined),
+        /** Fires when the window is resized */
         resize: new BehaviorSubject<Box | undefined>(undefined),
         /** Fires when the visualized data change (including filter or domain change) */
         data: new BehaviorSubject<Data<TItem> | undefined>(undefined),
@@ -62,7 +66,6 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
     }
 
     emitZoom(origin?: string): void {
-        console.log('emitZoom', origin)
         if (this.boxes.visWorld) {
             nextIfChanged(this.events.zoom, this.zoomParamFromVisWorld(this.boxes.visWorld, origin));
         }
@@ -153,8 +156,6 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
 
     /** Enforce change of zoom and return the zoom value after the change */
     zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined, origin?: string): ZoomEventParam<TX, TY, TItem> {
-        // if (!this.dom || !this.zoomBehavior) return undefined;
-
         const visWorldBox = Box.clamp({
             xmin: this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.boxes.wholeWorld.xmin,
             xmax: this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.boxes.wholeWorld.xmax,
@@ -163,17 +164,10 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
         }, this.boxes.wholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
 
         this.zoomVisWorldBox(visWorldBox, origin);
-
-        // const xScale = Box.width(this.boxes.canvas) / Box.width(visWorldBox);
-        // const yScale = Box.height(this.boxes.canvas) / Box.height(visWorldBox);
-        // const transform = d3.zoomIdentity.scale(xScale).translate(-visWorldBox.xmin, 0);
-        // this.zoomBehavior.transform(this.dom.svg as any, transform);
-
         return this.zoomParamFromVisWorld(visWorldBox, origin);
     }
 
     zoomVisWorldBox(visWorldBox: Box, origin?: string): void {
-        console.log('zoom', origin)
         this.boxes.visWorld = visWorldBox;
         this.scales = Scales(this.boxes);
         this.emitZoom(origin);

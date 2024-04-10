@@ -5,20 +5,14 @@ import { attrd } from '../utils';
 import { HotmapExtension, HotmapExtensionBase } from './extension';
 
 
-/** Only allow zooming with scrolling gesture when Ctrl key (or Meta key, i.e. Command/Windows) is pressed.
- * If `false`, zooming is allowed always, but Ctrl or Meta key makes it faster. */
-const ZOOM_REQUIRE_CTRL = false;
-const ZOOM_SENSITIVITY = 1;
-const PAN_SENSITIVITY = 0.6;
-const MIN_ZOOMED_DATAPOINTS = 1;
-// TODO move consts to params
-
-
 export interface ZoomExtensionParams {
-    /** Only interpret scrolling as zoom when the Control key is pressed. */
+    /** Only interpret scrolling as zoom when the Control key is pressed (or Meta key, i.e. Command/Windows).  If `false`, zooming is allowed always, but Ctrl or Meta key makes it faster. */
     scrollRequireCtrl: boolean,
+    /** Adjust how sensitive zooming is to wheel events */
     zoomSensitivity: number;
+    /** Adjust how sensitive panning is to wheel events */
     panSensitivity: number;
+    /** Smallest width or height that can be zoomed in (expressed as number of data items) */
     minZoomedDatapoints: number;
 }
 
@@ -41,12 +35,11 @@ export const ZoomExtension = HotmapExtension.fromClass({
             super.register();
             this.subscribe(this.state.events.render, () => this.addZoomBehavior());
             this.subscribe(this.state.events.data, () => {
-                this.adjustZoomExtent('data');
+                this.adjustZoomExtent();
                 this.adjustZoom();
             });
             this.subscribe(this.state.events.resize, e => {
-                console.log('resize', e)
-                this.adjustZoomExtent('resize');
+                this.adjustZoomExtent();
                 this.adjustZoom();
             });
             this.subscribe(this.state.events.zoom, e => {
@@ -54,6 +47,10 @@ export const ZoomExtension = HotmapExtension.fromClass({
                     this.adjustZoom();
                 }
             });
+        }
+        update(params: Partial<ZoomExtensionParams>): void {
+            super.update(params);
+            this.adjustZoomExtent();
         }
 
         private addZoomBehavior() {
@@ -67,7 +64,7 @@ export const ZoomExtension = HotmapExtension.fromClass({
             this.zoomBehavior.wheelDelta(e => {
                 // Default function is: -e.deltaY * (e.deltaMode === 1 ? 0.05 : e.deltaMode ? 1 : 0.002) * (e.ctrlKey ? 10 : 1)
                 const action = this.wheelAction(e);
-                return action.kind === 'zoom' ? ZOOM_SENSITIVITY * action.delta : 0;
+                return action.kind === 'zoom' ? this.params.zoomSensitivity * action.delta : 0;
             });
             this.zoomBehavior.on('zoom', e => this.handleZoom(e));
 
@@ -78,7 +75,6 @@ export const ZoomExtension = HotmapExtension.fromClass({
         /** Handle zoom event coming from the D3 zoom behavior */
         private handleZoom(e: any) {
             const visWorld = this.zoomTransformToVisWorld(e.transform);
-            console.log('onzoom', !!e.sourceEvent, visWorld.xmin, visWorld.xmax, visWorld.ymin, visWorld.ymax);
             this.state.zoomVisWorldBox(visWorld, ZoomExtension.name);
             if (!!e.sourceEvent) {
                 this.state.events.hover.next(this.state.getPointedItem(e.sourceEvent));
@@ -87,7 +83,6 @@ export const ZoomExtension = HotmapExtension.fromClass({
 
         /** Handle event coming directly from the mouse wheel (customizes basic D3 zoom behavior) */
         private handleWheel(e: WheelEvent) {
-            console.log('handleWheel', e)
             if (!this.state.dom) return;
             e.preventDefault(); // avoid scrolling or previous-page gestures
 
@@ -97,7 +92,7 @@ export const ZoomExtension = HotmapExtension.fromClass({
             if (this.zoomBehavior) {
                 const action = this.wheelAction(e);
                 if (action.kind === 'pan') {
-                    const shiftX = PAN_SENSITIVITY * scaleDistance(this.state.scales.canvasToWorld.x, action.deltaX);
+                    const shiftX = this.params.panSensitivity * scaleDistance(this.state.scales.canvasToWorld.x, action.deltaX);
                     this.zoomBehavior.duration(1000).translateBy(this.state.dom.svg as any, shiftX, 0);
                 }
                 if (action.kind === 'showHelp') {
@@ -122,15 +117,14 @@ export const ZoomExtension = HotmapExtension.fromClass({
             this.currentWheelGesture.lastAbsDelta = absDelta;
         }
 
-        private adjustZoomExtent(debugCause: string) {
-            console.log('adjustZoomExtent', debugCause, !!this.zoomBehavior)
+        private adjustZoomExtent() {
             if (!this.state.dom) return;
             if (!this.zoomBehavior) return;
             this.zoomBehavior.translateExtent([[this.state.boxes.wholeWorld.xmin, -Infinity], [this.state.boxes.wholeWorld.xmax, Infinity]]);
             const canvasWidth = Box.width(this.state.boxes.canvas);
             const wholeWorldWidth = Box.width(this.state.boxes.wholeWorld);
             const minZoom = canvasWidth / wholeWorldWidth; // zoom-out
-            const maxZoom = Math.max(canvasWidth / MIN_ZOOMED_DATAPOINTS, minZoom); // zoom-in
+            const maxZoom = Math.max(canvasWidth / this.params.minZoomedDatapoints, minZoom); // zoom-in
             this.zoomBehavior.scaleExtent([minZoom, maxZoom]);
             this.zoomBehavior.extent([[this.state.boxes.canvas.xmin, this.state.boxes.canvas.ymin], [this.state.boxes.canvas.xmax, this.state.boxes.canvas.ymax]]);
         }
@@ -175,7 +169,7 @@ export const ZoomExtension = HotmapExtension.fromClass({
             const isVertical = Math.abs(e.deltaX) < Math.abs(e.deltaY);
 
             const modeSpeed = (e.deltaMode === 1) ? 25 : e.deltaMode ? 500 : 1; // scroll in lines vs pages vs pixels
-            const speedup = ZOOM_REQUIRE_CTRL ? 1 : (this.currentWheelGesture.ctrlKey || this.currentWheelGesture.metaKey ? 10 : 1);
+            const speedup = this.params.scrollRequireCtrl ? 1 : (this.currentWheelGesture.ctrlKey || this.currentWheelGesture.metaKey ? 10 : 1);
 
             if (isHorizontal) {
                 return { kind: 'pan', deltaX: -e.deltaX * modeSpeed * speedup, deltaY: 0 };
@@ -184,7 +178,7 @@ export const ZoomExtension = HotmapExtension.fromClass({
                 if (this.currentWheelGesture.shiftKey) {
                     return { kind: 'pan', deltaX: -e.deltaY * modeSpeed * speedup, deltaY: 0 };
                 }
-                if (ZOOM_REQUIRE_CTRL && !this.currentWheelGesture.ctrlKey && !this.currentWheelGesture.metaKey) {
+                if (this.params.scrollRequireCtrl && !this.currentWheelGesture.ctrlKey && !this.currentWheelGesture.metaKey) {
                     return (Math.abs(e.deltaY) * modeSpeed >= 5) ? { kind: 'showHelp' } : { kind: 'ignore' };
                 }
                 return { kind: 'zoom', delta: -e.deltaY * 0.002 * modeSpeed * speedup };

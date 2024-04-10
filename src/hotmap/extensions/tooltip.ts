@@ -36,14 +36,6 @@ export const TooltipExtension: HotmapExtension<TooltipExtensionParams<never, nev
                 this.subscribe(this.state.events.zoom, () => this.updatePinnedTooltipPosition());
                 this.subscribe(this.state.events.resize, () => this.updatePinnedTooltipPosition());
             }
-            // update(params: TooltipExtensionParams<TX, TY, TItem>) {
-            //     console.log('Updating Blabla')
-            //     super.update(params);
-            // }
-            // unregister() {
-            //     console.log('Unregistering Blabla')
-            //     super.unregister();
-            // }
 
             private drawTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
                 if (!this.state.dom) return;

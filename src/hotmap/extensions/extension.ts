@@ -74,23 +74,24 @@ export const HotmapExtension = {
     },
 };
 
-interface SampleExtensionParams { }
-const DefaultSampleExtensionParams: SampleExtensionParams = {};
 
-export const SampleExtension = HotmapExtension.fromClass({
-    name: 'builtin.sample',
-    defaultParams: DefaultSampleExtensionParams,
-    class: class extends HotmapExtensionBase<SampleExtensionParams> {
+interface ExampleExtensionParams { }
+const DefaultExampleExtensionParams: ExampleExtensionParams = {};
+
+export const ExampleExtension = HotmapExtension.fromClass({
+    name: 'builtin.example',
+    defaultParams: DefaultExampleExtensionParams,
+    class: class extends HotmapExtensionBase<ExampleExtensionParams> {
         register() {
             super.register();
-            console.log('Registering SampleExtension', this.state, this.params);
+            console.log('Registering ExampleExtension', this.state, this.params);
         }
-        update(params: Partial<SampleExtensionParams>) {
+        update(params: Partial<ExampleExtensionParams>) {
             super.update(params);
-            console.log('Updating SampleExtension with params', params);
+            console.log('Updating ExampleExtension with params', params);
         }
         unregister() {
-            console.log('Unregistering SampleExtension');
+            console.log('Unregistering ExampleExtension');
             super.unregister();
         }
     }

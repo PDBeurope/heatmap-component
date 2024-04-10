@@ -5,12 +5,12 @@ import { Data } from './data';
 import { Domain } from './domain';
 import { DefaultNumericColorProviderFactory, DrawExtension, DrawExtensionParams, VisualParams } from './extensions/draw';
 import { ExtensionInstance, ExtensionInstanceRegistration, HotmapExtension } from './extensions/extension';
-import { MarkerExtension } from './extensions/marker';
+import { MarkerExtension, MarkerExtensionParams } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 import { Box, Scales, scaleDistance } from './scales';
 import { MIN_ZOOMED_DATAPOINTS_HARD, State } from './state';
 import { attrd, getSize, nextIfChanged, removeElement } from './utils';
-import { ZoomExtension } from './extensions/zoom';
+import { ZoomExtension, ZoomExtensionParams } from './extensions/zoom';
 
 
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
@@ -148,8 +148,10 @@ export class Heatmap<TX, TY, TItem> {
     }
 
     readonly extensions: {
+        marker?: ExtensionInstanceRegistration<MarkerExtensionParams>,
         tooltip?: ExtensionInstanceRegistration<TooltipExtensionParams<TX, TY, TItem>>,
         draw?: ExtensionInstanceRegistration<DrawExtensionParams<TX, TY, TItem>>,
+        zoom?: ExtensionInstanceRegistration<ZoomExtensionParams>,
     } = {};
 
     /** Create a new `Heatmap` and set `data` */
@@ -186,10 +188,10 @@ export class Heatmap<TX, TY, TItem> {
             colorProvider = DefaultNumericColorProviderFactory(dataRange.min, dataRange.max) as Provider<TX, TY, TItem, Color>;
             // (this as unknown as Heatmap<TX, TY, number>).setColor(colorProvider);
         }
-        this.registerBehavior(MarkerExtension);
+        this.extensions.marker = this.registerBehavior(MarkerExtension);
         this.extensions.tooltip = this.registerBehavior(TooltipExtension);
         this.extensions.draw = this.registerBehavior(DrawExtension, { colorProvider });
-        this.registerBehavior(ZoomExtension);
+        this.extensions.zoom = this.registerBehavior(ZoomExtension);
     }
 
 

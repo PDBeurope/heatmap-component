@@ -55,7 +55,6 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
 
         register() {
             super.register();
-            console.log('Registering DrawExtension', this.state, this.params);
             this.subscribe(this.state.events.render, () => {
                 if (!this.state.dom) return;
                 const ctx = this.state.dom.canvas.node()?.getContext('2d');
@@ -71,7 +70,6 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
             });
         }
         update(params: Partial<DrawExtensionParams<TX, TY, TItem>>) {
-            console.log('Updating DrawExtension with params', params);
             if (params.colorProvider !== this.params.colorProvider) {
                 this.downsampler = undefined;
             }
@@ -79,7 +77,6 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
             this.requestDraw();
         }
         unregister() {
-            console.log('Unregistering DrawExtension');
             super.unregister();
         }
 
@@ -113,10 +110,8 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
             // console.time('downsample')
             const downsampledImage = Downsampler.getDownsampled(this.downsampler, {
                 x: xResolution * Box.width(this.state.boxes.wholeWorld) / (Box.width(this.state.boxes.visWorld)),
-                // y: this.state.data.nRows,
                 y: yResolution * Box.height(this.state.boxes.wholeWorld) / (Box.height(this.state.boxes.visWorld)),
             });
-            // console.log('downsampled', downsampledImage.nColumns, downsampledImage.nRows);
             // console.timeEnd('downsample')
             return this.drawThisImage(downsampledImage, this.state.data.nColumns / downsampledImage.nColumns, this.state.data.nRows / downsampledImage.nRows);
         }
