@@ -32,7 +32,6 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
     };
     boxes: Boxes;
     scales: Scales;
-    readonly lastWheelEvent = { timestamp: 0, absDelta: 0, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false };
 
     public readonly events = {
         hover: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
@@ -46,6 +45,7 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
     } as const;
 
 
+    /** Return data item that is being pointed by the mouse in `event` */
     getPointedItem(event: MouseEvent | undefined): ItemEventParam<TX, TY, TItem> {
         if (!event) {
             return undefined;
@@ -162,7 +162,7 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
             ymax: this.getZoomRequestIndexMagic('y', 'Max', z) ?? this.boxes.wholeWorld.ymax,
         }, this.boxes.wholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
 
-        this.zoomToVisWorld(visWorldBox, origin);
+        this.zoomVisWorldBox(visWorldBox, origin);
 
         // const xScale = Box.width(this.boxes.canvas) / Box.width(visWorldBox);
         // const yScale = Box.height(this.boxes.canvas) / Box.height(visWorldBox);
@@ -172,7 +172,7 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
         return this.zoomParamFromVisWorld(visWorldBox, origin);
     }
 
-    zoomToVisWorld(visWorldBox: Box, origin?: string): void {
+    zoomVisWorldBox(visWorldBox: Box, origin?: string): void {
         console.log('zoom', origin)
         this.boxes.visWorld = visWorldBox;
         this.scales = Scales(this.boxes);
