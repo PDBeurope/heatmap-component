@@ -1,13 +1,12 @@
 import { Observable, Observer, Unsubscribable } from 'rxjs';
-import { State } from '../state';
-import { removeElement, shallowMerge } from '../utils';
+import { State } from './state';
+import { removeElement, shallowMerge } from './utils';
 
 
 export interface ExtensionInstance<TParams extends {}> {
     register: () => void,
     update: (params: Partial<TParams>) => void,
     unregister: () => void,
-    // params: TParams,
 }
 
 export interface ExtensionInstanceRegistration<TParams extends {}> {

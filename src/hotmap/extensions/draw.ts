@@ -1,11 +1,12 @@
 import { clamp, isNil } from 'lodash';
-import { Color } from '../color';
-import { Data, Image } from '../data';
-import { Downsampler } from '../downsampling';
+import { Color } from '../data/color';
+import { Array2D } from '../data/array2d';
+import { Downsampler } from '../data/downsampling';
+import { Image } from '../data/image';
 import { Provider } from '../heatmap';
 import { Box, scaleDistance } from '../scales';
 import { Refresher, minimum } from '../utils';
-import { HotmapExtension, HotmapExtensionBase } from './extension';
+import { HotmapExtension, HotmapExtensionBase } from '../extension';
 
 
 /** Size of rectangle in pixels, when showing gaps is switched on (for smaller sizes off, to avoid Moire patterns) */
@@ -85,7 +86,7 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
             const image = Image.create(this.state.data.nColumns, this.state.data.nRows);
             for (let iy = 0; iy < this.state.data.nRows; iy++) {
                 for (let ix = 0; ix < this.state.data.nColumns; ix++) {
-                    const item = Data.getItem(this.state.data, ix, iy);
+                    const item = Array2D.getItem(this.state.data, ix, iy);
                     if (item === undefined) continue; // keep transparent black
                     const color = this.params.colorProvider(item, this.state.xDomain.values[ix], this.state.yDomain.values[iy], ix, iy);
                     const c = (typeof color === 'string') ? Color.fromString(color) : color;

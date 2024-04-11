@@ -1,4 +1,4 @@
-/** Entrypoint the bundle */
+/** Entrypoint for the bundle */
 
 import * as Hotmap from './main';
 

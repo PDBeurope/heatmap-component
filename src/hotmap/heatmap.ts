@@ -1,16 +1,16 @@
-import { clamp, isNil, range, round } from 'lodash';
-import { Color } from './color';
+import { range } from 'lodash';
 import * as d3 from './d3-modules';
-import { Data } from './data';
-import { Domain } from './domain';
+import { Array2D } from './data/array2d';
+import { Color } from './data/color';
+import { Domain } from './data/domain';
+import { ExtensionInstance, ExtensionInstanceRegistration, HotmapExtension } from './extension';
 import { DefaultNumericColorProviderFactory, DrawExtension, DrawExtensionParams, VisualParams } from './extensions/draw';
-import { ExtensionInstance, ExtensionInstanceRegistration, HotmapExtension } from './extensions/extension';
 import { MarkerExtension, MarkerExtensionParams } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
-import { Box, Scales, scaleDistance } from './scales';
-import { MIN_ZOOMED_DATAPOINTS_HARD, State } from './state';
-import { attrd, getSize, nextIfChanged, removeElement } from './utils';
 import { ZoomExtension, ZoomExtensionParams } from './extensions/zoom';
+import { Box, Scales } from './scales';
+import { MIN_ZOOMED_DATAPOINTS_HARD, State } from './state';
+import { attrd, getSize, removeElement } from './utils';
 
 
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
@@ -184,7 +184,7 @@ export class Heatmap<TX, TY, TItem> {
 
         let colorProvider: Provider<TX, TY, TItem, Color> | undefined = undefined;
         if (this.state.data.isNumeric) {
-            const dataRange = Data.getRange(this.state.data as Data<number>);
+            const dataRange = Array2D.getRange(this.state.data as Array2D<number>);
             colorProvider = DefaultNumericColorProviderFactory(dataRange.min, dataRange.max) as Provider<TX, TY, TItem, Color>;
             // (this as unknown as Heatmap<TX, TY, number>).setColor(colorProvider);
         }
@@ -255,7 +255,7 @@ export class Heatmap<TX, TY, TItem> {
         this.events.resize.next(box);
     }
 
-    private setRawData(data: Data<TItem>): this {
+    private setRawData(data: Array2D<TItem>): this {
         this.state.data = data;
         if (this.state.boxes) {
             const newWholeWorld = Box.create(0, 0, data.nColumns, data.nRows);
@@ -374,14 +374,13 @@ export class Heatmap<TX, TY, TItem> {
     /** Return current zoom */
     getZoom(): ZoomEventParam<TX, TY, TItem> {
         return this.state.getZoom();
-        // return this.zoomParamFromVisWorld(this.state.boxes.visWorld);
     }
 
 }
 
 
 function makeRandomData(nColumns: number, nRows: number): DataDescription<number, number, number> {
-    const raw = Data.createRandom(nColumns, nRows);
+    const raw = Array2D.createRandom(nColumns, nRows);
     return {
         items: raw.items as number[],
         x: (d, i) => i % nColumns,

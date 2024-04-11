@@ -1,7 +1,7 @@
 import { clamp, range } from 'lodash';
-import * as d3 from './d3-modules';
-import { Image } from './data';
+import * as d3 from '../d3-modules';
 import { Domain } from './domain';
+import { Image } from './image';
 
 
 /** Like ArrayLike<T> but allows writing (includes T[], Float32Array, etc.) */

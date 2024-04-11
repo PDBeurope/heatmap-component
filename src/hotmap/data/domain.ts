@@ -1,11 +1,12 @@
 import { clamp, sortedIndex, sortedIndexBy } from 'lodash';
-import { IsNumeric, sortDirection } from './utils';
+import { IsNumeric, sortDirection } from '../utils';
 
 
+/** Represents a list of values corresponding to X (columns) or Y (rows) coordinates in a heatmap */
 export interface Domain<T> {
     /** Values in the domain */
     values: T[],
-    /** Mapping of values to their index in the domain */
+    /** Mapping of values to their index in the domain (i.e. column or row index) */
     index: Map<T, number>,
     /** Flags whether all values within the domain are numbers */
     isNumeric: IsNumeric<T>,
@@ -14,19 +15,20 @@ export interface Domain<T> {
 }
 
 export const Domain = {
+    /** Create a `Domain` object with given values. */
     create<T>(values: T[]): Domain<T> {
         const isNumeric = values.every(v => typeof v === 'number') as IsNumeric<T>;
         return {
             values,
             isNumeric,
             sortDirection: isNumeric ? sortDirection(values as number[]) : 'none',
-            index: _createIndex(values),
+            index: createIndex(values),
         };
     },
 
-    /** For numeric domain:
-     * return `domain.values[index]` if `index` is an integer within [0, domain.values.length);
-     * interpolate/extrapolate if `index` is non-integer number or out of range.
+    /** For numeric domain: convert index to value, i.e.
+     * return `index`-th value of the domain if `index` is an integer within [0, domain.values.length);
+     * interpolate/extrapolate if `index` is a non-integer number or out of range.
      * For non-numeric domain: always return `undefined`. */
     interpolateValue<T>(domain: Domain<T>, index: number): T extends number ? number : undefined {
         if (domain.isNumeric) {
@@ -46,28 +48,27 @@ export const Domain = {
         if (!domain.isNumeric) {
             console.warn('Cannot interpolate index because the domain is not numeric');
             return undefined;
-        } else {
-            return _getIndexWithInterpolation(domain as Domain<number>, value as number);
         }
+        if (typeof value !== 'number') {
+            console.warn('Cannot interpolate index because the value is not numeric');
+            return undefined;
+        }
+        const { sortDirection, values } = domain as Domain<number>;
+        if (sortDirection === 'none') {
+            console.warn('Cannot interpolate index because the domain is not sorted');
+            return undefined;
+        }
+        let nextIndex = (sortDirection === 'asc') ? sortedIndex(values, value) : sortedIndexBy(values, value, v => -v);
+        nextIndex = clamp(nextIndex, 1, values.length - 1);
+        const previousIndex = nextIndex - 1;
+        const previousValue = values[previousIndex];
+        const nextValue = values[nextIndex];
+        return (value - previousValue) / (nextValue - previousValue) + previousIndex;
     },
 };
 
-
-function _getIndexWithInterpolation(domain: Domain<number>, value: number): number | undefined {
-    if (domain.sortDirection === 'none') {
-        console.warn('Cannot interpolate index because the domain is not sorted');
-        return undefined;
-    }
-    let nextIndex = domain.sortDirection === 'asc' ? sortedIndex(domain.values, value) : sortedIndexBy(domain.values, value, v => -v);
-    nextIndex = clamp(nextIndex, 1, domain.values.length - 1);
-    const previousIndex = nextIndex - 1;
-    const previousValue = domain.values[previousIndex];
-    const nextValue = domain.values[nextIndex];
-    return (value - previousValue) / (nextValue - previousValue) + previousIndex;
-};
-
 /** Create a mapping of values to their index in the array */
-function _createIndex<T>(values: T[]): Map<T, number> {
+function createIndex<T>(values: T[]): Map<T, number> {
     const map = new Map<T, number>();
     const n = values.length;
     for (let i = 0; i < n; i++) {

@@ -1,10 +1,11 @@
-import { Data, Image } from './data';
-import { XY } from './scales';
+import { XY } from '../scales';
+import { Array2D } from './array2d';
+import { Image } from './image';
 
 
 type DownsamplingMode = 'number' | 'image'
 
-type DataType<M extends DownsamplingMode> = M extends 'image' ? Image : M extends 'number' ? Data<number> : never
+type DataType<M extends DownsamplingMode> = M extends 'image' ? Image : M extends 'number' ? Array2D<number> : never
 
 type ResolutionString = `${number}x${number}`
 
@@ -27,7 +28,7 @@ export type Downsampler<TMode extends DownsamplingMode = DownsamplingMode> = {
 
 export const Downsampler = {
     /** Create a new downsampler for a 2D number array */
-    fromNumbers(data: Data<number>): Downsampler<'number'> {
+    fromNumbers(data: Array2D<number>): Downsampler<'number'> {
         const result: Downsampler<'number'> = { mode: 'number', nColumns: data.nColumns, nRows: data.nRows, downsampled: {} };
         set(result, { x: data.nColumns, y: data.nRows }, data);
         return result;
@@ -126,7 +127,7 @@ function downsample<M extends DownsamplingMode>(mode: M, input: DataType<M>, new
 }
 
 /** Downsample 2D array of numbers to a new size. */
-function downsampleNumbers(input: Data<number>, newSize: XY): Data<number> {
+function downsampleNumbers(input: Array2D<number>, newSize: XY): Array2D<number> {
     if (input.nColumns === 2 * newSize.x && input.nRows === newSize.y) {
         return downsampleNumbers_halveX(input);
     }
@@ -137,12 +138,12 @@ function downsampleNumbers(input: Data<number>, newSize: XY): Data<number> {
 }
 
 /** Downsample 2D array of numbers to a new size - implementation for general sizes. */
-function downsampleNumbers_general(input: Data<number>, newSize: { x: number, y: number }): Data<number> {
+function downsampleNumbers_general(input: Array2D<number>, newSize: { x: number, y: number }): Array2D<number> {
     const w0 = input.nColumns;
     const h0 = input.nRows;
     const w1 = newSize.x;
     const h1 = newSize.y;
-    Data.validateLength(input);
+    Array2D.validateLength(input);
     const x = resamplingCoefficients(w0, w1);
     const y = resamplingCoefficients(h0, h1);
     const out = new Float32Array(h1 * w1);
@@ -156,17 +157,17 @@ function downsampleNumbers_general(input: Data<number>, newSize: { x: number, y:
             out[y_to_offset + x.to[j]] += inputValue * y_weight * x.weight[j];
         }
     }
-    const result: Data<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true };
+    const result: Array2D<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true };
     return result;
 }
 
 /** Downsample 2D array of numbers to a new size - simplified implementation for special cases when newX===oldX/2, newY===oldY. */
-function downsampleNumbers_halveX(input: Data<number>): Data<number> {
+function downsampleNumbers_halveX(input: Array2D<number>): Array2D<number> {
     const w0 = input.nColumns;
     const h0 = input.nRows;
     const w1 = Math.floor(w0 / 2);
     const h1 = h0;
-    Data.validateLength(input);
+    Array2D.validateLength(input);
     const out = new Float32Array(w1 * h1);
     for (let i = 0; i < h1; i++) { // row index
         for (let j = 0; j < w1; j++) { // column index
@@ -177,16 +178,16 @@ function downsampleNumbers_halveX(input: Data<number>): Data<number> {
             out[i * w1 + j] = val;
         }
     }
-    const result: Data<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true };
+    const result: Array2D<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true };
     return result;
 }
 /** Downsample 2D array of numbers to a new size - simplified implementation for special cases when newX===oldX, newY===oldY/2. */
-function downsampleNumbers_halveY(input: Data<number>): Data<number> {
+function downsampleNumbers_halveY(input: Array2D<number>): Array2D<number> {
     const w0 = input.nColumns;
     const h0 = input.nRows;
     const w1 = w0;
     const h1 = Math.floor(h0 / 2);
-    Data.validateLength(input);
+    Array2D.validateLength(input);
     const out = new Float32Array(w1 * h1);
     for (let i = 0; i < h1; i++) { // row index
         for (let j = 0; j < w1; j++) { // column index
@@ -197,7 +198,7 @@ function downsampleNumbers_halveY(input: Data<number>): Data<number> {
             out[i * w1 + j] = val;
         }
     }
-    const result: Data<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true };
+    const result: Array2D<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true };
     return result;
 }
 

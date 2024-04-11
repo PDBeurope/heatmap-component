@@ -1,8 +1,8 @@
 import { clamp, isNil, round } from 'lodash';
 import { BehaviorSubject } from 'rxjs';
 import * as d3 from './d3-modules';
-import { Data } from './data';
-import { Domain } from './domain';
+import { Array2D } from './data/array2d';
+import { Domain } from './data/domain';
 import { DataDescription, ItemEventParam, Provider, XAlignmentMode, YAlignmentMode, ZoomEventParam } from './heatmap';
 import { Box, Boxes, Scales } from './scales';
 import { nextIfChanged } from './utils';
@@ -15,7 +15,7 @@ export const MIN_ZOOMED_DATAPOINTS_HARD = 1;
 
 export class State<TX, TY, TItem> { // TODO: try to convert to object if makes sense, ensure mandatory props are set in constructor
     originalData: DataDescription<TX, TY, TItem>;
-    data: Data<TItem>;
+    data: Array2D<TItem>;
     xDomain: Domain<TX>;
     yDomain: Domain<TY>;
     xAlignment: XAlignmentMode = 'center';
@@ -43,7 +43,7 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
         /** Fires when the window is resized */
         resize: new BehaviorSubject<Box | undefined>(undefined),
         /** Fires when the visualized data change (including filter or domain change) */
-        data: new BehaviorSubject<Data<TItem> | undefined>(undefined),
+        data: new BehaviorSubject<Array2D<TItem> | undefined>(undefined),
         /** Fires when the component is initially render in a div */
         render: new BehaviorSubject<undefined>(undefined),
     } as const;
@@ -56,7 +56,7 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
         }
         const xIndex = Math.floor(this.scales.canvasToWorld.x(event.offsetX));
         const yIndex = Math.floor(this.scales.canvasToWorld.y(event.offsetY));
-        const datum = Data.getItem(this.data, xIndex, yIndex);
+        const datum = Array2D.getItem(this.data, xIndex, yIndex);
         if (!datum) {
             return undefined;
         }

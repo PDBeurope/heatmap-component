@@ -2,7 +2,7 @@ import * as d3 from '../d3-modules';
 import { Class } from '../heatmap';
 import { Box, scaleDistance } from '../scales';
 import { attrd } from '../utils';
-import { HotmapExtension, HotmapExtensionBase } from './extension';
+import { HotmapExtension, HotmapExtensionBase } from '../extension';
 
 
 export interface ZoomExtensionParams {

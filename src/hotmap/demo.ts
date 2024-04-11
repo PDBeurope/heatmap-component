@@ -80,17 +80,17 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
             console.log('clicking', e.datum, e.x, e.y, e.xIndex, e.yIndex, e.sourceEvent);
         }
     });
-    // hm.events.zoom.subscribe(e => {
-    //     if (!e) {
-    //         console.log('zooming nothing');
-    //     } else {
-    //         console.log('zooming', e.xMinIndex, e.xMaxIndex, 'values', e.xMin, e.xMax, e);
-    //         d3.select('#xminindex').text(e.xMinIndex);
-    //         d3.select('#xmaxindex').text(e.xMaxIndex);
-    //         d3.select('#xmin').text(e.xMin);
-    //         d3.select('#xmax').text(e.xMax);
-    //     }
-    // });
+    hm.events.zoom.subscribe(e => {
+        if (!e) {
+            // console.log('zooming nothing');
+        } else {
+            // console.log('zooming', e.xMinIndex, e.xMaxIndex, 'values', e.xMin, e.xMax, e);
+            d3.select('#xminindex').text(e.xMinIndex);
+            d3.select('#xmaxindex').text(e.xMaxIndex);
+            d3.select('#xmin').text(e.xMin);
+            d3.select('#xmax').text(e.xMax);
+        }
+    });
     hm.render(divElementOrId);
     (window as any).hm = hm;
 }

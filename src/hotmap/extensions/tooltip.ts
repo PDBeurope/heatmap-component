@@ -1,7 +1,7 @@
 import { Class, ItemEventParam, Provider } from '../heatmap';
 import { Box, XY } from '../scales';
 import { attrd, formatDataItem } from '../utils';
-import { HotmapExtension, HotmapExtensionBase } from './extension';
+import { HotmapExtension, HotmapExtensionBase } from '../extension';
 
 
 function DefaultTooltipProvider(dataItem: unknown, x: unknown, y: unknown, xIndex: number, yIndex: number): string {
