@@ -1,12 +1,12 @@
 import { clamp, isNil } from 'lodash';
-import { Color } from '../data/color';
 import { Array2D } from '../data/array2d';
+import { Color } from '../data/color';
 import { Downsampler } from '../data/downsampling';
 import { Image } from '../data/image';
-import { Provider } from '../heatmap';
-import { Box, scaleDistance } from '../scales';
-import { Refresher, minimum } from '../utils';
 import { HotmapExtension, HotmapExtensionBase } from '../extension';
+import { Box, scaleDistance } from '../scales';
+import { Provider } from '../state';
+import { Refresher, minimum } from '../utils';
 
 
 /** Size of rectangle in pixels, when showing gaps is switched on (for smaller sizes off, to avoid Moire patterns) */
@@ -83,10 +83,10 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
 
         private getColorArray(): Image {
             // console.time('get all colors')
-            const image = Image.create(this.state.data.nColumns, this.state.data.nRows);
-            for (let iy = 0; iy < this.state.data.nRows; iy++) {
-                for (let ix = 0; ix < this.state.data.nColumns; ix++) {
-                    const item = Array2D.getItem(this.state.data, ix, iy);
+            const image = Image.create(this.state.dataArray.nColumns, this.state.dataArray.nRows);
+            for (let iy = 0; iy < this.state.dataArray.nRows; iy++) {
+                for (let ix = 0; ix < this.state.dataArray.nColumns; ix++) {
+                    const item = Array2D.getItem(this.state.dataArray, ix, iy);
                     if (item === undefined) continue; // keep transparent black
                     const color = this.params.colorProvider(item, this.state.xDomain.values[ix], this.state.yDomain.values[iy], ix, iy);
                     const c = (typeof color === 'string') ? Color.fromString(color) : color;
@@ -114,7 +114,7 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
                 y: yResolution * Box.height(this.state.boxes.wholeWorld) / (Box.height(this.state.boxes.visWorld)),
             });
             // console.timeEnd('downsample')
-            return this.drawThisImage(downsampledImage, this.state.data.nColumns / downsampledImage.nColumns, this.state.data.nRows / downsampledImage.nRows);
+            return this.drawThisImage(downsampledImage, this.state.dataArray.nColumns / downsampledImage.nColumns, this.state.dataArray.nRows / downsampledImage.nRows);
         }
 
         private _canvasImage?: Image;

@@ -1,7 +1,8 @@
-import { Class, ItemEventParam } from '../heatmap';
-import { Box, scaleDistance } from '../scales';
-import { attrd } from '../utils';
 import { HotmapExtension, HotmapExtensionBase } from '../extension';
+import { Class } from '../heatmap';
+import { Box, scaleDistance } from '../scales';
+import { ItemEventParam } from '../state';
+import { attrd } from '../utils';
 
 
 export interface MarkerExtensionParams {

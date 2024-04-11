@@ -3,7 +3,6 @@ import { BehaviorSubject } from 'rxjs';
 import * as d3 from './d3-modules';
 import { Array2D } from './data/array2d';
 import { Domain } from './data/domain';
-import { DataDescription, ItemEventParam, Provider, XAlignmentMode, YAlignmentMode, ZoomEventParam } from './heatmap';
 import { Box, Boxes, Scales } from './scales';
 import { nextIfChanged } from './utils';
 
@@ -13,15 +12,91 @@ const ZOOM_EVENT_ROUNDING_PRECISION = 9;
 export const MIN_ZOOMED_DATAPOINTS_HARD = 1;
 
 
+export type DataDescription<TX, TY, TItem> = {
+    /** Array of X values assigned to columns, from left to right ("column names") */
+    xDomain: TX[],
+    /** Array of Y values assigned to rows, from top to bottom ("row names") */
+    yDomain: TY[],
+    /** Data items to show in the heatmap (each item is visualized as a rectangle) */
+    items: TItem[],
+    /** X values for the data items (either an array with the X values (must have the same length as `items`), or a function that computes X value for given item)  */
+    x: ((dataItem: TItem, index: number) => TX) | TX[],
+    /** Y values for the data items (either an array with the Y values (must have the same length as `items`), or a function that computes Y value for given item)  */
+    y: ((dataItem: TItem, index: number) => TY) | TY[],
+    /** Optional filter function that can be used to show only a subset of data items */
+    filter?: Provider<TX, TY, TItem, boolean>,
+}
+
+/** A function that returns something (of type `TResult`) for a data item (such functions are passed to setTooltip, setColor etc.). */
+export type Provider<TX, TY, TItem, TResult> = (d: TItem, x: TX, y: TY, xIndex: number, yIndex: number) => TResult
+
+/** Emitted on data-item-related events (hover, click...) */
+export type ItemEventParam<TX, TY, TItem> = {
+    datum: TItem,
+    x: TX,
+    y: TY,
+    xIndex: number,
+    yIndex: number,
+    sourceEvent: MouseEvent,
+} | undefined
+
+/** Emitted on zoom event */
+export type ZoomEventParam<TX, TY, TItem> = {
+    /** Continuous X index corresponding to the left edge of the viewport */
+    xMinIndex: number,
+    /** Continuous X index corresponding to the right edge of the viewport */
+    xMaxIndex: number,
+    /** (Only if the X domain is numeric, strictly sorted (asc or desc), and linear!) Continuous X value corresponding to the left edge of the viewport. */
+    xMin: TX extends number ? number : undefined,
+    /** (Only if the X domain is numeric, strictly sorted (asc or desc), and linear!) Continuous X value corresponding to the right edge of the viewport. */
+    xMax: TX extends number ? number : undefined,
+
+    /** X index of the first (at least partially) visible column` */
+    xFirstVisibleIndex: number,
+    /** X index of the last (at least partially) visible column` */
+    xLastVisibleIndex: number,
+    /** X value of the first (at least partially) visible column` */
+    xFirstVisible: TX,
+    /** X value of the last (at least partially) visible column` */
+    xLastVisible: TX,
+
+    /** Continuous Y-index corresponding to the top edge of the viewport */
+    yMinIndex: number,
+    /** Continuous Y-index corresponding to the bottom edge of the viewport */
+    yMaxIndex: number,
+    /** (Only if the Y domain is numeric, strictly sorted (asc or desc), and linear!) Continuous Y value corresponding to the top edge of the viewport. */
+    yMin: TY extends number ? number : undefined,
+    /** (Only if the Y domain is numeric, strictly sorted (asc or desc), and linear!) Continuous Y value corresponding to the bottom edge of the viewport. */
+    yMax: TY extends number ? number : undefined,
+
+    /** Y index of the first (at least partially) visible row` */
+    yFirstVisibleIndex: number,
+    /** Y index of the last (at least partially) visible row` */
+    yLastVisibleIndex: number,
+    /** Y value of the first (at least partially) visible row` */
+    yFirstVisible: TY,
+    /** Y value of the last (at least partially) visible row` */
+    yLastVisible: TY,
+
+    /** Identifies the originator of the zoom event (this is to avoid infinite loop when multiple component listen to zoom and change it) */
+    origin?: string,
+} | undefined
+
+
+/** Controls how X axis values align with the columns when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on X axis can be aligned to the left edge/center/right edge of the column showing that value) */
+export type XAlignmentMode = 'left' | 'center' | 'right'
+/** Controls how Y axis values align with the rows when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on Y axis is aligned to the top edge/center/bottom edge of the row showing that value) */
+export type YAlignmentMode = 'top' | 'center' | 'bottom'
+
+
 export class State<TX, TY, TItem> { // TODO: try to convert to object if makes sense, ensure mandatory props are set in constructor
     originalData: DataDescription<TX, TY, TItem>;
-    data: Array2D<TItem>;
+    dataArray: Array2D<TItem>;
     xDomain: Domain<TX>;
     yDomain: Domain<TY>;
     xAlignment: XAlignmentMode = 'center';
     yAlignment: YAlignmentMode = 'center';
 
-    filter?: Provider<TX, TY, TItem, boolean> = undefined;
     /** DOM elements managed by this component */
     dom?: {
         rootDiv: d3.Selection<HTMLDivElement, any, any, any>;
@@ -48,6 +123,65 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
         render: new BehaviorSubject<undefined>(undefined),
     } as const;
 
+    setData<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>) {
+        const self = this as unknown as State<TX_, TY_, TItem_>;
+        const { items, x, y, xDomain, yDomain, filter } = data;
+        const nColumns = xDomain.length;
+        const nRows = yDomain.length;
+        const array = new Array<TItem_ | undefined>(nColumns * nRows).fill(undefined);
+        const xs = (typeof x === 'function') ? items.map(x) : x;
+        const ys = (typeof y === 'function') ? items.map(y) : y;
+        self.xDomain = Domain.create(xDomain);
+        self.yDomain = Domain.create(yDomain);
+        let warnedX = false;
+        let warnedY = false;
+        for (let i = 0; i < items.length; i++) {
+            const d = items[i];
+            const x = xs[i];
+            const y = ys[i];
+            const ix = self.xDomain.index.get(x);
+            const iy = self.yDomain.index.get(y);
+            if (ix === undefined) {
+                if (!warnedX) {
+                    console.warn('Some data items map to X values out of the X domain:', d, 'maps to X', x);
+                    warnedX = true;
+                }
+            } else if (iy === undefined) {
+                if (!warnedY) {
+                    console.warn('Some data items map to Y values out of the Y domain:', d, 'maps to Y', y);
+                    warnedY = true;
+                }
+            } else if (filter !== undefined && !filter(d, x, y, ix, iy)) {
+                // skipping this item
+            } else {
+                array[nColumns * iy + ix] = d;
+            }
+        }
+        const isNumeric = items.every(d => typeof d === 'number') as (TItem_ extends number ? true : false);
+        self.originalData = data;
+        self.setDataArray({ items: array, nRows, nColumns, isNumeric });
+        return self;
+    }
+
+    private setDataArray(data: Array2D<TItem>): this {
+        this.dataArray = data;
+        if (this.boxes) {
+            const newWholeWorld = Box.create(0, 0, data.nColumns, data.nRows);
+            const xScale = Box.width(newWholeWorld) / Box.width(this.boxes.wholeWorld);
+            const yScale = Box.height(newWholeWorld) / Box.height(this.boxes.wholeWorld);
+            this.boxes.wholeWorld = newWholeWorld;
+            this.boxes.visWorld = Box.clamp({
+                xmin: this.boxes.visWorld.xmin * xScale,
+                xmax: this.boxes.visWorld.xmax * xScale,
+                ymin: this.boxes.visWorld.ymin * yScale,
+                ymax: this.boxes.visWorld.ymax * yScale
+            }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD); // TODO factor this out with zoom-related helpers
+            this.scales = Scales(this.boxes);
+        }
+        this.events.data.next(data);
+        return this;
+    }
+
 
     /** Return data item that is being pointed by the mouse in `event` */
     getPointedItem(event: MouseEvent | undefined): ItemEventParam<TX, TY, TItem> {
@@ -56,7 +190,7 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
         }
         const xIndex = Math.floor(this.scales.canvasToWorld.x(event.offsetX));
         const yIndex = Math.floor(this.scales.canvasToWorld.y(event.offsetY));
-        const datum = Array2D.getItem(this.data, xIndex, yIndex);
+        const datum = Array2D.getItem(this.dataArray, xIndex, yIndex);
         if (!datum) {
             return undefined;
         }
@@ -76,13 +210,13 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
 
         const xMinIndex_ = round(box.xmin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
         const xMaxIndex_ = round(box.xmax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
-        const xFirstVisibleIndex = clamp(Math.floor(xMinIndex_), 0, this.data.nColumns - 1);
-        const xLastVisibleIndex = clamp(Math.ceil(xMaxIndex_) - 1, 0, this.data.nColumns - 1);
+        const xFirstVisibleIndex = clamp(Math.floor(xMinIndex_), 0, this.dataArray.nColumns - 1);
+        const xLastVisibleIndex = clamp(Math.ceil(xMaxIndex_) - 1, 0, this.dataArray.nColumns - 1);
 
         const yMinIndex_ = round(box.ymin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
         const yMaxIndex_ = round(box.ymax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
-        const yFirstVisibleIndex = clamp(Math.floor(yMinIndex_), 0, this.data.nRows - 1);
-        const yLastVisibleIndex = clamp(Math.ceil(yMaxIndex_) - 1, 0, this.data.nRows - 1);
+        const yFirstVisibleIndex = clamp(Math.floor(yMinIndex_), 0, this.dataArray.nRows - 1);
+        const yLastVisibleIndex = clamp(Math.ceil(yMaxIndex_) - 1, 0, this.dataArray.nRows - 1);
 
         const xShift = indexAlignmentShift(this.xAlignment);
         const yShift = indexAlignmentShift(this.yAlignment);
@@ -179,7 +313,6 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
     }
 
 }
-
 
 
 function indexAlignmentShift(alignment: XAlignmentMode | YAlignmentMode) {

@@ -1,7 +1,8 @@
-import { Class, ItemEventParam, Provider } from '../heatmap';
-import { Box, XY } from '../scales';
-import { attrd, formatDataItem } from '../utils';
 import { HotmapExtension, HotmapExtensionBase } from '../extension';
+import { Class } from '../heatmap';
+import { Box, XY } from '../scales';
+import { ItemEventParam, Provider } from '../state';
+import { attrd, formatDataItem } from '../utils';
 
 
 function DefaultTooltipProvider(dataItem: unknown, x: unknown, y: unknown, xIndex: number, yIndex: number): string {

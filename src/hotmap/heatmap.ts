@@ -2,14 +2,13 @@ import { range } from 'lodash';
 import * as d3 from './d3-modules';
 import { Array2D } from './data/array2d';
 import { Color } from './data/color';
-import { Domain } from './data/domain';
 import { ExtensionInstance, ExtensionInstanceRegistration, HotmapExtension } from './extension';
 import { DefaultNumericColorProviderFactory, DrawExtension, DrawExtensionParams, VisualParams } from './extensions/draw';
 import { MarkerExtension, MarkerExtensionParams } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 import { ZoomExtension, ZoomExtensionParams } from './extensions/zoom';
 import { Box, Scales } from './scales';
-import { MIN_ZOOMED_DATAPOINTS_HARD, State } from './state';
+import { DataDescription, Provider, State, XAlignmentMode, YAlignmentMode, ZoomEventParam } from './state';
 import { attrd, getSize, removeElement } from './utils';
 
 
@@ -45,85 +44,6 @@ export const Class = {
 
 /** Initial size set to canvas (doesn't really matter because it will be immediately resized to the real size) */
 const CANVAS_INIT_SIZE = { width: 100, height: 100 };
-
-
-export type DataDescription<TX, TY, TItem> = {
-    /** Array of X values assigned to columns, from left to right ("column names") */
-    xDomain: TX[],
-    /** Array of Y values assigned to rows, from top to bottom ("row names") */
-    yDomain: TY[],
-    /** Data items to show in the heatmap (each item is visualized as a rectangle) */
-    items: TItem[],
-    /** X values for the data items (either an array with the X values (must have the same length as `items`), or a function that computes X value for given item)  */
-    x: ((dataItem: TItem, index: number) => TX) | TX[],
-    /** Y values for the data items (either an array with the Y values (must have the same length as `items`), or a function that computes Y value for given item)  */
-    y: ((dataItem: TItem, index: number) => TY) | TY[],
-}
-
-/** Types of input parameters of provider functions (that are passed to setTooltip etc.) */
-type ProviderParams<TX, TY, TItem> = [d: TItem, x: TX, y: TY, xIndex: number, yIndex: number]
-
-/** A function that returns something (of type `TResult`) for a data item (such functions are passed to setTooltip, setColor etc.). */
-export type Provider<TX, TY, TItem, TResult> = (...args: ProviderParams<TX, TY, TItem>) => TResult
-
-/** Emitted on data-item-related events (hover, click...) */
-export type ItemEventParam<TX, TY, TItem> = {
-    datum: TItem,
-    x: TX,
-    y: TY,
-    xIndex: number,
-    yIndex: number,
-    sourceEvent: MouseEvent,
-} | undefined
-
-/** Emitted on zoom event */
-export type ZoomEventParam<TX, TY, TItem> = {
-    /** Continuous X index corresponding to the left edge of the viewport */
-    xMinIndex: number,
-    /** Continuous X index corresponding to the right edge of the viewport */
-    xMaxIndex: number,
-    /** (Only if the X domain is numeric, strictly sorted (asc or desc), and linear!) Continuous X value corresponding to the left edge of the viewport. */
-    xMin: TX extends number ? number : undefined,
-    /** (Only if the X domain is numeric, strictly sorted (asc or desc), and linear!) Continuous X value corresponding to the right edge of the viewport. */
-    xMax: TX extends number ? number : undefined,
-
-    /** X index of the first (at least partially) visible column` */
-    xFirstVisibleIndex: number,
-    /** X index of the last (at least partially) visible column` */
-    xLastVisibleIndex: number,
-    /** X value of the first (at least partially) visible column` */
-    xFirstVisible: TX,
-    /** X value of the last (at least partially) visible column` */
-    xLastVisible: TX,
-
-    /** Continuous Y-index corresponding to the top edge of the viewport */
-    yMinIndex: number,
-    /** Continuous Y-index corresponding to the bottom edge of the viewport */
-    yMaxIndex: number,
-    /** (Only if the Y domain is numeric, strictly sorted (asc or desc), and linear!) Continuous Y value corresponding to the top edge of the viewport. */
-    yMin: TY extends number ? number : undefined,
-    /** (Only if the Y domain is numeric, strictly sorted (asc or desc), and linear!) Continuous Y value corresponding to the bottom edge of the viewport. */
-    yMax: TY extends number ? number : undefined,
-
-    /** Y index of the first (at least partially) visible row` */
-    yFirstVisibleIndex: number,
-    /** Y index of the last (at least partially) visible row` */
-    yLastVisibleIndex: number,
-    /** Y value of the first (at least partially) visible row` */
-    yFirstVisible: TY,
-    /** Y value of the last (at least partially) visible row` */
-    yLastVisible: TY,
-
-    /** Identifies the originator of the zoom event (this is to avoid infinite loop when multiple component listen to zoom and change it) */
-    origin?: string,
-} | undefined
-
-
-/** Controls how X axis values align with the columns when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on X axis can be aligned to the left edge/center/right edge of the column showing that value) */
-export type XAlignmentMode = 'left' | 'center' | 'right'
-/** Controls how Y axis values align with the rows when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on Y axis is aligned to the top edge/center/bottom edge of the row showing that value) */
-export type YAlignmentMode = 'top' | 'center' | 'bottom'
-
 
 export class Heatmap<TX, TY, TItem> {
     private readonly state: State<TX, TY, TItem> = new State();
@@ -170,8 +90,8 @@ export class Heatmap<TX, TY, TItem> {
         this.setData(data);
 
         this.state.boxes = {
-            visWorld: Box.create(0, 0, this.state.data.nColumns, this.state.data.nRows),
-            wholeWorld: Box.create(0, 0, this.state.data.nColumns, this.state.data.nRows),
+            visWorld: Box.create(0, 0, this.state.dataArray.nColumns, this.state.dataArray.nRows),
+            wholeWorld: Box.create(0, 0, this.state.dataArray.nColumns, this.state.dataArray.nRows),
             canvas: Box.create(0, 0, CANVAS_INIT_SIZE.width, CANVAS_INIT_SIZE.height), // To be changed via 'resize' event subscription
         };
 
@@ -183,8 +103,8 @@ export class Heatmap<TX, TY, TItem> {
         });
 
         let colorProvider: Provider<TX, TY, TItem, Color> | undefined = undefined;
-        if (this.state.data.isNumeric) {
-            const dataRange = Array2D.getRange(this.state.data as Array2D<number>);
+        if (this.state.dataArray.isNumeric) {
+            const dataRange = Array2D.getRange(this.state.dataArray as Array2D<number>);
             colorProvider = DefaultNumericColorProviderFactory(dataRange.min, dataRange.max) as Provider<TX, TY, TItem, Color>;
             // (this as unknown as Heatmap<TX, TY, number>).setColor(colorProvider);
         }
@@ -255,64 +175,9 @@ export class Heatmap<TX, TY, TItem> {
         this.events.resize.next(box);
     }
 
-    private setRawData(data: Array2D<TItem>): this {
-        this.state.data = data;
-        if (this.state.boxes) {
-            const newWholeWorld = Box.create(0, 0, data.nColumns, data.nRows);
-            const xScale = Box.width(newWholeWorld) / Box.width(this.state.boxes.wholeWorld);
-            const yScale = Box.height(newWholeWorld) / Box.height(this.state.boxes.wholeWorld);
-            this.state.boxes.wholeWorld = newWholeWorld;
-            this.state.boxes.visWorld = Box.clamp({
-                xmin: this.state.boxes.visWorld.xmin * xScale,
-                xmax: this.state.boxes.visWorld.xmax * xScale,
-                ymin: this.state.boxes.visWorld.ymin * yScale,
-                ymax: this.state.boxes.visWorld.ymax * yScale
-            }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD); // TODO factor this out with zoom-related helpers
-            this.state.scales = Scales(this.state.boxes);
-        }
-        // this.adjustZoomExtent();
-        this.events.data.next(data);
-        return this;
-    }
-
     setData<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>): Heatmap<TX_, TY_, TItem_> {
-        const self = this as unknown as Heatmap<TX_, TY_, TItem_>;
-        const { items, x, y, xDomain, yDomain } = data;
-        const nColumns = xDomain.length;
-        const nRows = yDomain.length;
-        const array = new Array<TItem_ | undefined>(nColumns * nRows).fill(undefined);
-        const xs = (typeof x === 'function') ? items.map(x) : x;
-        const ys = (typeof y === 'function') ? items.map(y) : y;
-        self.state.xDomain = Domain.create(xDomain);
-        self.state.yDomain = Domain.create(yDomain);
-        let warnedX = false;
-        let warnedY = false;
-        for (let i = 0; i < items.length; i++) {
-            const d = items[i];
-            const x = xs[i];
-            const y = ys[i];
-            const ix = self.state.xDomain.index.get(x);
-            const iy = self.state.yDomain.index.get(y);
-            if (ix === undefined) {
-                if (!warnedX) {
-                    console.warn('Some data items map to X values out of the X domain:', d, 'maps to X', x);
-                    warnedX = true;
-                }
-            } else if (iy === undefined) {
-                if (!warnedY) {
-                    console.warn('Some data items map to Y values out of the Y domain:', d, 'maps to Y', y);
-                    warnedY = true;
-                }
-            } else if (self.state.filter !== undefined && !self.state.filter(d, x, y, ix, iy)) {
-                // skipping this item
-            } else {
-                array[nColumns * iy + ix] = d;
-            }
-        }
-        const isNumeric = items.every(d => typeof d === 'number') as (TItem_ extends number ? true : false);
-        self.state.originalData = data;
-        self.setRawData({ items: array, nRows, nColumns, isNumeric });
-        return self;
+        this.state.setData(data);
+        return this as unknown as Heatmap<TX_, TY_, TItem_>;
     }
 
     /** Change X and Y domain without changing the data (can be used for reordering or hiding columns/rows). */
@@ -321,6 +186,15 @@ export class Heatmap<TX, TY, TItem> {
             ...this.state.originalData,
             xDomain: xDomain ?? this.state.originalData.xDomain,
             yDomain: yDomain ?? this.state.originalData.yDomain,
+        });
+        return this;
+    }
+
+    /** Change filter function without changing the underlying data (can be used for showing/hiding individual data items). */
+    setFilter(filter: Provider<TX, TY, TItem, boolean> | undefined): this {
+        this.setData({
+            ...this.state.originalData,
+            filter: filter,
         });
         return this;
     }
@@ -335,21 +209,15 @@ export class Heatmap<TX, TY, TItem> {
      * hm.setColor(Color.createScale('YlOrRd', [0, 100]));
      * ```
      */
-    setColor(colorProvider: (...args: ProviderParams<TX, TY, TItem>) => string | Color): this {
+    setColor(colorProvider: Provider<TX, TY, TItem, string | Color>): this {
         this.extensions.draw?.update({ colorProvider });
         return this;
     }
 
-    setTooltip(tooltipProvider: ((...args: ProviderParams<TX, TY, TItem>) => string) | 'default' | null): this {
+    setTooltip(tooltipProvider: Provider<TX, TY, TItem, string> | 'default' | null): this {
         this.extensions.tooltip?.update({
             tooltipProvider: (tooltipProvider === 'default') ? DefaultTooltipExtensionParams.tooltipProvider : tooltipProvider,
         });
-        return this;
-    }
-
-    setFilter(filter: ((...args: ProviderParams<TX, TY, TItem>) => boolean) | undefined): this {
-        this.state.filter = filter;
-        this.setData(this.state.originalData); // reapplies filter
         return this;
     }
 
@@ -375,7 +243,6 @@ export class Heatmap<TX, TY, TItem> {
     getZoom(): ZoomEventParam<TX, TY, TItem> {
         return this.state.getZoom();
     }
-
 }
 
 
