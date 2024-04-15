@@ -26,6 +26,12 @@ export type DataDescription<TX, TY, TItem> = {
     /** Optional filter function that can be used to show only a subset of data items */
     filter?: Provider<TX, TY, TItem, boolean>,
 }
+export const DataDescription = {
+    /** Return a DataDescription with no data. */
+    empty<TX, TY, TItem>(): DataDescription<TX, TY, TItem> {
+        return { xDomain: [], yDomain: [], items: [], x: [], y: [] };
+    },
+};
 
 /** A function that returns something (of type `TResult`) for a data item (such functions are passed to setTooltip, setColor etc.). */
 export type Provider<TX, TY, TItem, TResult> = (d: TItem, x: TX, y: TY, xIndex: number, yIndex: number) => TResult
@@ -89,13 +95,16 @@ export type XAlignmentMode = 'left' | 'center' | 'right'
 export type YAlignmentMode = 'top' | 'center' | 'bottom'
 
 
-export class State<TX, TY, TItem> { // TODO: try to convert to object if makes sense, ensure mandatory props are set in constructor
-    originalData: DataDescription<TX, TY, TItem>;
-    dataArray: Array2D<TItem>;
-    xDomain: Domain<TX>;
-    yDomain: Domain<TY>;
+export class State<TX, TY, TItem> {
+    originalData: DataDescription<TX, TY, TItem> = DataDescription.empty();
+    dataArray: Array2D<TItem> = Array2D.empty();
+    xDomain: Domain<TX> = Domain.create([]);
+    yDomain: Domain<TY> = Domain.create([]);
     xAlignment: XAlignmentMode = 'center';
     yAlignment: YAlignmentMode = 'center';
+
+    boxes: Boxes = { wholeWorld: Box.create(0, 0, 1, 1), visWorld: Box.create(0, 0, 1, 1), canvas: Box.create(0, 0, 1, 1) };
+    scales: Scales = Scales(this.boxes);
 
     /** DOM elements managed by this component */
     dom?: {
@@ -105,10 +114,8 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
         canvas: d3.Selection<HTMLCanvasElement, any, any, any>; // TODO move to DrawExtension, create on render event
         svg: d3.Selection<SVGSVGElement, any, any, any>;
     };
-    boxes: Boxes;
-    scales: Scales;
 
-    public readonly events = {
+    readonly events = {
         /** Fires when the user hovers over the component */
         hover: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
         /** Fires when the user selects/deselects a data item (e.g. by clicking on it) */
@@ -122,6 +129,11 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
         /** Fires when the component is initially render in a div */
         render: new BehaviorSubject<undefined>(undefined),
     } as const;
+
+
+    constructor(data: DataDescription<TX, TY, TItem>) {
+        this.setData(data);
+    }
 
     setData<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>) {
         const self = this as unknown as State<TX_, TY_, TItem_>;
@@ -165,19 +177,17 @@ export class State<TX, TY, TItem> { // TODO: try to convert to object if makes s
 
     private setDataArray(data: Array2D<TItem>): this {
         this.dataArray = data;
-        if (this.boxes) {
-            const newWholeWorld = Box.create(0, 0, data.nColumns, data.nRows);
-            const xScale = Box.width(newWholeWorld) / Box.width(this.boxes.wholeWorld);
-            const yScale = Box.height(newWholeWorld) / Box.height(this.boxes.wholeWorld);
-            this.boxes.wholeWorld = newWholeWorld;
-            this.boxes.visWorld = Box.clamp({
-                xmin: this.boxes.visWorld.xmin * xScale,
-                xmax: this.boxes.visWorld.xmax * xScale,
-                ymin: this.boxes.visWorld.ymin * yScale,
-                ymax: this.boxes.visWorld.ymax * yScale
-            }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD); // TODO factor this out with zoom-related helpers
-            this.scales = Scales(this.boxes);
-        }
+        const newWholeWorld = Box.create(0, 0, data.nColumns, data.nRows);
+        const xScale = Box.width(newWholeWorld) / Box.width(this.boxes.wholeWorld);
+        const yScale = Box.height(newWholeWorld) / Box.height(this.boxes.wholeWorld);
+        this.boxes.wholeWorld = newWholeWorld;
+        this.boxes.visWorld = Box.clamp({
+            xmin: this.boxes.visWorld.xmin * xScale,
+            xmax: this.boxes.visWorld.xmax * xScale,
+            ymin: this.boxes.visWorld.ymin * yScale,
+            ymax: this.boxes.visWorld.ymax * yScale
+        }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD); // TODO factor this out with zoom-related helpers
+        this.scales = Scales(this.boxes);
         this.events.data.next(data);
         return this;
     }

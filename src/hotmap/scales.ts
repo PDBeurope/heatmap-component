@@ -4,7 +4,7 @@ import * as d3 from './d3-modules';
 
 export interface XY { x: number, y: number }
 
-export interface Box { xmin: number, ymin: number, xmax: number, ymax: number }
+export interface Box { readonly xmin: number, readonly ymin: number, readonly xmax: number, readonly ymax: number }
 
 export const Box = {
     create(xmin: number, ymin: number, xmax: number, ymax: number): Box {
@@ -32,10 +32,10 @@ export interface BoxSize { width: number, height: number }
 
 
 export interface Boxes {
-    /** Part of the "world" (where the data live) which maps to the viewport */
-    visWorld: Box,
-    /** The whole world (~ maximum zoom-out) */
+    /** The whole "world" (where the data live) */
     wholeWorld: Box,
+    /** Part of the world which maps to the viewport */
+    visWorld: Box,
     /** Viewport in the canvas coordinates (starts at [0,0]).
      * These coordinates can be used both for interactivity via DOM events and for drawing via canvas context,
      * because the logical size of the canvas is synchronized with its DOM size. */

@@ -46,7 +46,7 @@ export const Class = {
 const CANVAS_INIT_SIZE = { width: 100, height: 100 };
 
 export class Heatmap<TX, TY, TItem> {
-    private readonly state: State<TX, TY, TItem> = new State();
+    private readonly state: State<TX, TY, TItem>;
 
     get events() { return this.state.events; }
 
@@ -87,17 +87,10 @@ export class Heatmap<TX, TY, TItem> {
     }
 
     private constructor(data: DataDescription<TX, TY, TItem>) {
-        this.setData(data);
-
-        this.state.boxes = {
-            visWorld: Box.create(0, 0, this.state.dataArray.nColumns, this.state.dataArray.nRows),
-            wholeWorld: Box.create(0, 0, this.state.dataArray.nColumns, this.state.dataArray.nRows),
-            canvas: Box.create(0, 0, CANVAS_INIT_SIZE.width, CANVAS_INIT_SIZE.height), // To be changed via 'resize' event subscription
-        };
+        this.state = new State(data);
 
         this.events.resize.subscribe(box => {
             if (!box) return;
-            this.state.boxes.canvas = box;
             this.state.boxes.canvas = box;
             this.state.scales = Scales(this.state.boxes);
         });

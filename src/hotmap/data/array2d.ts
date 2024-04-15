@@ -23,6 +23,11 @@ export const Array2D = {
         return data.items[data.nColumns * y + x];
     },
 
+    /** Return an Array2D with dimensions 0x0 with no data. */
+    empty<T>(): Array2D<T> {
+        return { nColumns: 0, nRows: 0, items: [], isNumeric: true as any };
+    },
+
     /** Return new `Data` with random values between 0 and 1 */
     createRandom(nColumns: number, nRows: number): Array2D<number> {
         const items = range(nColumns * nRows).map(i => {
