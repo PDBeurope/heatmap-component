@@ -2,7 +2,7 @@ import { range } from 'lodash';
 import * as d3 from './d3-modules';
 import { Array2D } from './data/array2d';
 import { Color } from './data/color';
-import { ExtensionInstance, ExtensionInstanceRegistration, HotmapExtension } from './extension';
+import { ExtensionInstance, HotmapExtension } from './extension';
 import { DefaultNumericColorProviderFactory, DrawExtension, DrawExtensionParams, VisualParams } from './extensions/draw';
 import { MarkerExtension, MarkerExtensionParams } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
@@ -50,28 +50,17 @@ export class Heatmap<TX, TY, TItem> {
 
     get events() { return this.state.events; }
 
-    private readonly _behaviors: ExtensionInstance<{}>[] = [];
-    registerBehavior<TParams extends {}, TDefaults extends TParams>(behavior: HotmapExtension<TParams, TDefaults>, params?: Partial<TParams>): ExtensionInstanceRegistration<TParams> {
-        const behaviors = this._behaviors;
-        const behaviorInstance: ExtensionInstance<TParams> = behavior.create(this.state, params);
+    registerBehavior<TParams extends {}, TDefaults extends TParams>(behavior: HotmapExtension<TParams, TDefaults>, params?: Partial<TParams>): ExtensionInstance<TParams> {
+        const behaviorInstance = behavior.create(this.state, params);
         behaviorInstance.register();
-        behaviors.push(behaviorInstance);
-        return {
-            update(newParams: Partial<TParams>) {
-                behaviorInstance.update(newParams);
-            },
-            unregister() {
-                removeElement(behaviors, behaviorInstance);
-                behaviorInstance.unregister();
-            },
-        };
+        return behaviorInstance;
     }
 
     readonly extensions: {
-        marker?: ExtensionInstanceRegistration<MarkerExtensionParams>,
-        tooltip?: ExtensionInstanceRegistration<TooltipExtensionParams<TX, TY, TItem>>,
-        draw?: ExtensionInstanceRegistration<DrawExtensionParams<TX, TY, TItem>>,
-        zoom?: ExtensionInstanceRegistration<ZoomExtensionParams>,
+        marker?: ExtensionInstance<MarkerExtensionParams>,
+        tooltip?: ExtensionInstance<TooltipExtensionParams<TX, TY, TItem>>,
+        draw?: ExtensionInstance<DrawExtensionParams<TX, TY, TItem>>,
+        zoom?: ExtensionInstance<ZoomExtensionParams>,
     } = {};
 
     /** Create a new `Heatmap` and set `data` */

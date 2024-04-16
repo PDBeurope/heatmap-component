@@ -9,16 +9,11 @@ export interface ExtensionInstance<TParams extends {}> {
     unregister: () => void,
 }
 
-export interface ExtensionInstanceRegistration<TParams extends {}> {
-    update: (params: Partial<TParams>) => void,
-    unregister: () => void,
-}
-
-export type ScopeExtensionName = `${string}.${string}`
+export type ScopedExtensionName = `${string}.${string}`
 
 export interface Extension<TState, TParams extends {}, TDefaults extends TParams> {
     /** Unique name of the extension, prefixed by scope, e.g. builtin.tooltip, spamextensions.spam */
-    name: ScopeExtensionName,
+    name: ScopedExtensionName,
     defaultParams: TDefaults,
     create<P extends TParams>(state: TState, params?: Partial<P>): ExtensionInstance<P>,
 }
@@ -58,7 +53,7 @@ export class HotmapExtensionBase<TParams extends {}, TX = any, TY = any, TItem =
 }
 
 type HotmapExtensionCreationParam<TParams extends {}, TDefaults extends TParams> = {
-    name: ScopeExtensionName,
+    name: ScopedExtensionName,
     defaultParams: TDefaults,
     class: typeof HotmapExtensionBase<TParams>,
 }
