@@ -119,7 +119,7 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
 
         private _canvasImage?: Image;
         private getCanvasImage(): Image {
-            if (!this.ctx) throw new Error('`getCanvasImage` should only be called when canvas is initialized');
+            if (!this.ctx) throw new Error('`getCanvasImage` should only be called after canvas is initialized');
             const w = Math.floor(this.ctx.canvas.width);
             const h = Math.floor(this.ctx.canvas.height);
             if (this._canvasImage && this._canvasImage.nColumns === w && this._canvasImage.nRows === h) {
@@ -132,7 +132,7 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
 
         private _canvasImageData?: ImageData;
         private getCanvasImageData(): ImageData {
-            if (!this.ctx) throw new Error('`getCanvasImageData` should only be called when canvas is initialized');
+            if (!this.ctx) throw new Error('`getCanvasImageData` should only be called after canvas is initialized');
             const w = Math.floor(this.ctx.canvas.width);
             const h = Math.floor(this.ctx.canvas.height);
             if (this._canvasImageData && this._canvasImageData.width === w && this._canvasImageData.height === h) {

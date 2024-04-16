@@ -96,25 +96,39 @@ export type YAlignmentMode = 'top' | 'center' | 'bottom'
 
 
 export class State<TX, TY, TItem> {
+    /** Data as provided to the `setData` method */
     originalData: DataDescription<TX, TY, TItem> = DataDescription.empty();
+    /** A 2D array with the data items, for fast access to a specific row and column */
     dataArray: Array2D<TItem> = Array2D.empty();
+    /** Values corresponding to the individual columns */
     xDomain: Domain<TX> = Domain.create([]);
+    /** Values corresponding to the individual rows */
     yDomain: Domain<TY> = Domain.create([]);
+    /** Controls how X axis values align with the columns when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on X axis can be aligned to the left edge/center/right edge of the column showing that value) */
     xAlignment: XAlignmentMode = 'center';
+    /** Controls how Y axis values align with the rows when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on Y axis is aligned to the top edge/center/bottom edge of the row showing that value) */
     yAlignment: YAlignmentMode = 'center';
 
+    /** Extent of the data world and canvas */
     boxes: Boxes = { wholeWorld: Box.create(0, 0, 1, 1), visWorld: Box.create(0, 0, 1, 1), canvas: Box.create(0, 0, 1, 1) };
+    /** Conversion between the data world and canvas coordinates */
     scales: Scales = Scales(this.boxes);
 
     /** DOM elements managed by this component */
     dom?: {
+        /** Root div in which the whole heatmap component is rendered (passed to the `render` method) */
         rootDiv: d3.Selection<HTMLDivElement, any, any, any>;
+        /** Position-relative div covering the whole area of the heatmap component */
         mainDiv: d3.Selection<HTMLDivElement, any, any, any>;
+        /** Div covering the canvas area */
         canvasDiv: d3.Selection<HTMLDivElement, any, any, any>;
-        canvas: d3.Selection<HTMLCanvasElement, any, any, any>; // TODO move to DrawExtension, create on render event
+        /** Canvas element for rendering the data */
+        canvas: d3.Selection<HTMLCanvasElement, any, any, any>;
+        /** SVG element for handling HTML events and rendering simple things (e.g. markers) */
         svg: d3.Selection<SVGSVGElement, any, any, any>;
     };
 
+    /** Custom events fired by the heatmap component, all are RXJS `BehaviorSubject` */
     readonly events = {
         /** Fires when the user hovers over the component */
         hover: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
@@ -186,7 +200,7 @@ export class State<TX, TY, TItem> {
             xmax: this.boxes.visWorld.xmax * xScale,
             ymin: this.boxes.visWorld.ymin * yScale,
             ymax: this.boxes.visWorld.ymax * yScale
-        }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD); // TODO factor this out with zoom-related helpers
+        }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
         this.scales = Scales(this.boxes);
         this.events.data.next(data);
         return this;
