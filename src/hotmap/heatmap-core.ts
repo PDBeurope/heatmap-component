@@ -60,7 +60,7 @@ export class HeatmapCore<TX, TY, TItem> {
 
         svg.on('mousemove.hotmapcore', (e: MouseEvent) => this.state.events.hover.next(this.state.getPointedItem(e)));
         svg.on('mouseleave.hotmapcore', (e: MouseEvent) => this.state.events.hover.next(undefined));
-        svg.on('click.hotmapcore', (e: MouseEvent) => this.state.events.click.next(this.state.getPointedItem(e)));
+        svg.on('click.hotmapcore', (e: MouseEvent) => this.state.events.select.next(this.state.getPointedItem(e)));
 
         this.state.events.render.next(undefined);
         this.state.emitResize();

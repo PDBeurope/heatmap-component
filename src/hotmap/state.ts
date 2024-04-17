@@ -37,7 +37,6 @@ export const DataDescription = {
 /** A function that returns something (of type `TResult`) for a data item (such functions are passed to setTooltip, setColor etc.). */
 export type Provider<TX, TY, TItem, TResult> = (d: TItem, x: TX, y: TY, xIndex: number, yIndex: number) => TResult
 
-// TODO refactor to {item:{...}, sourceEvent:...}?
 /** Emitted on data-item-related events (hover, click...) */
 export type ItemEventParam<TX, TY, TItem> = {
     datum: TItem,
@@ -134,9 +133,8 @@ export class State<TX, TY, TItem> {
     readonly events = {
         /** Fires when the user hovers over the component */
         hover: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
-        // TODO rename to `select`?
         /** Fires when the user selects/deselects a data item (e.g. by clicking on it) */
-        click: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
+        select: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
         /** Fires when the component is zoomed in or out, or panned (translated) */
         zoom: new BehaviorSubject<ZoomEventParam<TX, TY, TItem>>(undefined),
         /** Fires when the window is resized */

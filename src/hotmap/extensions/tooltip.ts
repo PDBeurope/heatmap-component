@@ -33,7 +33,7 @@ export const TooltipExtension: HotmapExtension<TooltipExtensionParams<never, nev
             register() {
                 super.register();
                 this.subscribe(this.state.events.hover, pointed => this.drawTooltip(pointed));
-                this.subscribe(this.state.events.click, pointed => this.drawPinnedTooltip(pointed));
+                this.subscribe(this.state.events.select, pointed => this.drawPinnedTooltip(pointed));
                 this.subscribe(this.state.events.zoom, () => this.updatePinnedTooltipPosition());
                 this.subscribe(this.state.events.resize, () => this.updatePinnedTooltipPosition());
             }
@@ -83,7 +83,7 @@ export const TooltipExtension: HotmapExtension<TooltipExtensionParams<never, nev
 
                     // Tooltip close button
                     attrd(tooltip.append('div'), { class: Class.PinnedTooltipClose })
-                        .on('click', () => this.state.events.click.next(undefined))
+                        .on('click', () => this.state.events.select.next(undefined))
                         .append('svg')
                         .attr('viewBox', '0 0 24 24')
                         .attr('preserveAspectRatio', 'none')

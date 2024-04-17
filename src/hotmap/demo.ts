@@ -73,11 +73,11 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
     //         console.log('hovering', e.datum, e.x, e.y, e.xIndex, e.yIndex, e.sourceEvent);
     //     }
     // });
-    hm.events.click.subscribe(e => {
+    hm.events.select.subscribe(e => {
         if (!e) {
-            console.log('clicking nothing');
+            console.log('selecting nothing');
         } else {
-            console.log('clicking', e.datum, e.x, e.y, e.xIndex, e.yIndex, e.sourceEvent);
+            console.log('selecting', e.datum, e.x, e.y, e.xIndex, e.yIndex, e.sourceEvent);
         }
     });
     hm.events.zoom.subscribe(e => {
