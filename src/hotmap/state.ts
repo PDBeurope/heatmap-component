@@ -4,7 +4,7 @@ import * as d3 from './d3-modules';
 import { Array2D } from './data/array2d';
 import { Domain } from './data/domain';
 import { Box, Boxes, Scales } from './scales';
-import { nextIfChanged } from './utils';
+import { getSize, nextIfChanged } from './utils';
 
 
 /** Avoid zooming to things like 0.4999999999999998 */
@@ -12,6 +12,7 @@ const ZOOM_EVENT_ROUNDING_PRECISION = 9;
 export const MIN_ZOOMED_DATAPOINTS_HARD = 1;
 
 
+// TODO move to data submodule?
 export type DataDescription<TX, TY, TItem> = {
     /** Array of X values assigned to columns, from left to right ("column names") */
     xDomain: TX[],
@@ -36,6 +37,7 @@ export const DataDescription = {
 /** A function that returns something (of type `TResult`) for a data item (such functions are passed to setTooltip, setColor etc.). */
 export type Provider<TX, TY, TItem, TResult> = (d: TItem, x: TX, y: TY, xIndex: number, yIndex: number) => TResult
 
+// TODO move to events submodule?
 /** Emitted on data-item-related events (hover, click...) */
 export type ItemEventParam<TX, TY, TItem> = {
     datum: TItem,
@@ -149,7 +151,7 @@ export class State<TX, TY, TItem> {
         this.setData(data);
     }
 
-    setData<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>) {
+    setData<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>): State<TX_, TY_, TItem_> {
         const self = this as unknown as State<TX_, TY_, TItem_>;
         const { items, x, y, xDomain, yDomain, filter } = data;
         const nColumns = xDomain.length;
@@ -189,7 +191,7 @@ export class State<TX, TY, TItem> {
         return self;
     }
 
-    private setDataArray(data: Array2D<TItem>): this {
+    private setDataArray(data: Array2D<TItem>): void {
         this.dataArray = data;
         const newWholeWorld = Box.create(0, 0, data.nColumns, data.nRows);
         const xScale = Box.width(newWholeWorld) / Box.width(this.boxes.wholeWorld);
@@ -203,7 +205,6 @@ export class State<TX, TY, TItem> {
         }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
         this.scales = Scales(this.boxes);
         this.events.data.next(data);
-        return this;
     }
 
 
@@ -223,10 +224,24 @@ export class State<TX, TY, TItem> {
         return { datum, x, y, xIndex, yIndex, sourceEvent: event };
     }
 
+    emitResize(): void {
+        if (!this.dom) return;
+        const size = getSize(this.dom.canvas);
+        const box = Box.create(0, 0, size.width, size.height);
+        this.events.resize.next(box);
+    }
+
     emitZoom(origin?: string): void {
         if (this.boxes.visWorld) {
             nextIfChanged(this.events.zoom, this.zoomParamFromVisWorld(this.boxes.visWorld, origin));
         }
+    }
+
+    /** Controls how column/row indices and names map to X and Y axes. */
+    setAlignment(x: XAlignmentMode | undefined, y: YAlignmentMode | undefined): void {
+        if (x) this.xAlignment = x;
+        if (y) this.yAlignment = y;
+        this.emitZoom('setAlignment');
     }
 
     private zoomParamFromVisWorld(box: Box | undefined, origin?: string): ZoomEventParam<TX, TY, TItem> {
@@ -312,6 +327,7 @@ export class State<TX, TY, TItem> {
         return undefined;
     }
 
+    // TODO use origin from the ZoomEventParam, drop `origin` parameter (everywhere)
     /** Enforce change of zoom and return the zoom value after the change */
     zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined, origin?: string): ZoomEventParam<TX, TY, TItem> {
         const visWorldBox = Box.clamp({

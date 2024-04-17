@@ -1,15 +1,13 @@
 import { range } from 'lodash';
-import * as d3 from './d3-modules';
 import { Array2D } from './data/array2d';
 import { Color } from './data/color';
-import { ExtensionInstance, HotmapExtension } from './extension';
+import { ExtensionInstance } from './extension';
 import { DefaultNumericColorProviderFactory, DrawExtension, DrawExtensionParams, VisualParams } from './extensions/draw';
 import { MarkerExtension, MarkerExtensionParams } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 import { ZoomExtension, ZoomExtensionParams } from './extensions/zoom';
-import { Box, Scales } from './scales';
-import { DataDescription, Provider, State, XAlignmentMode, YAlignmentMode, ZoomEventParam } from './state';
-import { attrd, getSize, removeElement } from './utils';
+import { HeatmapCore } from './heatmap-core';
+import { DataDescription, Provider, XAlignmentMode, YAlignmentMode, ZoomEventParam } from './state';
 
 
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
@@ -21,40 +19,8 @@ import { attrd, getSize, removeElement } from './utils';
 // TODO: Would: Smoothen zooming and panning with mouse wheel?
 
 
-
-/** Class names of DOM elements */
-export const Class = {
-    MainDiv: 'hotmap-main-div',
-    CanvasDiv: 'hotmap-canvas-div',
-    Marker: 'hotmap-marker',
-    MarkerX: 'hotmap-marker-x',
-    MarkerY: 'hotmap-marker-y',
-    TooltipBox: 'hotmap-tooltip-box',
-    TooltipContent: 'hotmap-tooltip-content',
-    PinnedTooltipBox: 'hotmap-pinned-tooltip-box',
-    PinnedTooltipContent: 'hotmap-pinned-tooltip-content',
-    PinnedTooltipPin: 'hotmap-pinned-tooltip-pin',
-    PinnedTooltipClose: 'hotmap-pinned-tooltip-close',
-    Overlay: 'hotmap-overlay',
-    OverlayShade: 'hotmap-overlay-shade',
-    OverlayMessage: 'hotmap-overlay-message',
-} as const;
-
-
-
-/** Initial size set to canvas (doesn't really matter because it will be immediately resized to the real size) */
-const CANVAS_INIT_SIZE = { width: 100, height: 100 };
-
-export class Heatmap<TX, TY, TItem> {
-    private readonly state: State<TX, TY, TItem>;
-
+export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
     get events() { return this.state.events; }
-
-    registerBehavior<TParams extends {}, TDefaults extends TParams>(behavior: HotmapExtension<TParams, TDefaults>, params?: Partial<TParams>): ExtensionInstance<TParams> {
-        const behaviorInstance = behavior.create(this.state, params);
-        behaviorInstance.register();
-        return behaviorInstance;
-    }
 
     readonly extensions: {
         marker?: ExtensionInstance<MarkerExtensionParams>,
@@ -65,96 +31,24 @@ export class Heatmap<TX, TY, TItem> {
 
     /** Create a new `Heatmap` and set `data` */
     static create<TX, TY, TItem>(data: DataDescription<TX, TY, TItem>): Heatmap<TX, TY, TItem> {
-        return new this(data);
+        const instance = new this(data);
+
+        let colorProvider: Provider<TX, TY, TItem, Color> | undefined = undefined;
+        if (instance.state.dataArray.isNumeric) {
+            const dataRange = Array2D.getRange(instance.state.dataArray as Array2D<number>);
+            colorProvider = DefaultNumericColorProviderFactory(dataRange.min, dataRange.max) as Provider<TX, TY, TItem, Color>;
+        }
+        instance.extensions.marker = instance.registerBehavior(MarkerExtension);
+        instance.extensions.tooltip = instance.registerBehavior(TooltipExtension);
+        instance.extensions.draw = instance.registerBehavior(DrawExtension, { colorProvider });
+        instance.extensions.zoom = instance.registerBehavior(ZoomExtension);
+
+        return instance;
     }
 
     /** Create a new `Heatmap` with dummy data */
     static createDummy(nColumns: number = 20, nRows: number = 20): Heatmap<number, number, number> {
-        // return new this(makeRandomData2(2000, 20));
-        return new this(makeRandomData2(nColumns, nRows));
-        // return new this(makeRandomData2(2e5, 20));
-    }
-
-    private constructor(data: DataDescription<TX, TY, TItem>) {
-        this.state = new State(data);
-
-        this.events.resize.subscribe(box => {
-            if (!box) return;
-            this.state.boxes.canvas = box;
-            this.state.scales = Scales(this.state.boxes);
-        });
-
-        let colorProvider: Provider<TX, TY, TItem, Color> | undefined = undefined;
-        if (this.state.dataArray.isNumeric) {
-            const dataRange = Array2D.getRange(this.state.dataArray as Array2D<number>);
-            colorProvider = DefaultNumericColorProviderFactory(dataRange.min, dataRange.max) as Provider<TX, TY, TItem, Color>;
-            // (this as unknown as Heatmap<TX, TY, number>).setColor(colorProvider);
-        }
-        this.extensions.marker = this.registerBehavior(MarkerExtension);
-        this.extensions.tooltip = this.registerBehavior(TooltipExtension);
-        this.extensions.draw = this.registerBehavior(DrawExtension, { colorProvider });
-        this.extensions.zoom = this.registerBehavior(ZoomExtension);
-    }
-
-
-    /** Clear all the contents of the root div. */
-    remove(): void {
-        if (!this.state.dom) return;
-        this.state.dom.rootDiv.select('*').remove();
-    }
-
-    /** Render this heatmap in the given DIV element */
-    render(divElementOrId: HTMLDivElement | string): this {
-        if (this.state.dom) {
-            console.error(`This ${this.constructor.name} has already been rendered in element`, this.state.dom.rootDiv.node());
-            throw new Error(`This ${this.constructor.name} has already been rendered. Cannot render again.`);
-        }
-        console.time('Hotmap render');
-
-        const rootDiv: d3.Selection<HTMLDivElement, any, any, any> = (typeof divElementOrId === 'string') ? d3.select(`#${divElementOrId}`) : d3.select(divElementOrId);
-        if (rootDiv.empty()) throw new Error('Failed to initialize, wrong div ID?');
-        this.remove();
-
-        const mainDiv = attrd(rootDiv.append('div'), {
-            class: Class.MainDiv,
-            style: { position: 'relative', width: '100%', height: '100%' },
-        });
-
-        const canvasDiv = attrd(mainDiv.append('div'), {
-            class: Class.CanvasDiv,
-            style: { position: 'absolute', width: '100%', height: '100%' },
-        });
-
-        const canvas = attrd(canvasDiv.append('canvas'), {
-            width: CANVAS_INIT_SIZE.width,
-            height: CANVAS_INIT_SIZE.height,
-            style: { position: 'absolute', width: '100%', height: '100%' },
-        });
-
-        const svg = attrd(canvasDiv.append('svg'), {
-            style: { position: 'absolute', width: '100%', height: '100%' },
-        });
-        this.state.dom = { rootDiv, mainDiv, canvasDiv, canvas, svg };
-
-        svg.on('mousemove', (e: MouseEvent) => this.events.hover.next(this.state.getPointedItem(e)));
-        svg.on('mouseleave', (e: MouseEvent) => this.events.hover.next(undefined));
-        svg.on('click', (e: MouseEvent) => this.events.click.next(this.state.getPointedItem(e)));
-
-        this.events.render.next(undefined);
-        this.emitResize();
-        d3.select(window).on('resize.resizehotmapcanvas', () => this.emitResize());
-
-        // this.addZoomBehavior();
-
-        console.timeEnd('Hotmap render');
-        return this;
-    }
-
-    private emitResize() {
-        if (!this.state.dom) return;
-        const size = getSize(this.state.dom.canvas);
-        const box = Box.create(0, 0, size.width, size.height);
-        this.events.resize.next(box);
+        return this.create(makeRandomData2(nColumns, nRows));
     }
 
     setData<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>): Heatmap<TX_, TY_, TItem_> {
@@ -210,9 +104,7 @@ export class Heatmap<TX, TY, TItem> {
 
     /** Controls how column/row indices and names map to X and Y axes. */
     setAlignment(x: XAlignmentMode | undefined, y: YAlignmentMode | undefined): this {
-        if (x) this.state.xAlignment = x;
-        if (y) this.state.yAlignment = y;
-        this.state.emitZoom('setAlignment');
+        this.state.setAlignment(x, y);
         return this;
     }
 

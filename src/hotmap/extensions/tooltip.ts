@@ -1,5 +1,5 @@
+import { Class } from '../class-names';
 import { HotmapExtension, HotmapExtensionBase } from '../extension';
-import { Class } from '../heatmap';
 import { Box, XY } from '../scales';
 import { ItemEventParam, Provider } from '../state';
 import { attrd, formatDataItem } from '../utils';
