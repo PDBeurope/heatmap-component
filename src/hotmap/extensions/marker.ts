@@ -1,5 +1,5 @@
 import { Class } from '../class-names';
-import { HotmapExtension, HotmapExtensionBase } from '../extension';
+import { HotmapExtension, HotmapBehaviorBase } from '../extension';
 import { Box, scaleDistance } from '../scales';
 import { ItemEventParam } from '../state';
 import { attrd } from '../utils';
@@ -16,7 +16,7 @@ export const DefaultMarkerExtensionParams: MarkerExtensionParams = {
 export const MarkerExtension = HotmapExtension.fromClass({
     name: 'builtin.marker',
     defaultParams: DefaultMarkerExtensionParams,
-    class: class extends HotmapExtensionBase<MarkerExtensionParams> {
+    behavior: class extends HotmapBehaviorBase<MarkerExtensionParams> {
         register() {
             super.register();
             this.subscribe(this.state.events.hover, pointed => {

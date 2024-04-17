@@ -3,13 +3,13 @@ import { Array2D } from '../data/array2d';
 import { Color } from '../data/color';
 import { Downsampler } from '../data/downsampling';
 import { Image } from '../data/image';
-import { HotmapExtension, HotmapExtensionBase } from '../extension';
+import { HotmapExtension, HotmapBehaviorBase } from '../extension';
 import { Box, scaleDistance } from '../scales';
 import { Provider } from '../state';
 import { Refresher, minimum } from '../utils';
 
 
-/** Size of rectangle in pixels, when showing gaps is switched on (for smaller sizes off, to avoid Moire patterns) */
+/** Size of rectangle in pixels, when showing gaps is switched on (switched off for smaller sizes, to avoid Moire patterns) */
 const MIN_PIXELS_PER_RECT_FOR_GAPS = 2;
 
 const DefaultColor = Color.fromString('#888888');
@@ -45,7 +45,7 @@ export const DefaultDrawExtensionParams: DrawExtensionParams<unknown, unknown, u
 export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, never>, typeof DefaultDrawExtensionParams> = HotmapExtension.fromClass({
     name: 'builtin.sample',
     defaultParams: DefaultDrawExtensionParams,
-    class: class <TX, TY, TItem> extends HotmapExtensionBase<DrawExtensionParams<TX, TY, TItem>> {
+    behavior: class <TX, TY, TItem> extends HotmapBehaviorBase<DrawExtensionParams<TX, TY, TItem>> {
         /** Canvas rendering context */
         private ctx?: CanvasRenderingContext2D;
         /** Manager for downsampled images */

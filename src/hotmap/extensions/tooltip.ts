@@ -1,5 +1,5 @@
 import { Class } from '../class-names';
-import { HotmapExtension, HotmapExtensionBase } from '../extension';
+import { HotmapExtension, HotmapBehaviorBase } from '../extension';
 import { Box, XY } from '../scales';
 import { ItemEventParam, Provider } from '../state';
 import { attrd, formatDataItem } from '../utils';
@@ -26,7 +26,7 @@ export const TooltipExtension: HotmapExtension<TooltipExtensionParams<never, nev
     = HotmapExtension.fromClass({
         name: 'builtin.tooltip',
         defaultParams: DefaultTooltipExtensionParams,
-        class: class <TX, TY, TItem> extends HotmapExtensionBase<TooltipExtensionParams<TX, TY, TItem>, TX, TY, TItem> {
+        behavior: class <TX, TY, TItem> extends HotmapBehaviorBase<TooltipExtensionParams<TX, TY, TItem>, TX, TY, TItem> {
             /** Position of the pinned tooltip, if any. In world coordinates, continuous. Use `Math.floor` to get column/row index. */
             private pinnedTooltip?: XY = undefined;
 

@@ -1,7 +1,7 @@
 import { range } from 'lodash';
 import { Array2D } from './data/array2d';
 import { Color } from './data/color';
-import { ExtensionInstance } from './extension';
+import { Behavior } from './extension';
 import { DefaultNumericColorProviderFactory, DrawExtension, DrawExtensionParams, VisualParams } from './extensions/draw';
 import { MarkerExtension, MarkerExtensionParams } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
@@ -11,7 +11,6 @@ import { DataDescription, Provider, XAlignmentMode, YAlignmentMode, ZoomEventPar
 
 
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
-// TODO: Should: think in more depth what could happen when changing data type with filters, providers, etc. already set
 // TODO: Should: reasonable level of customizability
 // TODO: Should: docs
 // TODO: Could: various zoom modes (horizontal, vertical, both, none...)
@@ -23,27 +22,27 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
     get events() { return this.state.events; }
 
     readonly extensions: {
-        marker?: ExtensionInstance<MarkerExtensionParams>,
-        tooltip?: ExtensionInstance<TooltipExtensionParams<TX, TY, TItem>>,
-        draw?: ExtensionInstance<DrawExtensionParams<TX, TY, TItem>>,
-        zoom?: ExtensionInstance<ZoomExtensionParams>,
+        marker?: Behavior<MarkerExtensionParams>,
+        tooltip?: Behavior<TooltipExtensionParams<TX, TY, TItem>>,
+        draw?: Behavior<DrawExtensionParams<TX, TY, TItem>>,
+        zoom?: Behavior<ZoomExtensionParams>,
     } = {};
 
     /** Create a new `Heatmap` and set `data` */
     static create<TX, TY, TItem>(data: DataDescription<TX, TY, TItem>): Heatmap<TX, TY, TItem> {
-        const instance = new this(data);
+        const heatmap = new this(data);
 
         let colorProvider: Provider<TX, TY, TItem, Color> | undefined = undefined;
-        if (instance.state.dataArray.isNumeric) {
-            const dataRange = Array2D.getRange(instance.state.dataArray as Array2D<number>);
+        if (heatmap.state.dataArray.isNumeric) {
+            const dataRange = Array2D.getRange(heatmap.state.dataArray as Array2D<number>);
             colorProvider = DefaultNumericColorProviderFactory(dataRange.min, dataRange.max) as Provider<TX, TY, TItem, Color>;
         }
-        instance.extensions.marker = instance.registerBehavior(MarkerExtension);
-        instance.extensions.tooltip = instance.registerBehavior(TooltipExtension);
-        instance.extensions.draw = instance.registerBehavior(DrawExtension, { colorProvider });
-        instance.extensions.zoom = instance.registerBehavior(ZoomExtension);
+        heatmap.extensions.marker = heatmap.registerExtension(MarkerExtension);
+        heatmap.extensions.tooltip = heatmap.registerExtension(TooltipExtension);
+        heatmap.extensions.draw = heatmap.registerExtension(DrawExtension, { colorProvider });
+        heatmap.extensions.zoom = heatmap.registerExtension(ZoomExtension);
 
-        return instance;
+        return heatmap;
     }
 
     /** Create a new `Heatmap` with dummy data */
@@ -109,8 +108,8 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
     }
 
     /** Enforce change of zoom and return the zoom value after the change */
-    zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined, origin?: string): ZoomEventParam<TX, TY, TItem> {
-        return this.state.zoom(z, origin);
+    zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined): ZoomEventParam<TX, TY, TItem> {
+        return this.state.zoom(z);
     }
 
     /** Return current zoom */

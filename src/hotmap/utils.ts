@@ -34,13 +34,6 @@ export function kebabCase(str: string) {
     return str.replace(/([A-Z])/g, '-$1').toLowerCase();
 }
 
-/** Emit a new value for `subject`, unless it is equal to the current value */
-export function nextIfChanged<T>(subject: BehaviorSubject<T>, newValue: T, key: ((value: T) => any) = (v => v)) {
-    if (!isEqual(key(subject.getValue()), key(newValue))) {
-        subject.next(newValue);
-    }
-}
-
 /** Return the smallest of the given numbers. Ignore any nullish values. If all values are nullish, return `undefined`. */
 export function minimum(...values: (number | null | undefined)[]): number | undefined {
     const definedValues = values.filter(x => !isNil(x)) as number[];

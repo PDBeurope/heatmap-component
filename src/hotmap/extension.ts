@@ -3,28 +3,31 @@ import { State } from './state';
 import { removeElement, shallowMerge } from './utils';
 
 
-export interface ExtensionInstance<TParams extends {}> {
+export interface Behavior<TParams extends {}> {
     register: () => void,
     update: (params: Partial<TParams>) => void,
     unregister: () => void,
 }
 
+/** Unique name of the extension, prefixed by scope, e.g. builtin.tooltip, spamextensions.spam */
 export type ScopedExtensionName = `${string}.${string}`
 
 export interface Extension<TState, TParams extends {}, TDefaults extends TParams> {
     /** Unique name of the extension, prefixed by scope, e.g. builtin.tooltip, spamextensions.spam */
     name: ScopedExtensionName,
+    /** Default parameter values */
     defaultParams: TDefaults,
-    create<P extends TParams>(state: TState, params?: Partial<P>): ExtensionInstance<P>,
+    /** Create a new behavior, bound to `state` */
+    create<P extends TParams>(state: TState, params?: Partial<P>): Behavior<P>,
 }
 
 
 export type HotmapExtension<TParams extends {}, TDefaults extends TParams> = Extension<State<any, any, any>, TParams, TDefaults>
 
 
-export class HotmapExtensionBase<TParams extends {}, TX = any, TY = any, TItem = any> implements ExtensionInstance<TParams> {
+export class HotmapBehaviorBase<TParams extends {}, TX = any, TY = any, TItem = any> implements Behavior<TParams> {
     constructor(protected state: State<TX, TY, TItem>, protected params: TParams) { }
-    private readonly subs: Unsubscribable[] = [];
+    private readonly subscriptions: Unsubscribable[] = [];
     register() { };
     update(params: Partial<TParams>) {
         this.params = shallowMerge(this.params, params);
@@ -35,9 +38,9 @@ export class HotmapExtensionBase<TParams extends {}, TX = any, TY = any, TItem =
 
     protected subscribe<T>(subject: Observable<T>, observer: Partial<Observer<T>> | ((value: T) => void)): Unsubscribable {
         const sub = subject.subscribe(observer);
-        this.subs.push(sub);
+        this.subscriptions.push(sub);
         const unsubscribe = () => {
-            removeElement(this.subs, sub);
+            removeElement(this.subscriptions, sub);
             sub.unsubscribe();
         };
         return {
@@ -45,17 +48,17 @@ export class HotmapExtensionBase<TParams extends {}, TX = any, TY = any, TItem =
         };
     };
     protected unsubscribeAll() {
-        for (const sub of this.subs) {
+        for (const sub of this.subscriptions) {
             sub.unsubscribe();
         }
-        this.subs.length = 0;
+        this.subscriptions.length = 0;
     };
 }
 
 type HotmapExtensionCreationParam<TParams extends {}, TDefaults extends TParams> = {
     name: ScopedExtensionName,
     defaultParams: TDefaults,
-    class: typeof HotmapExtensionBase<TParams>,
+    behavior: typeof HotmapBehaviorBase<TParams>,
 }
 
 export const HotmapExtension = {
@@ -63,30 +66,7 @@ export const HotmapExtension = {
         return {
             name: p.name,
             defaultParams: p.defaultParams,
-            create: (state, params) => new p.class(state, shallowMerge<TParams>(p.defaultParams, params)),
+            create: (state, params) => new p.behavior(state, shallowMerge<TParams>(p.defaultParams, params)),
         };
     },
 };
-
-
-interface ExampleExtensionParams { }
-const DefaultExampleExtensionParams: ExampleExtensionParams = {};
-
-export const ExampleExtension = HotmapExtension.fromClass({
-    name: 'builtin.example',
-    defaultParams: DefaultExampleExtensionParams,
-    class: class extends HotmapExtensionBase<ExampleExtensionParams> {
-        register() {
-            super.register();
-            console.log('Registering ExampleExtension', this.state, this.params);
-        }
-        update(params: Partial<ExampleExtensionParams>) {
-            super.update(params);
-            console.log('Updating ExampleExtension with params', params);
-        }
-        unregister() {
-            console.log('Unregistering ExampleExtension');
-            super.unregister();
-        }
-    }
-});

@@ -1,6 +1,6 @@
 import { Class } from '../class-names';
 import * as d3 from '../d3-modules';
-import { HotmapExtension, HotmapExtensionBase } from '../extension';
+import { HotmapExtension, HotmapBehaviorBase } from '../extension';
 import { Box, scaleDistance } from '../scales';
 import { attrd } from '../utils';
 
@@ -27,9 +27,11 @@ export const DefaultZoomExtensionParams: ZoomExtensionParams = {
 export const ZoomExtension = HotmapExtension.fromClass({
     name: 'builtin.zoom',
     defaultParams: DefaultZoomExtensionParams,
-    class: class extends HotmapExtensionBase<ZoomExtensionParams> {
+    behavior: class extends HotmapBehaviorBase<ZoomExtensionParams> {
         private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
         private readonly currentWheelGesture = { lastTimestamp: 0, lastAbsDelta: 0, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false };
+        /** Used to avoid emitting a new zoom event when adjusting D3 zoom behavior to zoom changes from elsewhere */
+        private suppressEmit: boolean = false;
 
         register() {
             super.register();
@@ -75,8 +77,8 @@ export const ZoomExtension = HotmapExtension.fromClass({
         /** Handle zoom event coming from the D3 zoom behavior */
         private handleZoom(e: any) {
             const visWorld = this.zoomTransformToVisWorld(e.transform);
-            this.state.zoomVisWorldBox(visWorld, ZoomExtension.name);
-            if (!!e.sourceEvent) {
+            this.state.zoomVisWorldBox(visWorld, ZoomExtension.name, !this.suppressEmit);
+            if (e.sourceEvent) {
                 this.state.events.hover.next(this.state.getPointedItem(e.sourceEvent));
             }
         }
@@ -134,7 +136,9 @@ export const ZoomExtension = HotmapExtension.fromClass({
             if (!this.state.dom) return;
             if (!this.zoomBehavior) return;
             const currentZoom = this.visWorldToZoomTransform(this.state.boxes.visWorld);
+            this.suppressEmit = true;
             this.zoomBehavior.transform(this.state.dom.svg as any, currentZoom);
+            this.suppressEmit = false;
         }
 
         private zoomTransformToVisWorld(transform: { k: number, x: number, y: number }): Box {

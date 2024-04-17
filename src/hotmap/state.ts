@@ -1,15 +1,15 @@
-import { clamp, isNil, round } from 'lodash';
+import { clamp, isEqual, isNil, round } from 'lodash';
 import { BehaviorSubject } from 'rxjs';
 import * as d3 from './d3-modules';
 import { Array2D } from './data/array2d';
 import { Domain } from './data/domain';
 import { Box, Boxes, Scales } from './scales';
-import { getSize, nextIfChanged } from './utils';
+import { getSize } from './utils';
 
 
 /** Avoid zooming to things like 0.4999999999999998 */
 const ZOOM_EVENT_ROUNDING_PRECISION = 9;
-export const MIN_ZOOMED_DATAPOINTS_HARD = 1;
+const MIN_ZOOMED_DATAPOINTS_HARD = 1;
 
 
 // TODO move to data submodule?
@@ -37,7 +37,7 @@ export const DataDescription = {
 /** A function that returns something (of type `TResult`) for a data item (such functions are passed to setTooltip, setColor etc.). */
 export type Provider<TX, TY, TItem, TResult> = (d: TItem, x: TX, y: TY, xIndex: number, yIndex: number) => TResult
 
-// TODO move to events submodule?
+// TODO refactor to {item:{...}, sourceEvent:...}?
 /** Emitted on data-item-related events (hover, click...) */
 export type ItemEventParam<TX, TY, TItem> = {
     datum: TItem,
@@ -134,6 +134,7 @@ export class State<TX, TY, TItem> {
     readonly events = {
         /** Fires when the user hovers over the component */
         hover: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
+        // TODO rename to `select`?
         /** Fires when the user selects/deselects a data item (e.g. by clicking on it) */
         click: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
         /** Fires when the component is zoomed in or out, or panned (translated) */
@@ -232,9 +233,9 @@ export class State<TX, TY, TItem> {
     }
 
     emitZoom(origin?: string): void {
-        if (this.boxes.visWorld) {
-            nextIfChanged(this.events.zoom, this.zoomParamFromVisWorld(this.boxes.visWorld, origin));
-        }
+        const newZoom = this.zoomParamFromVisWorld(this.boxes.visWorld, origin);
+        if (isEqual(newZoom, this.events.zoom.value)) return;  // to avoid infinite loops
+        this.events.zoom.next(newZoom);
     }
 
     /** Controls how column/row indices and names map to X and Y axes. */
@@ -327,9 +328,8 @@ export class State<TX, TY, TItem> {
         return undefined;
     }
 
-    // TODO use origin from the ZoomEventParam, drop `origin` parameter (everywhere)
     /** Enforce change of zoom and return the zoom value after the change */
-    zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined, origin?: string): ZoomEventParam<TX, TY, TItem> {
+    zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined): ZoomEventParam<TX, TY, TItem> {
         const visWorldBox = Box.clamp({
             xmin: this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.boxes.wholeWorld.xmin,
             xmax: this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.boxes.wholeWorld.xmax,
@@ -337,14 +337,14 @@ export class State<TX, TY, TItem> {
             ymax: this.getZoomRequestIndexMagic('y', 'Max', z) ?? this.boxes.wholeWorld.ymax,
         }, this.boxes.wholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
 
-        this.zoomVisWorldBox(visWorldBox, origin);
-        return this.zoomParamFromVisWorld(visWorldBox, origin);
+        this.zoomVisWorldBox(visWorldBox, z?.origin);
+        return this.zoomParamFromVisWorld(this.boxes.visWorld, z?.origin);
     }
 
-    zoomVisWorldBox(visWorldBox: Box, origin?: string): void {
+    zoomVisWorldBox(visWorldBox: Box, origin?: string, emit: boolean = true): void {
         this.boxes.visWorld = visWorldBox;
         this.scales = Scales(this.boxes);
-        this.emitZoom(origin);
+        if (emit) this.emitZoom(origin);
     }
 
     /** Return current zoom */

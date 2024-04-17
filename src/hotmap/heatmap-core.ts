@@ -1,22 +1,18 @@
 import { Class } from './class-names';
 import * as d3 from './d3-modules';
-import { ExtensionInstance, HotmapExtension } from './extension';
+import { Behavior, HotmapExtension } from './extension';
 import { Scales } from './scales';
 import { DataDescription, State } from './state';
 import { attrd } from './utils';
 
 
-/** Initial size set to canvas (doesn't really matter because it will be immediately resized to the real size) */
-const CANVAS_INIT_SIZE = { width: 100, height: 100 };
-
-
 export class HeatmapCore<TX, TY, TItem> {
     protected readonly state: State<TX, TY, TItem>;
 
-    registerBehavior<TParams extends {}, TDefaults extends TParams>(behavior: HotmapExtension<TParams, TDefaults>, params?: Partial<TParams>): ExtensionInstance<TParams> {
-        const behaviorInstance = behavior.create(this.state, params);
-        behaviorInstance.register();
-        return behaviorInstance;
+    registerExtension<TParams extends {}, TDefaults extends TParams>(extension: HotmapExtension<TParams, TDefaults>, params?: Partial<TParams>): Behavior<TParams> {
+        const behavior = extension.create(this.state, params);
+        behavior.register();
+        return behavior;
     }
 
     constructor(data: DataDescription<TX, TY, TItem>) {
@@ -52,8 +48,8 @@ export class HeatmapCore<TX, TY, TItem> {
         });
 
         const canvas = attrd(canvasDiv.append('canvas'), {
-            width: CANVAS_INIT_SIZE.width,
-            height: CANVAS_INIT_SIZE.height,
+            width: 100, // Initial canvas size doesn't matter because it will be immediately resized
+            height: 100, // Initial canvas size doesn't matter because it will be immediately resized
             style: { position: 'absolute', width: '100%', height: '100%' },
         });
 
