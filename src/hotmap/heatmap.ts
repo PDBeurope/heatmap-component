@@ -1,13 +1,13 @@
-import { range } from 'lodash';
 import { Array2D } from './data/array2d';
 import { Color } from './data/color';
+import { DataDescription, Provider } from './data/data-description';
 import { Behavior } from './extension';
 import { DefaultNumericColorProviderFactory, DrawExtension, DrawExtensionParams, VisualParams } from './extensions/draw';
 import { MarkerExtension, MarkerExtensionParams } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 import { ZoomExtension, ZoomExtensionParams } from './extensions/zoom';
 import { HeatmapCore } from './heatmap-core';
-import { DataDescription, Provider, XAlignmentMode, YAlignmentMode, ZoomEventParam } from './state';
+import { XAlignmentMode, YAlignmentMode, ZoomEventParam } from './state';
 
 
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
@@ -47,9 +47,12 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
 
     /** Create a new `Heatmap` with dummy data */
     static createDummy(nColumns: number = 20, nRows: number = 20): Heatmap<number, number, number> {
-        return this.create(makeRandomData2(nColumns, nRows));
+        return this.create(DataDescription.createRandomWithGradient(nColumns, nRows));
     }
 
+    /** Replace current data by new data.
+     * (If the new data are of different type, this method effectively changes the generic type parameters of `this`!
+     * Returns re-typed `this`.) */
     setData<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>): Heatmap<TX_, TY_, TItem_> {
         this.state.setData(data);
         return this as unknown as Heatmap<TX_, TY_, TItem_>;
@@ -116,24 +119,4 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
     getZoom(): ZoomEventParam<TX, TY, TItem> {
         return this.state.getZoom();
     }
-}
-
-
-function makeRandomData(nColumns: number, nRows: number): DataDescription<number, number, number> {
-    const raw = Array2D.createRandom(nColumns, nRows);
-    return {
-        items: raw.items as number[],
-        x: (d, i) => i % nColumns,
-        y: (d, i) => Math.floor(i / nColumns),
-        xDomain: range(nColumns),
-        yDomain: range(nRows),
-    };
-}
-
-function makeRandomData2(nColumns: number, nRows: number): DataDescription<number, number, number> {
-    const data = makeRandomData(nColumns, nRows);
-    return {
-        ...data,
-        items: data.items.map((d, i) => (d * 0.5) + (i % nColumns / nColumns * 0.5)),
-    };
 }

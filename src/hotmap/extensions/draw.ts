@@ -5,8 +5,8 @@ import { Downsampler } from '../data/downsampling';
 import { Image } from '../data/image';
 import { HotmapExtension, HotmapBehaviorBase } from '../extension';
 import { Box, scaleDistance } from '../scales';
-import { Provider } from '../state';
 import { Refresher, minimum } from '../utils';
+import { Provider } from '../data/data-description';
 
 
 /** Size of rectangle in pixels, when showing gaps is switched on (switched off for smaller sizes, to avoid Moire patterns) */

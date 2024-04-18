@@ -1,7 +1,8 @@
 import { Class } from '../class-names';
+import { Provider } from '../data/data-description';
 import { HotmapExtension, HotmapBehaviorBase } from '../extension';
 import { Box, XY } from '../scales';
-import { ItemEventParam, Provider } from '../state';
+import { ItemEventParam } from '../state';
 import { attrd, formatDataItem } from '../utils';
 
 

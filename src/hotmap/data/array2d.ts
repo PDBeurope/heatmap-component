@@ -16,7 +16,7 @@ export interface Array2D<TItem> {
 
 export const Array2D = {
     /** Get the value at column `x`, row `y` */
-    getItem<TItem>(data: Array2D<TItem>, x: number, y: number): TItem | undefined {
+    getItem<T>(data: Array2D<T>, x: number, y: number): T | undefined {
         if (x < 0 || x >= data.nColumns || y < 0 || y >= data.nRows) {
             return undefined;
         }
@@ -26,6 +26,13 @@ export const Array2D = {
     /** Return an Array2D with dimensions 0x0 with no data. */
     empty<T>(): Array2D<T> {
         return { nColumns: 0, nRows: 0, items: [], isNumeric: true as any };
+    },
+
+    /** Return an Array2D with dimensions nColumns x nRows. */
+    create<T>(nColumns: number, nRows: number, items: (T | undefined)[]): Array2D<T> {
+        if (items.length !== nColumns * nRows) throw new Error('ValueError: length of `items` must be nColumns * nRows');
+        const isNumeric = items.every(d => typeof d === 'number') as IsNumeric<T>;
+        return { nColumns, nRows, items, isNumeric };
     },
 
     /** Return new `Data` with random values between 0 and 1 */

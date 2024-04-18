@@ -1,8 +1,9 @@
 import { Class } from './class-names';
 import * as d3 from './d3-modules';
+import { DataDescription } from './data/data-description';
 import { Behavior, HotmapExtension } from './extension';
 import { Scales } from './scales';
-import { DataDescription, State } from './state';
+import { State } from './state';
 import { attrd } from './utils';
 
 

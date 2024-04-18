@@ -2,6 +2,7 @@ import { clamp, isEqual, isNil, round } from 'lodash';
 import { BehaviorSubject } from 'rxjs';
 import * as d3 from './d3-modules';
 import { Array2D } from './data/array2d';
+import { DataDescription } from './data/data-description';
 import { Domain } from './data/domain';
 import { Box, Boxes, Scales } from './scales';
 import { getSize } from './utils';
@@ -11,31 +12,6 @@ import { getSize } from './utils';
 const ZOOM_EVENT_ROUNDING_PRECISION = 9;
 const MIN_ZOOMED_DATAPOINTS_HARD = 1;
 
-
-// TODO move to data submodule?
-export type DataDescription<TX, TY, TItem> = {
-    /** Array of X values assigned to columns, from left to right ("column names") */
-    xDomain: TX[],
-    /** Array of Y values assigned to rows, from top to bottom ("row names") */
-    yDomain: TY[],
-    /** Data items to show in the heatmap (each item is visualized as a rectangle) */
-    items: TItem[],
-    /** X values for the data items (either an array with the X values (must have the same length as `items`), or a function that computes X value for given item)  */
-    x: ((dataItem: TItem, index: number) => TX) | TX[],
-    /** Y values for the data items (either an array with the Y values (must have the same length as `items`), or a function that computes Y value for given item)  */
-    y: ((dataItem: TItem, index: number) => TY) | TY[],
-    /** Optional filter function that can be used to show only a subset of data items */
-    filter?: Provider<TX, TY, TItem, boolean>,
-}
-export const DataDescription = {
-    /** Return a DataDescription with no data. */
-    empty<TX, TY, TItem>(): DataDescription<TX, TY, TItem> {
-        return { xDomain: [], yDomain: [], items: [], x: [], y: [] };
-    },
-};
-
-/** A function that returns something (of type `TResult`) for a data item (such functions are passed to setTooltip, setColor etc.). */
-export type Provider<TX, TY, TItem, TResult> = (d: TItem, x: TX, y: TY, xIndex: number, yIndex: number) => TResult
 
 /** Emitted on data-item-related events (hover, click...) */
 export type ItemEventParam<TX, TY, TItem> = {
@@ -105,6 +81,7 @@ export class State<TX, TY, TItem> {
     xDomain: Domain<TX> = Domain.create([]);
     /** Values corresponding to the individual rows */
     yDomain: Domain<TY> = Domain.create([]);
+
     /** Controls how X axis values align with the columns when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on X axis can be aligned to the left edge/center/right edge of the column showing that value) */
     xAlignment: XAlignmentMode = 'center';
     /** Controls how Y axis values align with the rows when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on Y axis is aligned to the top edge/center/bottom edge of the row showing that value) */
@@ -150,43 +127,16 @@ export class State<TX, TY, TItem> {
         this.setData(data);
     }
 
+    /** Replace current data by new data.
+     * (If the new data are of different type, this method effectively changes the generic type parameters of `this`!
+     * Returns re-typed `this`.) */
     setData<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>): State<TX_, TY_, TItem_> {
+        const { array2d, xDomain, yDomain } = DataDescription.toArray2D(data);
         const self = this as unknown as State<TX_, TY_, TItem_>;
-        const { items, x, y, xDomain, yDomain, filter } = data;
-        const nColumns = xDomain.length;
-        const nRows = yDomain.length;
-        const array = new Array<TItem_ | undefined>(nColumns * nRows).fill(undefined);
-        const xs = (typeof x === 'function') ? items.map(x) : x;
-        const ys = (typeof y === 'function') ? items.map(y) : y;
-        self.xDomain = Domain.create(xDomain);
-        self.yDomain = Domain.create(yDomain);
-        let warnedX = false;
-        let warnedY = false;
-        for (let i = 0; i < items.length; i++) {
-            const d = items[i];
-            const x = xs[i];
-            const y = ys[i];
-            const ix = self.xDomain.index.get(x);
-            const iy = self.yDomain.index.get(y);
-            if (ix === undefined) {
-                if (!warnedX) {
-                    console.warn('Some data items map to X values out of the X domain:', d, 'maps to X', x);
-                    warnedX = true;
-                }
-            } else if (iy === undefined) {
-                if (!warnedY) {
-                    console.warn('Some data items map to Y values out of the Y domain:', d, 'maps to Y', y);
-                    warnedY = true;
-                }
-            } else if (filter !== undefined && !filter(d, x, y, ix, iy)) {
-                // skipping this item
-            } else {
-                array[nColumns * iy + ix] = d;
-            }
-        }
-        const isNumeric = items.every(d => typeof d === 'number') as (TItem_ extends number ? true : false);
         self.originalData = data;
-        self.setDataArray({ items: array, nRows, nColumns, isNumeric });
+        self.xDomain = xDomain;
+        self.yDomain = yDomain;
+        self.setDataArray(array2d);
         return self;
     }
 
