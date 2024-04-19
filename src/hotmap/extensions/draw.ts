@@ -9,9 +9,6 @@ import { Refresher, minimum } from '../utils';
 import { Provider } from '../data/data-description';
 
 
-/** Size of rectangle in pixels, when showing gaps is switched on (switched off for smaller sizes, to avoid Moire patterns) */
-const MIN_PIXELS_PER_RECT_FOR_GAPS = 2;
-
 const DefaultColor = Color.fromString('#888888');
 export const DefaultColorProvider = () => DefaultColor;
 export const DefaultNumericColorProviderFactory = (min: number, max: number) => Color.createScale('YlOrRd', [min, max]);
@@ -26,6 +23,8 @@ export interface VisualParams {
     yGapPixels: number | null,
     /** Vertical gap between neighboring rows relative to (row height + gap). If both `yGapPixels` and `yGapRelative` are non-null, the smaller final gap value will be used. The margin before the first and after the last row is half of the gap between rows. */
     yGapRelative: number | null,
+    /** Minimal size (width or height) of rectangle in pixels, when showing gaps is switched on. (Gaps are switched off for smaller sizes, to avoid Moire patterns.) */
+    minRectSizeForGaps: number,
 }
 
 export interface DrawExtensionParams<TX, TY, TItem> extends VisualParams {
@@ -39,6 +38,7 @@ export const DefaultDrawExtensionParams: DrawExtensionParams<unknown, unknown, u
     xGapRelative: 0.1,
     yGapPixels: 2,
     yGapRelative: 0.1,
+    minRectSizeForGaps: 2,
 };
 
 
@@ -148,8 +148,8 @@ export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, ne
             // console.time(`drawThisImage`)
             const rectWidth = scaleDistance(this.state.scales.worldToCanvas.x, 1) * xScale;
             const rectHeight = scaleDistance(this.state.scales.worldToCanvas.y, 1) * yScale;
-            const showXGaps = Box.width(this.state.boxes.canvas) > MIN_PIXELS_PER_RECT_FOR_GAPS * Box.width(this.state.boxes.visWorld);
-            const showYGaps = Box.height(this.state.boxes.canvas) > MIN_PIXELS_PER_RECT_FOR_GAPS * Box.height(this.state.boxes.visWorld);
+            const showXGaps = Box.width(this.state.boxes.canvas) > this.params.minRectSizeForGaps * Box.width(this.state.boxes.visWorld);
+            const showYGaps = Box.height(this.state.boxes.canvas) > this.params.minRectSizeForGaps * Box.height(this.state.boxes.visWorld);
             const xHalfGap = showXGaps ? 0.5 * this.getXGap(rectWidth) : 0;
             const yHalfGap = showYGaps ? 0.5 * this.getYGap(rectHeight) : 0;
             const globalOpacity =

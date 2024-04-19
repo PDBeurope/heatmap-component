@@ -182,7 +182,7 @@ export class State<TX, TY, TItem> {
 
     emitZoom(origin?: string): void {
         const newZoom = this.zoomParamFromVisWorld(this.boxes.visWorld, origin);
-        if (isEqual(newZoom, this.events.zoom.value)) return;  // to avoid infinite loops
+        if (isEqual(newZoom, this.events.zoom.value)) return; // to avoid infinite loops
         this.events.zoom.next(newZoom);
     }
 

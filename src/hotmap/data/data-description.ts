@@ -66,7 +66,7 @@ export const DataDescription = {
     },
 
     /** Create random data */
-    createRandom(nColumns: number, nRows: number, ): DataDescription<number, number, number> {
+    createRandom(nColumns: number, nRows: number): DataDescription<number, number, number> {
         const raw = Array2D.createRandom(nColumns, nRows);
         return {
             items: raw.items as number[],

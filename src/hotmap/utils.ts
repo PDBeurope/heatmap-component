@@ -1,5 +1,4 @@
-import { isEqual, isNil } from 'lodash';
-import { BehaviorSubject } from 'rxjs';
+import { isNil } from 'lodash';
 import * as d3 from './d3-modules';
 import { BoxSize } from './scales';
 
@@ -11,13 +10,13 @@ export async function sleep(ms: number) {
     await new Promise(resolve => setTimeout(resolve, ms));
 }
 
+export type AnySelection = d3.Selection<any, any, any, any>
+
 /** Return size of a DOM element `selection` */
 export function getSize(selection: AnySelection): BoxSize {
     const { width, height } = selection.node()!.getBoundingClientRect();
     return { width, height };
 }
-
-export type AnySelection = d3.Selection<any, any, any, any>
 
 /** Syntax sugar for applying attributes and styles to D3 selections.
  * Automatically converts camelCase to kebab-case (don't for really camelCase attributes, like `viewBox`). */
@@ -30,6 +29,8 @@ export function attrd<S extends AnySelection>(selection: S, attributes: Record<s
     }
     return selection;
 }
+
+/** Convert camelCaseString to kebab-case-string */
 export function kebabCase(str: string) {
     return str.replace(/([A-Z])/g, '-$1').toLowerCase();
 }

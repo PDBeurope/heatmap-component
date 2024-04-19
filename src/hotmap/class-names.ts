@@ -15,5 +15,3 @@ export const Class = {
     OverlayShade: 'hotmap-overlay-shade',
     OverlayMessage: 'hotmap-overlay-message',
 } as const;
-
-// TODO move more constants here?

@@ -3,6 +3,6 @@
 
 export * from 'd3-color';
 export * from 'd3-scale';
-export * from 'd3-scale-chromatic'; // (21 KB)
+export * from 'd3-scale-chromatic';
 export * from 'd3-selection';
-export * from 'd3-zoom'; // (27 KB)
+export * from 'd3-zoom';
