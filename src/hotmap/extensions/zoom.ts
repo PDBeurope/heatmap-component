@@ -68,7 +68,7 @@ export const ZoomExtension = HotmapExtension.fromClass({
             if (this.zoomBehavior) {
                 // Remove any old behavior
                 this.zoomBehavior.on('zoom', null);
-                this.targetElement.on(".zoom", null);
+                this.targetElement.on('.zoom', null);
                 this.zoomBehavior = undefined;
             }
             if (this.params.axis === 'none') return;
