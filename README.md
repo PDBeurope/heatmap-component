@@ -2,6 +2,10 @@
 
 TypeScript library for creating interactive grid heatmaps
 
+## Documentation
+
+[Documentation](./docs/index)
+
 ## Install dependencies and build
 
 ```sh
