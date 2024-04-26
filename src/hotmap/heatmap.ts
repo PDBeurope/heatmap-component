@@ -111,6 +111,12 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
         return this;
     }
 
+    /** Set zooming parameters. Use `axis` parameter to turn zooming on/off. */
+    setZooming(params: Partial<ZoomExtensionParams>): this {
+        this.extensions.zoom?.update(params);
+        return this;
+    }
+
     /** Enforce change of zoom and return the zoom value after the change */
     zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined): ZoomEventParam<TX, TY, TItem> {
         return this.state.zoom(z);

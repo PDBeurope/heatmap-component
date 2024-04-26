@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+- Zooming is off by default (call `hm.setZooming({ axis: 'x' })` to turn it on)
+
 ## [0.8.0] - 2024-04-26
 
 - More efficient drawing to canvas (`putImageData` instead of `fillRect`)

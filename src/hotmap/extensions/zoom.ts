@@ -6,6 +6,7 @@ import { attrd } from '../utils';
 
 
 export interface ZoomExtensionParams {
+    axis: 'none' | 'x',
     /** Only interpret scrolling as zoom when the Control key is pressed (or Meta key, i.e. Command/Windows).  If `false`, zooming is allowed always, but Ctrl or Meta key makes it faster. */
     scrollRequireCtrl: boolean,
     /** Adjust how sensitive zooming is to wheel events */
@@ -17,6 +18,7 @@ export interface ZoomExtensionParams {
 }
 
 export const DefaultZoomExtensionParams: ZoomExtensionParams = {
+    axis: 'none',
     scrollRequireCtrl: false,
     zoomSensitivity: 1,
     panSensitivity: 0.6,
@@ -29,9 +31,12 @@ export const ZoomExtension = HotmapExtension.fromClass({
     defaultParams: DefaultZoomExtensionParams,
     behavior: class extends HotmapBehaviorBase<ZoomExtensionParams> {
         private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
+        /** Used to merge multiple wheel events into one gesture (needed for correct functioning on Mac touchpad) */
         private readonly currentWheelGesture = { lastTimestamp: 0, lastAbsDelta: 0, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false };
         /** Used to avoid emitting a new zoom event when adjusting D3 zoom behavior to zoom changes from elsewhere */
         private suppressEmit: boolean = false;
+        /** DOM element to which the the zoom behavior is bound */
+        private get targetElement() { return this.state.dom?.svg; }
 
         register() {
             super.register();
@@ -51,16 +56,22 @@ export const ZoomExtension = HotmapExtension.fromClass({
             });
         }
         update(params: Partial<ZoomExtensionParams>): void {
+            const needsReapply = params.axis !== undefined && params.axis !== this.params.axis;
             super.update(params);
+            if (needsReapply) this.addZoomBehavior();
             this.adjustZoomExtent();
+            this.adjustZoom();
         }
 
         private addZoomBehavior() {
-            if (!this.state.dom) return;
+            if (!this.targetElement) return;
             if (this.zoomBehavior) {
                 // Remove any old behavior
                 this.zoomBehavior.on('zoom', null);
+                this.targetElement.on(".zoom", null);
+                this.zoomBehavior = undefined;
             }
+            if (this.params.axis === 'none') return;
             this.zoomBehavior = d3.zoom();
             this.zoomBehavior.filter(e => (e instanceof WheelEvent) ? (this.wheelAction(e).kind === 'zoom') : true);
             this.zoomBehavior.wheelDelta(e => {
@@ -70,8 +81,8 @@ export const ZoomExtension = HotmapExtension.fromClass({
             });
             this.zoomBehavior.on('zoom', e => this.handleZoom(e));
 
-            this.state.dom.svg.call(this.zoomBehavior as any);
-            this.state.dom.svg.on('wheel.customzoom', e => this.handleWheel(e)); // Avoid calling the event 'wheel.zoom', that would conflict with zoom behavior
+            this.targetElement.call(this.zoomBehavior as any);
+            this.targetElement.on('wheel.customzoom', e => this.handleWheel(e)); // Avoid calling the event 'wheel.zoom', that would conflict with zoom behavior
         }
 
         /** Handle zoom event coming from the D3 zoom behavior */
@@ -85,7 +96,7 @@ export const ZoomExtension = HotmapExtension.fromClass({
 
         /** Handle event coming directly from the mouse wheel (customizes basic D3 zoom behavior) */
         private handleWheel(e: WheelEvent) {
-            if (!this.state.dom) return;
+            if (!this.targetElement) return;
             e.preventDefault(); // avoid scrolling or previous-page gestures
 
             // Magic to handle touchpad scrolling on Mac
@@ -95,7 +106,7 @@ export const ZoomExtension = HotmapExtension.fromClass({
                 const action = this.wheelAction(e);
                 if (action.kind === 'pan') {
                     const shiftX = this.params.panSensitivity * scaleDistance(this.state.scales.canvasToWorld.x, action.deltaX);
-                    this.zoomBehavior.duration(1000).translateBy(this.state.dom.svg as any, shiftX, 0);
+                    this.zoomBehavior.duration(1000).translateBy(this.targetElement as any, shiftX, 0);
                 }
                 if (action.kind === 'showHelp') {
                     this.showScrollingMessage();
@@ -133,11 +144,11 @@ export const ZoomExtension = HotmapExtension.fromClass({
 
         /** Synchronize the state of the zoom behavior with the visWorld box (e.g. when canvas resizes) */
         private adjustZoom() {
-            if (!this.state.dom) return;
+            if (!this.targetElement) return;
             if (!this.zoomBehavior) return;
             const currentZoom = this.visWorldToZoomTransform(this.state.boxes.visWorld);
             this.suppressEmit = true;
-            this.zoomBehavior.transform(this.state.dom.svg as any, currentZoom);
+            this.zoomBehavior.transform(this.targetElement as any, currentZoom);
             this.suppressEmit = false;
         }
 

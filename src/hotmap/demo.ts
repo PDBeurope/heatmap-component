@@ -12,6 +12,7 @@ export function demo(divElementOrId: HTMLDivElement | string) {
     hm.render(divElementOrId);
     // hm.setFilter(d => d > 0.1);
     // setTimeout(()=> hm.setFilter(undefined), 2000);
+    hm.setZooming({ axis: 'x' });
     (window as any).hm = hm;
     // const q = resamplingCoefficients(10, 4, { from: 2.6, to: 10 });
     // for (let i = 0; i < q.from.length; i++) {
@@ -91,6 +92,7 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
             d3.select('#xmax').text(e.xMax);
         }
     });
+    hm.setZooming({ axis: 'x' });
     hm.render(divElementOrId);
     (window as any).hm = hm;
 }
