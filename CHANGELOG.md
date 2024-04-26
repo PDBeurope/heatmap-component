@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+## [0.8.0] - 2024-04-26
+
 - More efficient drawing to canvas (`putImageData` instead of `fillRect`)
 - Breaking change: renamed `click` event to `select`
 
