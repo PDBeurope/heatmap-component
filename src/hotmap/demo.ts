@@ -97,4 +97,28 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
     (window as any).hm = hm;
 }
 
+export function demo3(divElementOrId: HTMLDivElement | string) {
+    const items = [
+        { col: 0, row: 0, score: 0.6 },
+        { col: 0, row: 1, score: 0.4 },
+        { col: 0, row: 2, score: -1 },
+        { col: 1, row: 1, score: 0.6 },
+        { col: 2, row: 0, score: 0.6 },
+        { col: 2, row: 1, score: 0.8 },
+        { col: 2, row: 2, score: 1 },
+    ];
+    const hm = Heatmap.create({
+        xDomain: [0, 1, 2],
+        yDomain: [0, 1, 2],
+        items: items,
+        x: d => d.col,
+        y: d => d.row,
+    });
+    const colorScale = d3.scaleLinear([-1, 0, 1], ['#E13D3D', '#ffffff', '#2C8C11']);
+    hm.setColor(d => colorScale(d.score));
+    hm.setVisualParams({ xGapRelative: 0.1, yGapRelative: 0.1, xGapPixels: null, yGapPixels: null });
+    hm.render(divElementOrId);
+    (window as any).hm = hm;
+}
+
 

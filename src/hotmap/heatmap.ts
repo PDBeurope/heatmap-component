@@ -10,6 +10,8 @@ import { HeatmapCore } from './heatmap-core';
 import { XAlignmentMode, YAlignmentMode, ZoomEventParam } from './state';
 
 
+// TODO: Must: fix markers on resize
+// TODO: Should: adjust GitHub action to build always, publish pages on main branch, publish npm on tag
 // TODO: Should: publish on npm before we move this to production, serve via jsdelivr
 // TODO: Should: docs
 // TODO: Could: reorganize demos and index.html, github.io
