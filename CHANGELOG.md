@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+## [0.9.0] - 2024-04-29
+
 -   Renamed the package from `hotmap` to `heatmap-component`
 -   Zooming is off by default (call `hm.setZooming({ axis: 'x' })` to turn it on)
 

@@ -122,7 +122,7 @@ jobs:
           with:
             name: build
             path: build
-        # - name: NPM Publish
-        #   run: npm publish
-        #   env:
-        #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        - name: NPM Publish
+          run: npm publish
+          env:
+            NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

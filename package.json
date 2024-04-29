@@ -1,7 +1,12 @@
 {
   "name": "heatmap-component",
-  "version": "0.8.0",
-  "description": "",
+  "version": "0.9.0",
+  "description": "TypeScript library for creating interactive grid heatmaps",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PDBeurope/heatmap-component.git"
+  },
+  "homepage": "https://PDBeurope.github.io/heatmap-component",
   "files": [
     "build",
     "lib",

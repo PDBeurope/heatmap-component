@@ -4,21 +4,32 @@ TypeScript library for creating interactive grid heatmaps
 
 ## Documentation
 
-[Documentation](./docs/index)
+[Documentation pages](./docs/index)
 
-## Install dependencies and build
+## Demos
+
+[Demos](./demo)
+
+## Development
+
+### Get source code
+
+```sh
+git clone https://github.com/PDBeurope/heatmap-component.git
+cd heatmap-component/
+```
+
+### Install dependencies and build
 
 ```sh
 npm install
 npm run rebuild
 ```
 
-## Run locally
+### Run locally
 
 ```sh
 npm run start
 ```
 
-Go to <http://localhost:7000/demo/>
-
-:)
+Then go to <http://localhost:7000/demo/>
