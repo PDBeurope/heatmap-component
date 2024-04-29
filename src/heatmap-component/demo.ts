@@ -3,26 +3,8 @@ import { Heatmap } from './heatmap';
 import { formatDataItem } from './utils';
 
 
-export function demo(divElementOrId: HTMLDivElement | string) {
-    const hm = Heatmap.createDummy(2e5, 20); // Heatmap<number, number, number>
-    hm.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
-    // hm.setVisualParams({ yGapRelative: 0 });
-    // hm.setColor(Color.createScale([0, 0.5, 1], ['#00d', '#ddd', '#d00']));
-    // hm.setColor(d3.scaleLinear([0, 0.5, 1], ['#00d', '#ddd', '#d00']));
-    hm.render(divElementOrId);
-    // hm.setFilter(d => d > 0.1);
-    // setTimeout(()=> hm.setFilter(undefined), 2000);
-    hm.setZooming({ axis: 'x' });
-    (window as any).hm = hm;
-    // const q = resamplingCoefficients(10, 4, { from: 2.6, to: 10 });
-    // for (let i = 0; i < q.from.length; i++) {
-    //     console.log(q.from[i], q.to[i], q.weight[i]);
-    // }
-    // console.log(sum(q.weight));
-    // benchmarkColor('#caffeeee', 1e7)
-}
-
-export function demo2(divElementOrId: HTMLDivElement | string) {
+/** Demo showing small data with a lot of customizations */
+export function demo1(divElementOrId: HTMLDivElement | string) {
     const items = [
         { col: 1, row: 'A', score: 0.0 },
         { col: 1, row: 'B', score: 0.2 },
@@ -97,6 +79,28 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
     (window as any).hm = hm;
 }
 
+/** Demo showing a big data example (200_000 x 20) */
+export function demo2(divElementOrId: HTMLDivElement | string) {
+    const hm = Heatmap.createDummy(2e5, 20); // Heatmap<number, number, number>
+    hm.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
+    // hm.setVisualParams({ yGapRelative: 0 });
+    // hm.setColor(Color.createScale([0, 0.5, 1], ['#00d', '#ddd', '#d00']));
+    // hm.setColor(d3.scaleLinear([0, 0.5, 1], ['#00d', '#ddd', '#d00']));
+    hm.render(divElementOrId);
+    // hm.setFilter(d => d > 0.1);
+    // setTimeout(()=> hm.setFilter(undefined), 2000);
+    hm.setZooming({ axis: 'x' });
+    (window as any).hm = hm;
+    // const q = resamplingCoefficients(10, 4, { from: 2.6, to: 10 });
+    // for (let i = 0; i < q.from.length; i++) {
+    //     console.log(q.from[i], q.to[i], q.weight[i]);
+    // }
+    // console.log(sum(q.weight));
+    // benchmarkColor('#caffeeee', 1e7)
+}
+
+
+/** Demo generating the heatmap-component logo */
 export function demo3(divElementOrId: HTMLDivElement | string) {
     const items = [
         { col: 0, row: 0, score: 0.6 },
