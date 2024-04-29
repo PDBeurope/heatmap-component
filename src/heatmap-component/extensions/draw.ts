@@ -3,7 +3,7 @@ import { Array2D } from '../data/array2d';
 import { Color } from '../data/color';
 import { Downsampler } from '../data/downsampling';
 import { Image } from '../data/image';
-import { HotmapExtension, HotmapBehaviorBase } from '../extension';
+import { HeatmapExtension, HeatmapBehaviorBase } from '../extension';
 import { Box, scaleDistance } from '../scales';
 import { Refresher, minimum } from '../utils';
 import { Provider } from '../data/data-description';
@@ -42,10 +42,10 @@ export const DefaultDrawExtensionParams: DrawExtensionParams<unknown, unknown, u
 };
 
 
-export const DrawExtension: HotmapExtension<DrawExtensionParams<never, never, never>, typeof DefaultDrawExtensionParams> = HotmapExtension.fromClass({
+export const DrawExtension: HeatmapExtension<DrawExtensionParams<never, never, never>, typeof DefaultDrawExtensionParams> = HeatmapExtension.fromClass({
     name: 'builtin.sample',
     defaultParams: DefaultDrawExtensionParams,
-    behavior: class <TX, TY, TItem> extends HotmapBehaviorBase<DrawExtensionParams<TX, TY, TItem>> {
+    behavior: class <TX, TY, TItem> extends HeatmapBehaviorBase<DrawExtensionParams<TX, TY, TItem>> {
         /** Canvas rendering context */
         private ctx?: CanvasRenderingContext2D;
         /** Manager for downsampled images */

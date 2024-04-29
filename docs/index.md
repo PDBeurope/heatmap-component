@@ -1,4 +1,4 @@
-# Hotmap documentation
+# HeatmapComponent documentation
 
 The following text is just for testing the deployment pipeline. It's not the real documentation ;)
 

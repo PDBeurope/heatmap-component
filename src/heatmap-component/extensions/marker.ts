@@ -1,5 +1,5 @@
 import { Class } from '../class-names';
-import { HotmapExtension, HotmapBehaviorBase } from '../extension';
+import { HeatmapExtension, HeatmapBehaviorBase } from '../extension';
 import { Box, scaleDistance } from '../scales';
 import { ItemEventParam } from '../state';
 import { attrd } from '../utils';
@@ -13,10 +13,10 @@ export const DefaultMarkerExtensionParams: MarkerExtensionParams = {
     markerCornerRadius: 1,
 };
 
-export const MarkerExtension = HotmapExtension.fromClass({
+export const MarkerExtension = HeatmapExtension.fromClass({
     name: 'builtin.marker',
     defaultParams: DefaultMarkerExtensionParams,
-    behavior: class extends HotmapBehaviorBase<MarkerExtensionParams> {
+    behavior: class extends HeatmapBehaviorBase<MarkerExtensionParams> {
         register() {
             super.register();
             this.subscribe(this.state.events.hover, pointed => {

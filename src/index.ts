@@ -1,5 +1,5 @@
 /** Entrypoint for the bundle */
 
-import * as Hotmap from './main';
+import * as HeatmapComponent from './main';
 
-(window as any).Hotmap = Hotmap;
+(window as any).HeatmapComponent = HeatmapComponent;

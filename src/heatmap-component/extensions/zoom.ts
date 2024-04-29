@@ -1,6 +1,6 @@
 import { Class } from '../class-names';
 import * as d3 from '../d3-modules';
-import { HotmapExtension, HotmapBehaviorBase } from '../extension';
+import { HeatmapExtension, HeatmapBehaviorBase } from '../extension';
 import { Box, scaleDistance } from '../scales';
 import { attrd } from '../utils';
 
@@ -26,10 +26,10 @@ export const DefaultZoomExtensionParams: ZoomExtensionParams = {
 };
 
 
-export const ZoomExtension = HotmapExtension.fromClass({
+export const ZoomExtension = HeatmapExtension.fromClass({
     name: 'builtin.zoom',
     defaultParams: DefaultZoomExtensionParams,
-    behavior: class extends HotmapBehaviorBase<ZoomExtensionParams> {
+    behavior: class extends HeatmapBehaviorBase<ZoomExtensionParams> {
         private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
         /** Used to merge multiple wheel events into one gesture (needed for correct functioning on Mac touchpad) */
         private readonly currentWheelGesture = { lastTimestamp: 0, lastAbsDelta: 0, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false };

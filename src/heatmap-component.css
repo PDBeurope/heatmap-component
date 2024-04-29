@@ -5,24 +5,24 @@
     --tooltip-offset-y: 8px;
 }
 
-.hotmap-main-div {
+.heatmap-main-div {
     font-family: sans-serif;
 }
 
-.hotmap-canvas-div {
+.heatmap-canvas-div {
     /* Set background-color here to change the background of the heatmap */
     background-color: none;
 }
 
-.hotmap-tooltip-box,
-.hotmap-pinned-tooltip-box {
+.heatmap-tooltip-box,
+.heatmap-pinned-tooltip-box {
     z-index: 0;
     /* Avoid tooltip flickering */
     pointer-events: none;
 }
 
-.hotmap-tooltip-content,
-.hotmap-pinned-tooltip-content {
+.heatmap-tooltip-content,
+.heatmap-pinned-tooltip-content {
     margin-left: var(--tooltip-offset-x);
     margin-bottom: var(--tooltip-offset-y);
     border: solid black 1px;
@@ -34,7 +34,7 @@
     width: max-content;
 }
 
-.hotmap-pinned-tooltip-close {
+.heatmap-pinned-tooltip-close {
     position: absolute;
     top: -8px;
     right: -8px;
@@ -47,7 +47,7 @@
     cursor: pointer;
 }
 
-.hotmap-pinned-tooltip-close svg {
+.heatmap-pinned-tooltip-close svg {
     position: absolute;
     width: 100%;
     height: 100%;
@@ -55,7 +55,7 @@
     stroke: white;
 }
 
-.hotmap-pinned-tooltip-pin {
+.heatmap-pinned-tooltip-pin {
     position: absolute;
     left: 0px;
     bottom: 0px;
@@ -64,11 +64,11 @@
     z-index: -1;
 }
 
-.hotmap-pinned-tooltip-pin svg {
+.heatmap-pinned-tooltip-pin svg {
     fill: black;
 }
 
-.hotmap-overlay {
+.heatmap-overlay {
     position: absolute;
     width: 100%;
     height: 100%;
@@ -80,7 +80,7 @@
     z-index: 0;
 }
 
-.hotmap-overlay-shade {
+.heatmap-overlay-shade {
     position: absolute;
     width: 100%;
     height: 100%;
@@ -89,7 +89,7 @@
     z-index: -1;
 }
 
-.hotmap-overlay-message {
+.heatmap-overlay-message {
     margin: 5px;
     padding-block: 1em;
     padding-inline: 1.6em;
@@ -101,14 +101,14 @@
     box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.75);
 }
 
-.hotmap-marker {
+.heatmap-marker {
     stroke: black;
     stroke-width: 4;
     fill: none;
 }
 
-.hotmap-marker-x,
-.hotmap-marker-y {
+.heatmap-marker-x,
+.heatmap-marker-y {
     stroke: black;
     stroke-width: 2;
     fill: none;

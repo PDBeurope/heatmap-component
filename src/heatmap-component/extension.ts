@@ -22,10 +22,10 @@ export interface Extension<TState, TParams extends {}, TDefaults extends TParams
 }
 
 
-export type HotmapExtension<TParams extends {}, TDefaults extends TParams> = Extension<State<any, any, any>, TParams, TDefaults>
+export type HeatmapExtension<TParams extends {}, TDefaults extends TParams> = Extension<State<any, any, any>, TParams, TDefaults>
 
 
-export class HotmapBehaviorBase<TParams extends {}, TX = any, TY = any, TItem = any> implements Behavior<TParams> {
+export class HeatmapBehaviorBase<TParams extends {}, TX = any, TY = any, TItem = any> implements Behavior<TParams> {
     constructor(protected state: State<TX, TY, TItem>, protected params: TParams) { }
     private readonly subscriptions: Unsubscribable[] = [];
     register() { };
@@ -55,14 +55,14 @@ export class HotmapBehaviorBase<TParams extends {}, TX = any, TY = any, TItem = 
     };
 }
 
-type HotmapExtensionCreationParam<TParams extends {}, TDefaults extends TParams> = {
+type HeatmapExtensionCreationParam<TParams extends {}, TDefaults extends TParams> = {
     name: ScopedExtensionName,
     defaultParams: TDefaults,
-    behavior: typeof HotmapBehaviorBase<TParams>,
+    behavior: typeof HeatmapBehaviorBase<TParams>,
 }
 
-export const HotmapExtension = {
-    fromClass<TParams extends {}, TDefaults extends TParams>(p: HotmapExtensionCreationParam<TParams, TDefaults>): HotmapExtension<TParams, TDefaults> {
+export const HeatmapExtension = {
+    fromClass<TParams extends {}, TDefaults extends TParams>(p: HeatmapExtensionCreationParam<TParams, TDefaults>): HeatmapExtension<TParams, TDefaults> {
         return {
             name: p.name,
             defaultParams: p.defaultParams,

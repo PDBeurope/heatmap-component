@@ -1,4 +1,4 @@
-# hotmap
+# Heatmap Component
 
 TypeScript library for creating interactive grid heatmaps
 

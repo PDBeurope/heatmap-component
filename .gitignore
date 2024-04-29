@@ -12,4 +12,4 @@ npm-debug.log
 
 # NPM built package
 /package/
-/hotmap-*.tgz
+/heatmap-component-*.tgz
