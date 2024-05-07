@@ -3,7 +3,7 @@ import { Color } from './data/color';
 import { DataDescription, Provider } from './data/data-description';
 import { Behavior } from './extension';
 import { DefaultNumericColorProviderFactory, DrawExtension, DrawExtensionParams, VisualParams } from './extensions/draw';
-import { MarkerExtension, MarkerExtensionParams } from './extensions/marker';
+import { MarkerBehavior, MarkerExtension } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 import { ZoomExtension, ZoomExtensionParams } from './extensions/zoom';
 import { HeatmapCore } from './heatmap-core';
@@ -25,7 +25,7 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
     get events() { return this.state.events; }
 
     readonly extensions: {
-        marker?: Behavior<MarkerExtensionParams>,
+        marker?: MarkerBehavior,
         tooltip?: Behavior<TooltipExtensionParams<TX, TY, TItem>>,
         draw?: Behavior<DrawExtensionParams<TX, TY, TItem>>,
         zoom?: Behavior<ZoomExtensionParams>,
@@ -40,7 +40,7 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
             const dataRange = Array2D.getRange(heatmap.state.dataArray as Array2D<number>);
             colorProvider = DefaultNumericColorProviderFactory(dataRange.min, dataRange.max) as Provider<TX, TY, TItem, Color>;
         }
-        heatmap.extensions.marker = heatmap.registerExtension(MarkerExtension);
+        heatmap.extensions.marker = heatmap.registerExtension(MarkerExtension) as MarkerBehavior;
         heatmap.extensions.tooltip = heatmap.registerExtension(TooltipExtension);
         heatmap.extensions.draw = heatmap.registerExtension(DrawExtension, { colorProvider });
         heatmap.extensions.zoom = heatmap.registerExtension(ZoomExtension);
