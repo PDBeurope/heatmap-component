@@ -5,18 +5,32 @@ import { attrd } from '../utils';
 
 
 export interface MarkerExtensionParams {
+    /** Radius for rounding the corners of the marker rectangle */
     markerCornerRadius: number,
+    /** Ignore mouse events (when markers are managed programmaticaly) */
+    freeze: boolean,
 }
 
 export const DefaultMarkerExtensionParams: MarkerExtensionParams = {
     markerCornerRadius: 1,
+    freeze: false,
 };
 
 export class MarkerBehavior extends HeatmapBehaviorBase<MarkerExtensionParams> {
+    private readonly currentlyMarked: { xIndex: number | undefined, yIndex: number | undefined } = { xIndex: undefined, yIndex: undefined };
+
     register() {
         super.register();
         this.subscribe(this.state.events.hover, pointed => {
-            this.drawMarkers(pointed);
+            if (!this.params.freeze) {
+                this.drawMarkers(pointed);
+            }
+        });
+        this.subscribe(this.state.events.resize, () => {
+            this.drawMarkers(this.currentlyMarked);
+        });
+        this.subscribe(this.state.events.zoom, () => {
+            this.drawMarkers(this.currentlyMarked);
         });
     }
 
@@ -25,6 +39,8 @@ export class MarkerBehavior extends HeatmapBehaviorBase<MarkerExtensionParams> {
         if (pointed) {
             const xIndex = (pointed?.xIndex !== undefined) ? pointed.xIndex : this.state.xDomain.index.get(pointed?.x);
             const yIndex = (pointed?.yIndex !== undefined) ? pointed.yIndex : this.state.yDomain.index.get(pointed?.y);
+            this.currentlyMarked.xIndex = xIndex;
+            this.currentlyMarked.yIndex = yIndex;
             const xCoord = (xIndex !== undefined) ? this.state.scales.worldToCanvas.x(xIndex) : undefined;
             const yCoord = (yIndex !== undefined) ? this.state.scales.worldToCanvas.y(yIndex) : undefined;
             const width = scaleDistance(this.state.scales.worldToCanvas.x, 1);
