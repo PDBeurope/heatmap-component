@@ -4,26 +4,30 @@
 <head>
   <meta charset="utf-8" />
   <title>HeatmapComponent demo 1</title>
-  <!-- <script src="https://d3js.org/d3.v6.min.js"></script> -->
   <link rel="shortcut icon" type="image/x-icon" href="../favicon.ico">
   <link rel="stylesheet" type="text/css" href="../build/heatmap-component.css" />
   <script src="../build/heatmap-component.js"></script>
 </head>
 
 <body>
-  <!-- Your visualization will be placed here -->
-  <div id="app" style="width: 1000px; height: 300px; max-width: 95%; min-width: 400px; border: solid gainsboro 1px;">
+  <div style="width: 1000px; max-width: 95%; min-width: 400px;">
+    <!-- Your visualization will be placed here -->
+    <div id="app" style="width: 100%; height: 300px; border: solid gainsboro 1px;"></div>
+
+    <div style="display: flex; justify-content: space-between; margin: 5px;">
+      <div>xMinIndex: <span id="xminindex">?</span></div>
+      <div>xMaxIndex: <span id="xmaxindex">?</span></div>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin: 5px;">
+      <div>xMin: <span id="xmin">?</span></div>
+      <div>xMax: <span id="xmax">?</span></div>
+    </div>
+
+    <p style="margin-top: 30px;">
+      Use scroll to zoom, Shift+scroll (or horizontal scroll) to pan.
+    </p>
+    <div style="height: 100vh;"></div>
   </div>
-
-  <div id="xminindex">X</div>
-  <div id="xmaxindex" style="text-align: right;">X</div>
-  <div id="xmin">X</div>
-  <div id="xmax" style="text-align: right;">X</div>
-
-  <p style="margin-top: 30px;">
-    Use scroll to zoom, Shift+scroll (or horizontal scroll) to pan.
-  </p>
-  <div style="height: 100vh;"></div>
 
   <script>
     HeatmapComponent.demo1('app');

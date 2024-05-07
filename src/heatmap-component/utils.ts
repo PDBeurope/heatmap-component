@@ -19,7 +19,7 @@ export function getSize(selection: AnySelection): BoxSize {
 }
 
 /** Syntax sugar for applying attributes and styles to D3 selections.
- * Automatically converts camelCase to kebab-case (don't for really camelCase attributes, like `viewBox`). */
+ * Automatically converts camelCase to kebab-case (don't use for really camelCase attributes, like `viewBox`). */
 export function attrd<S extends AnySelection>(selection: S, attributes: Record<string, any> & { style?: Record<string, any> }): S {
     for (const name in attributes) {
         if (name !== 'style') selection.attr(kebabCase(name), attributes[name]);

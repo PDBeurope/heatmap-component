@@ -25,7 +25,7 @@ export type DataDescription<TX, TY, TItem> = {
 export const DataDescription = {
     /** Return a DataDescription with no data. */
     empty<TX, TY, TItem>(): DataDescription<TX, TY, TItem> {
-        return { xDomain: [], yDomain: [], items: [], x: [], y: [] };
+        return { items: [], xDomain: [null as TX], yDomain: [null as TY], x: () => null as TX, y: () => null as TY };
     },
     /** Place items into a 2D array, return the 2D array and domains. */
     toArray2D<TX, TY, TItem>(data: DataDescription<TX, TY, TItem>): { array2d: Array2D<TItem>, xDomain: Domain<TX>, yDomain: Domain<TY> } {

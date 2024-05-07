@@ -10,9 +10,6 @@ import { HeatmapCore } from './heatmap-core';
 import { XAlignmentMode, YAlignmentMode, ZoomEventParam } from './state';
 
 
-// TODO: Must: fix markers on resize
-// TODO: Should: adjust GitHub action to build always, publish pages on main branch, publish npm on tag
-// TODO: Should: publish on npm before we move this to production, serve via jsdelivr
 // TODO: Should: docs
 // TODO: Could: reorganize demos and index.html, github.io
 // TODO: Could: allow triggering markers from outside the code (and only vertical or only horizontal specifically, i.e. by handling out-of scope x/y appropriately)
@@ -46,6 +43,12 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
         heatmap.extensions.zoom = heatmap.registerExtension(ZoomExtension);
 
         return heatmap;
+    }
+
+    /** Create a new `Heatmap` without data (can add later via `.setData()`) */
+    static createEmpty<TX, TY, TItem>(): Heatmap<TX, TY, TItem> {
+        const data: DataDescription<TX, TY, TItem> = DataDescription.empty();
+        return this.create(data);
     }
 
     /** Create a new `Heatmap` with dummy data */

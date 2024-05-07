@@ -154,6 +154,7 @@ export class State<TX, TY, TItem> {
         }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
         this.scales = Scales(this.boxes);
         this.events.data.next(data);
+        this.emitZoom('setDataArray');
     }
 
 

@@ -20,10 +20,10 @@ export const Box = {
         return point.x >= box.xmin && point.x <= box.xmax && point.y >= box.ymin && point.y <= box.ymax;
     },
     clamp(box: Box, constraint: Box, minWidth: number = 0, minHeight: number = 0) {
-        const xmin = clamp(box.xmin, constraint.xmin, constraint.xmax - minWidth);
-        const xmax = clamp(box.xmax, xmin + minWidth, constraint.xmax);
-        const ymin = clamp(box.ymin, constraint.ymin, constraint.ymax - minHeight);
-        const ymax = clamp(box.ymax, ymin + minHeight, constraint.ymax);
+        const xmin = isNaN(box.xmin) ? constraint.xmin : clamp(box.xmin, constraint.xmin, constraint.xmax - minWidth);
+        const xmax = isNaN(box.xmax) ? constraint.xmax : clamp(box.xmax, xmin + minWidth, constraint.xmax);
+        const ymin = isNaN(box.ymin) ? constraint.ymin : clamp(box.ymin, constraint.ymin, constraint.ymax - minHeight);
+        const ymax = isNaN(box.ymax) ? constraint.ymax : clamp(box.ymax, ymin + minHeight, constraint.ymax);
         return Box.create(xmin, ymin, xmax, ymax);
     },
 };
