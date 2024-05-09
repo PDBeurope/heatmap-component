@@ -1,5 +1,4 @@
-# Sample workflow for building and deploying a Jekyll site to GitHub Pages
-name: Deploy Jekyll with GitHub Pages dependencies preinstalled
+name: Build package, deploy pages, publish npm package
 
 on:
   # Runs on push to any branch and on pull request merge

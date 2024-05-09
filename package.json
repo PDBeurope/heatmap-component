@@ -15,11 +15,12 @@
   ],
   "main": "lib/main.js",
   "scripts": {
-    "rebuild": "rm -rf tsconfig.tsbuildinfo lib/ build/ && npm run build",
-    "build": "npm run build-cpx && npm run build-tsc && npm run build-webpack",
+    "rebuild": "npm run clean && npm run build",
+    "build": "npm run build-cpx && npm run build-tsc && npm run build-webpack && node scripts.js add-banners",
     "build-cpx": "cpx src/**/*.css build/",
     "build-tsc": "tsc",
     "build-webpack": "webpack --mode production --config ./webpack.config.js",
+    "clean": "node scripts.js rm lib/ build/ tsconfig.tsbuildinfo",
     "start": "concurrently -c 'gray,green,blue,magenta' --names 'cpx,tsc,wpk,srv' --kill-others 'npm:watch-cpx' 'npm:watch-tsc' 'npm:watch-webpack' 'npm:serve'",
     "watch": "concurrently -c 'gray,green,blue' --names 'cpx,tsc,wpk' --kill-others 'npm:watch-cpx' 'npm:watch-tsc' 'npm:watch-webpack'",
     "watch-cpx": "cpx --watch src/*.css build/",
@@ -28,8 +29,8 @@
     "serve": "http-server -p 7000",
     "lint": "eslint src",
     "test": "jest src",
-    "prepack": "mv README.md README-git.md && mv README.npm.md README.md",
-    "postpack": "mv README.md README.npm.md && mv README-git.md README.md"
+    "prepack": "node scripts.js mv README.md README-git.md && node scripts.js mv README.npm.md README.md",
+    "postpack": "node scripts.js mv README.md README.npm.md && node scripts.js mv README-git.md README.md"
   },
   "author": "Protein Data Bank in Europe (PDBe), European Bioinformatics Institute (EMBL-EBI)",
   "contributors": [
