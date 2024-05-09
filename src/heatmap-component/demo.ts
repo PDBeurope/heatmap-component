@@ -91,7 +91,8 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
     const hm = Heatmap.createDummy(2e5, 20); // Heatmap<number, number, number>
     hm.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
     // hm.setColor(Color.createScale([0, 0.5, 1], ['#00d', '#ddd', '#d00']));
-    hm.setColor(Color.createScale('Magma', [0, 1], [1, 0]));
+    hm.setColor(Color.createScale('Magma', [0, 1]));
+    // hm.setColor(Color.createScale('Magma', [0, 1], [1, 0])); // reverse direction
     hm.render(divElementOrId);
     // hm.setFilter(d => d > 0.1);
     // setTimeout(()=> hm.setFilter(undefined), 2000);
@@ -109,26 +110,24 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
 /** Demo generating the heatmap-component logo */
 export function demo3(divElementOrId: HTMLDivElement | string) {
     const items = [
-        { col: 0, row: 0, score: 0.6 },
-        { col: 0, row: 1, score: 0.4 },
-        { col: 0, row: 2, score: -1 },
-        { col: 1, row: 1, score: 0.6 },
-        { col: 2, row: 0, score: 0.6 },
-        { col: 2, row: 1, score: 0.8 },
-        { col: 2, row: 2, score: 1 },
+        { col: 1, row: 'A', score: 0.6 },
+        { col: 1, row: 'B', score: 0.4 },
+        { col: 1, row: 'C', score: -1 },
+        { col: 2, row: 'B', score: 0.6 },
+        { col: 3, row: 'A', score: 0.6 },
+        { col: 3, row: 'B', score: 0.8 },
+        { col: 3, row: 'C', score: 1 },
     ];
     const hm = Heatmap.create({
-        xDomain: [0, 1, 2],
-        yDomain: [0, 1, 2],
+        xDomain: [1, 2, 3],
+        yDomain: ['A', 'B', 'C'],
         items: items,
         x: d => d.col,
         y: d => d.row,
     });
-    const colorScale = Color.createScale([-1, 0, 1], ['#E13D3D', '#ffffff', '#2C8C11']); // like d3.scaleLinear([-1, 0, 1], ['#E13D3D', '#ffffff', '#2C8C11']);
+    const colorScale = Color.createScale([-1, 0, 1], ['#E13D3D', 'white', '#2C8C11']); // like d3.scaleLinear([-1, 0, 1], ['#E13D3D', 'white', '#2C8C11']);
     hm.setColor(d => colorScale(d.score));
     hm.setVisualParams({ xGapRelative: 0.1, yGapRelative: 0.1, xGapPixels: null, yGapPixels: null });
     hm.render(divElementOrId);
     (window as any).hm = hm;
 }
-
-

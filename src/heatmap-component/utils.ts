@@ -120,7 +120,7 @@ export function removeElement<T>(array: T[], element: T): void {
 export function shallowMerge<T>(old: T, new_?: Partial<T>): T {
     const result: T = { ...old };
     for (const key in new_) {
-        const newValue = new_[key];
+        const newValue: T[typeof key] | undefined = new_[key];
         if (newValue !== undefined) {
             result[key] = newValue;
         }
