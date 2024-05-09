@@ -6,15 +6,17 @@ TypeScript library for creating interactive grid heatmaps
 
 TODO: more intro, why we do this
 TODO: high level overview of functionality
-TODO: image
+
+![Heatmap Component](./docs/heatmap-component.png)
 
 ## Documentation
 
--   [Documentation pages](./docs/README.md)
+-   Documentation for the current repository: [./docs/README.md](./docs/README.md)
+-   Documentation for the latest release: <https://github.com/PDBeurope/heatmap-component/blob/v0.9.0/docs/README.md>
 
 ## Demos
 
--   [Live demos on github.io](https://pdbeurope.github.io/heatmap-component/)
+-   Live demos: <https://pdbeurope.github.io/heatmap-component/> (deployed from `main` branch)
 
 ## npm package
 
@@ -49,7 +51,7 @@ Then go to http://localhost:7000/
 To release a new version of this package:
 
 -   Change version in `package.json`
--   Change version in the documentation link in `README.npm.md`
+-   Change version in the documentation link in `README.md` and `README.npm.md`
 -   Update `CHANGELOG.md`
 -   Run `npm install` (to update `package-lock.json`)
 -   Ensure `npm lint && npm rebuild && npm test` works properly

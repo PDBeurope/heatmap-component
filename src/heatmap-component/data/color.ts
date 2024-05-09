@@ -158,9 +158,6 @@ export const Color = {
     fromImage(image: Image, x: number, y: number): Color {
         return this.fromAragabaArray(image.items, 4 * (y * image.nColumns + x));
     },
-    /** Create a color scale, e.g. `Color.createScale('Magma', [0, 1], [0, 1])` or `Color.createScale([0, 0.5, 1], ['white', 'orange', 'brown'])` */
-    createScale,
-
     mix(color0: Color, color1: Color, q: number): Color {
         const a0 = color0 >>> 24 & 255;
         const r0 = color0 >>> 16 & 255;
@@ -444,9 +441,10 @@ function createScaleFromScheme(schemeName: D3ColorSchemeName, domain: [number, n
     return createScaleFromColors(dom, cols);
 }
 
-function createScale(schemeName: D3ColorSchemeName, domain?: [number, number], range?: [number, number]): ((x: number) => Color);
-function createScale(domain: number[], colors: (Color | string)[]): ((x: number) => Color);
-function createScale(a: D3ColorSchemeName | number[], b?: any, c?: any): ((x: number) => Color) {
+/** Create a color scale, e.g. `createColorScale('Magma', [0, 1], [0, 1])` or `createColorScale([0, 0.5, 1], ['white', 'orange', 'brown'])` */
+export function createColorScale(schemeName: D3ColorSchemeName, domain?: [number, number], range?: [number, number]): ((x: number) => Color);
+export function createColorScale(domain: number[], colors: (Color | string)[]): ((x: number) => Color);
+export function createColorScale(a: D3ColorSchemeName | number[], b?: any, c?: any): ((x: number) => Color) {
     if (typeof a === 'string') return createScaleFromScheme(a, b, c);
     else return createScaleFromColors(a, b);
 }
