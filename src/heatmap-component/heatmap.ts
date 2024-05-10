@@ -11,11 +11,13 @@ import { XAlignmentMode, YAlignmentMode, ZoomEventParam } from './state';
 
 
 // TODO: Should: docs
+// TODO: Could: categorical color schemes
 // TODO: Could: reorganize demos and index.html, github.io
 // TODO: Could: allow triggering markers from outside the code (and only vertical or only horizontal specifically, i.e. by handling out-of scope x/y appropriately)
 // TODO: Could: various zoom modes (horizontal, vertical, both, none...)
 // TODO: Would: try setting `downsamplingPixelsPerRect` dynamically, based on rendering times
 // TODO: Would: Smoothen zooming and panning with mouse wheel?
+// TODO: Would: Tooltip/marker only showing on click?
 
 
 export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {

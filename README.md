@@ -2,25 +2,53 @@
 
 # Heatmap Component
 
-TypeScript library for creating interactive grid heatmaps
+TypeScript library for creating interactive grid heatmaps.
 
-TODO: more intro, why we do this
-TODO: high level overview of functionality
+The goal of Heatmap Component is to provide a tool for visualizing two-dimensional data in the form of grid heatmaps. It focuses on interactivity, performance, and customizability.
+
+### Features
+
+-   Data type flexibility: appropriate for 2D arrays of numerical data, categorical data, and more complex data types
+-   Customizable color scheme
+-   Interactivity:
+    -   Zooming (currently only in x-axis direction)
+    -   Markers: highlighting current column, row, and data item
+    -   Tooltips: showing custom content when the user hovers or clicks a data item
+-   Efficient canvas-based rendering: smooth visualizations even with millions of data items
+-   Integrability with other components via exposed events (hover, select, zoom...)
+-   Extensibility: new behaviors can be added via extensions
+
+### What it doesn't do
+
+-   Visualization of data that don't fit into a 2D grid
+-   Other shapes than rectangles
+-   Axis labeling
+-   Data loading or modification via UI
+
+### Example of Heatmap Component visualization
 
 ![Heatmap Component](./docs/heatmap-component.png)
+
+### Live demos
+
+<https://pdbeurope.github.io/heatmap-component/> (deployed from `main` branch)
+
+---
 
 ## Documentation
 
 -   Documentation for the current repository: [./docs/README.md](./docs/README.md)
 -   Documentation for the latest release: <https://github.com/PDBeurope/heatmap-component/blob/v0.9.0/docs/README.md>
 
-## Demos
-
--   Live demos: <https://pdbeurope.github.io/heatmap-component/> (deployed from `main` branch)
+---
 
 ## npm package
 
-This package is published to npm: https://www.npmjs.com/package/heatmap-component
+This package is published to npm:
+
+<https://www.npmjs.com/package/heatmap-component>
+
+---
 
 ## Development
 
