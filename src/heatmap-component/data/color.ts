@@ -433,6 +433,10 @@ function createScaleFromColors(domain: number[], colors: (Color | string)[]) {
 
 function createScaleFromScheme(schemeName: D3ColorSchemeName, domain: [number, number] = [0, 1], range_: [number, number] = [0, 1]): ((x: number) => Color) {
     const colorInterpolator = d3[`interpolate${schemeName}`];
+    if (!colorInterpolator) {
+        const schemes = Object.keys(d3).filter(k => k.indexOf('interpolate') === 0).map(k => k.replace(/^interpolate/, ''));
+        throw new Error(`Invalid color scheme name: "${schemeName}".\n(Available schemes: ${schemes})`);
+    }
     const n = 100;
     const domSc = d3.scaleLinear([0, n], domain);
     const ranSc = d3.scaleLinear([0, n], range_);
