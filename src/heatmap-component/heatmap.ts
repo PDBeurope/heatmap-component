@@ -1,8 +1,7 @@
-import { Array2D } from './data/array2d';
 import { Color } from './data/color';
 import { DataDescription, Provider } from './data/data-description';
 import { Behavior } from './extension';
-import { DefaultNumericColorProviderFactory, DrawExtension, DrawExtensionParams, VisualParams } from './extensions/draw';
+import { DrawExtension, DrawExtensionParams, VisualParams } from './extensions/draw';
 import { MarkerBehavior, MarkerExtension } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 import { ZoomExtension, ZoomExtensionParams } from './extensions/zoom';
@@ -34,14 +33,9 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
     static create<TX, TY, TItem>(data: DataDescription<TX, TY, TItem>): Heatmap<TX, TY, TItem> {
         const heatmap = new this(data);
 
-        let colorProvider: Provider<TX, TY, TItem, Color> | undefined = undefined;
-        if (heatmap.state.dataArray.isNumeric) {
-            const dataRange = Array2D.getRange(heatmap.state.dataArray as Array2D<number>);
-            colorProvider = DefaultNumericColorProviderFactory(dataRange.min, dataRange.max) as Provider<TX, TY, TItem, Color>;
-        }
         heatmap.extensions.marker = heatmap.registerExtension(MarkerExtension) as MarkerBehavior;
         heatmap.extensions.tooltip = heatmap.registerExtension(TooltipExtension);
-        heatmap.extensions.draw = heatmap.registerExtension(DrawExtension, { colorProvider });
+        heatmap.extensions.draw = heatmap.registerExtension(DrawExtension);
         heatmap.extensions.zoom = heatmap.registerExtension(ZoomExtension);
 
         return heatmap;

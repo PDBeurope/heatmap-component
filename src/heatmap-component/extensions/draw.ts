@@ -1,6 +1,6 @@
 import { clamp, isNil } from 'lodash';
 import { Array2D } from '../data/array2d';
-import { Color, createColorScale } from '../data/color';
+import { Color } from '../data/color';
 import { Downsampler } from '../data/downsampling';
 import { Image } from '../data/image';
 import { HeatmapExtension, HeatmapBehaviorBase } from '../extension';
@@ -11,7 +11,6 @@ import { Provider } from '../data/data-description';
 
 const DefaultColor = Color.fromString('#888888');
 export const DefaultColorProvider = () => DefaultColor;
-export const DefaultNumericColorProviderFactory = (min: number, max: number) => createColorScale('YlOrRd', [min, max]);
 
 
 export interface VisualParams {

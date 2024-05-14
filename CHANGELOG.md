@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file, following t
 
 -   Support for `Heatmap.createEmpty()` and setting data later
 -   Can manipulate markers via `hm.extensions.marker?.drawMarkers({...})`
+-   Default coloring is "everything gray", even for numeric values
 
 ## [0.9.0] - 2024-04-29
 
