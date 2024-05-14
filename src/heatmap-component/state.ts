@@ -76,7 +76,7 @@ export class State<TX, TY, TDatum> {
     /** Data as provided to the `setData` method */
     originalData: DataDescription<TX, TY, TDatum> = DataDescription.empty();
     /** A 2D array with the data values, for fast access to a specific row and column */
-    dataArray: Array2D<TDatum> = Array2D.empty();
+    dataArray: Array2D<TDatum | undefined> = Array2D.empty();
     /** Values corresponding to the individual columns */
     xDomain: Domain<TX> = Domain.create([]);
     /** Values corresponding to the individual rows */
@@ -117,8 +117,8 @@ export class State<TX, TY, TDatum> {
         /** Fires when the window is resized */
         resize: new BehaviorSubject<Box | undefined>(undefined),
         /** Fires when the visualized data change (including filter or domain change) */
-        data: new BehaviorSubject<Array2D<TDatum> | undefined>(undefined),
-        /** Fires when the component is initially render in a div */
+        data: new BehaviorSubject<undefined>(undefined),
+        /** Fires when the component is initially rendered in a div */
         render: new BehaviorSubject<undefined>(undefined),
     } as const;
 
@@ -140,7 +140,7 @@ export class State<TX, TY, TDatum> {
         return self;
     }
 
-    private setDataArray(dataArray: Array2D<TDatum>): void {
+    private setDataArray(dataArray: Array2D<TDatum | undefined>): void {
         this.dataArray = dataArray;
         const newWholeWorld = Box.create(0, 0, dataArray.nColumns, dataArray.nRows);
         const xScale = Box.width(newWholeWorld) / Box.width(this.boxes.wholeWorld);
@@ -153,7 +153,7 @@ export class State<TX, TY, TDatum> {
             ymax: this.boxes.visWorld.ymax * yScale
         }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
         this.scales = Scales(this.boxes);
-        this.events.data.next(dataArray);
+        this.events.data.next(undefined);
         this.emitZoom('setDataArray');
     }
 

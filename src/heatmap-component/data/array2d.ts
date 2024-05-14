@@ -2,15 +2,14 @@ import { range } from 'lodash';
 import { IsNumeric } from '../utils';
 
 
-/** Represents a 2D array of values of type `T | undefined` */
-// TODO avoid including undefined in the type implicitely
+/** Represents a 2D array of values of type `T` */
 export interface Array2D<T> {
     /** Number of columns */
     nColumns: number,
     /** Number of rows */
     nRows: number,
     /** Data values. Value for column `x`, row `y` is saved at index `y*nColumns + x`. Use `Array2D.get()` instead of accessing directly. */
-    values: ArrayLike<T | undefined>,
+    values: ArrayLike<T>,
     /** Indicates whether the values are numbers */
     isNumeric: IsNumeric<T>,
 }
@@ -30,7 +29,7 @@ export const Array2D = {
     },
 
     /** Return an Array2D with dimensions nColumns x nRows. */
-    create<T>(nColumns: number, nRows: number, values: (T | undefined)[]): Array2D<T> {
+    create<T>(nColumns: number, nRows: number, values: T[]): Array2D<T> {
         if (values.length !== nColumns * nRows) throw new Error('ValueError: length of `values` must be nColumns * nRows');
         const isNumeric = values.every(d => typeof d === 'number') as IsNumeric<T>;
         return { nColumns, nRows, values, isNumeric };
@@ -55,7 +54,6 @@ export const Array2D = {
         let max = -Infinity;
         for (let i = 0; i < n; i++) {
             const d = values[i];
-            if (d === undefined) continue;
             if (d < min) min = d;
             if (d > max) max = d;
         }

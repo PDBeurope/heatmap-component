@@ -28,7 +28,7 @@ export const DataDescription = {
         return { data: [], xDomain: [null as TX], yDomain: [null as TY], x: () => null as TX, y: () => null as TY };
     },
     /** Place data items into a 2D array, return the 2D array and domains. */
-    toArray2D<TX, TY, TDatum>(data: DataDescription<TX, TY, TDatum>): { array2d: Array2D<TDatum>, xDomain: Domain<TX>, yDomain: Domain<TY> } {
+    toArray2D<TX, TY, TDatum>(data: DataDescription<TX, TY, TDatum>): { array2d: Array2D<TDatum | undefined>, xDomain: Domain<TX>, yDomain: Domain<TY> } {
         const { data: items, x, y, filter } = data;
         const xDomain = Domain.create(data.xDomain);
         const yDomain = Domain.create(data.yDomain);
