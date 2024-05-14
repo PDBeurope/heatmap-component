@@ -29,8 +29,9 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
         zoom?: Behavior<ZoomExtensionParams>,
     } = {};
 
-    /** Create a new `Heatmap` and set `data` */
-    static create<TX, TY, TItem>(data: DataDescription<TX, TY, TItem>): Heatmap<TX, TY, TItem> {
+    /** Create a new `Heatmap` and optionaly set `data`.
+     * If you omit the `data` parameter, you add data later via `.setData(data)`. */
+    static create<TX, TY, TItem>(data: DataDescription<TX, TY, TItem> = DataDescription.empty()): Heatmap<TX, TY, TItem> {
         const heatmap = new this(data);
 
         heatmap.extensions.marker = heatmap.registerExtension(MarkerExtension) as MarkerBehavior;
@@ -39,17 +40,6 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
         heatmap.extensions.zoom = heatmap.registerExtension(ZoomExtension);
 
         return heatmap;
-    }
-
-    /** Create a new `Heatmap` without data (can add later via `.setData()`) */
-    static createEmpty<TX, TY, TItem>(): Heatmap<TX, TY, TItem> {
-        const data: DataDescription<TX, TY, TItem> = DataDescription.empty();
-        return this.create(data);
-    }
-
-    /** Create a new `Heatmap` with dummy data */
-    static createDummy(nColumns: number = 20, nRows: number = 20): Heatmap<number, number, number> {
-        return this.create(DataDescription.createRandomWithGradient(nColumns, nRows));
     }
 
     /** Replace current data by new data.

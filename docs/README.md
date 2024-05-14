@@ -83,11 +83,11 @@ Create a heatmap instance using the prepared data.
 const heatmap = HeatmapComponent.Heatmap.create(data);
 ```
 
-Alternatives to `create` are `createEmpty`, which returns a new heatmap instance without data (you can add data later via `heatmap.setData(data)`), or `createDummy`, which uses random numerical data.
+You can also call `create()` with no argument and add data later via `heatmap.setData(data)`.
 
 ### Step 5: Customize
 
-Customize the heatmap instance as needed. Typically, you'll want to specify coloring. This is done by calling `setColor` method and providing a coloring function, which takes a datum and returns a color (can be a CSS color, e.g. `'green'`, `'#f00000'`, `'rgba(255,0,0,0.5)'`, or a package-specific `Color` type (encoding each color as a 32-bit unsigned interger for better performance TODO: link to details)). The coloring function can also take multiple parameters, being datum, column name, row name, column index, row index.
+Customize the heatmap instance as needed. Typically, you'll want to specify coloring (default coloring assigns gray color to any datum). This is done by calling `setColor` method and providing a coloring function, which takes a datum and returns a color (can be a CSS color, e.g. `'green'`, `'#f00000'`, `'rgba(255,0,0,0.5)'`, or a package-specific `Color` type (encoding each color as a 32-bit unsigned interger for better performance TODO: link to details)). The coloring function can also take multiple parameters, being datum, column name, row name, column index, row index.
 
 Use `HeatmapComponent.createColorScale` to create continuous color scales (details [here](./color-scales.md)).
 

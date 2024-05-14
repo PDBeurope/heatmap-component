@@ -1,4 +1,5 @@
 import { Heatmap, createColorScale } from '../main';
+import { DataDescription } from './data/data-description';
 
 
 /** Demo showing small data with a lot of customizations */
@@ -86,7 +87,8 @@ function setTextContent(elementSelector: string, content: unknown): void {
 
 /** Demo showing a big data example (200_000 x 20) */
 export function demo2(divElementOrId: HTMLDivElement | string) {
-    const hm = Heatmap.createDummy(2e5, 20); // Heatmap<number, number, number>
+    const data = DataDescription.createRandomWithGradient(2e5, 20);
+    const hm = Heatmap.create(data); // Heatmap<number, number, number>
     hm.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
     // hm.setColor(createScale([0, 0.5, 1], ['#00d', '#ddd', '#d00']));
     hm.setColor(createColorScale('Magma', [0, 1]));
