@@ -70,11 +70,6 @@ export function runWithTiming(f: () => any) {
     return end - start;
 }
 
-export function formatDataItem(item: any): string {
-    if (typeof item === 'number') return item.toFixed(3);
-    else return JSON.stringify(item);
-}
-
 /** Helper for running potentially time-consuming "refresh" actions (e.g. canvas draw) in a non-blocking way.
  * If the caller calls `requestRefresh()`, this call returns immediately but it is guaranteed
  * that `refresh` will be run asynchronously in the future.

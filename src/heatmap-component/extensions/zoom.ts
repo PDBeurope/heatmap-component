@@ -13,7 +13,7 @@ export interface ZoomExtensionParams {
     zoomSensitivity: number;
     /** Adjust how sensitive panning is to wheel events */
     panSensitivity: number;
-    /** Smallest width or height that can be zoomed in (expressed as number of data items) */
+    /** Smallest width or height that can be zoomed in (expressed as number of columns/rows) */
     minZoomedDatapoints: number;
 }
 
@@ -90,7 +90,7 @@ export const ZoomExtension = HeatmapExtension.fromClass({
             const visWorld = this.zoomTransformToVisWorld(e.transform);
             this.state.zoomVisWorldBox(visWorld, ZoomExtension.name, !this.suppressEmit);
             if (e.sourceEvent) {
-                this.state.events.hover.next(this.state.getPointedItem(e.sourceEvent));
+                this.state.events.hover.next(this.state.getPointedCell(e.sourceEvent));
             }
         }
 
@@ -112,7 +112,7 @@ export const ZoomExtension = HeatmapExtension.fromClass({
                     this.showScrollingMessage();
                 }
             }
-            this.state.events.hover.next(this.state.getPointedItem(e));
+            this.state.events.hover.next(this.state.getPointedCell(e));
         }
 
         /** Magic to handle touchpad scrolling on Mac (when user lifts fingers from touchpad, but the browser is still getting wheel events) */

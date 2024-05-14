@@ -13,9 +13,9 @@ const ZOOM_EVENT_ROUNDING_PRECISION = 9;
 const MIN_ZOOMED_DATAPOINTS_HARD = 1;
 
 
-/** Emitted on data-item-related events (hover, click...) */
-export type ItemEventParam<TX, TY, TItem> = {
-    datum: TItem,
+/** Emitted on data-cell-related events (hover, click...) */
+export type CellEventParam<TX, TY, TDatum> = {
+    datum: TDatum,
     x: TX,
     y: TY,
     xIndex: number,
@@ -24,7 +24,7 @@ export type ItemEventParam<TX, TY, TItem> = {
 } | undefined
 
 /** Emitted on zoom event */
-export type ZoomEventParam<TX, TY, TItem> = {
+export type ZoomEventParam<TX, TY> = {
     /** Continuous X index corresponding to the left edge of the viewport */
     xMinIndex: number,
     /** Continuous X index corresponding to the right edge of the viewport */
@@ -72,11 +72,11 @@ export type XAlignmentMode = 'left' | 'center' | 'right'
 export type YAlignmentMode = 'top' | 'center' | 'bottom'
 
 
-export class State<TX, TY, TItem> {
+export class State<TX, TY, TDatum> {
     /** Data as provided to the `setData` method */
-    originalData: DataDescription<TX, TY, TItem> = DataDescription.empty();
-    /** A 2D array with the data items, for fast access to a specific row and column */
-    dataArray: Array2D<TItem> = Array2D.empty();
+    originalData: DataDescription<TX, TY, TDatum> = DataDescription.empty();
+    /** A 2D array with the data values, for fast access to a specific row and column */
+    dataArray: Array2D<TDatum> = Array2D.empty();
     /** Values corresponding to the individual columns */
     xDomain: Domain<TX> = Domain.create([]);
     /** Values corresponding to the individual rows */
@@ -106,43 +106,43 @@ export class State<TX, TY, TItem> {
         svg: d3.Selection<SVGSVGElement, any, any, any>;
     };
 
-    /** Custom events fired by the heatmap component, all are RXJS `BehaviorSubject` */
+    /** Custom events fired by the heatmap component, all are RxJS `BehaviorSubject` */
     readonly events = {
         /** Fires when the user hovers over the component */
-        hover: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
-        /** Fires when the user selects/deselects a data item (e.g. by clicking on it) */
-        select: new BehaviorSubject<ItemEventParam<TX, TY, TItem>>(undefined),
+        hover: new BehaviorSubject<CellEventParam<TX, TY, TDatum>>(undefined),
+        /** Fires when the user selects/deselects a cell (e.g. by clicking on it) */
+        select: new BehaviorSubject<CellEventParam<TX, TY, TDatum>>(undefined),
         /** Fires when the component is zoomed in or out, or panned (translated) */
-        zoom: new BehaviorSubject<ZoomEventParam<TX, TY, TItem>>(undefined),
+        zoom: new BehaviorSubject<ZoomEventParam<TX, TY>>(undefined),
         /** Fires when the window is resized */
         resize: new BehaviorSubject<Box | undefined>(undefined),
         /** Fires when the visualized data change (including filter or domain change) */
-        data: new BehaviorSubject<Array2D<TItem> | undefined>(undefined),
+        data: new BehaviorSubject<Array2D<TDatum> | undefined>(undefined),
         /** Fires when the component is initially render in a div */
         render: new BehaviorSubject<undefined>(undefined),
     } as const;
 
 
-    constructor(data: DataDescription<TX, TY, TItem>) {
-        this.setData(data);
+    constructor(dataDescription: DataDescription<TX, TY, TDatum>) {
+        this.setData(dataDescription);
     }
 
     /** Replace current data by new data.
      * (If the new data are of different type, this method effectively changes the generic type parameters of `this`!
      * Returns re-typed `this`.) */
-    setData<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>): State<TX_, TY_, TItem_> {
-        const { array2d, xDomain, yDomain } = DataDescription.toArray2D(data);
-        const self = this as unknown as State<TX_, TY_, TItem_>;
-        self.originalData = data;
+    setData<TX_, TY_, TDatum_>(dataDescription: DataDescription<TX_, TY_, TDatum_>): State<TX_, TY_, TDatum_> {
+        const { array2d, xDomain, yDomain } = DataDescription.toArray2D(dataDescription);
+        const self = this as unknown as State<TX_, TY_, TDatum_>;
+        self.originalData = dataDescription;
         self.xDomain = xDomain;
         self.yDomain = yDomain;
         self.setDataArray(array2d);
         return self;
     }
 
-    private setDataArray(data: Array2D<TItem>): void {
-        this.dataArray = data;
-        const newWholeWorld = Box.create(0, 0, data.nColumns, data.nRows);
+    private setDataArray(dataArray: Array2D<TDatum>): void {
+        this.dataArray = dataArray;
+        const newWholeWorld = Box.create(0, 0, dataArray.nColumns, dataArray.nRows);
         const xScale = Box.width(newWholeWorld) / Box.width(this.boxes.wholeWorld);
         const yScale = Box.height(newWholeWorld) / Box.height(this.boxes.wholeWorld);
         this.boxes.wholeWorld = newWholeWorld;
@@ -153,19 +153,19 @@ export class State<TX, TY, TItem> {
             ymax: this.boxes.visWorld.ymax * yScale
         }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
         this.scales = Scales(this.boxes);
-        this.events.data.next(data);
+        this.events.data.next(dataArray);
         this.emitZoom('setDataArray');
     }
 
 
-    /** Return data item that is being pointed by the mouse in `event` */
-    getPointedItem(event: MouseEvent | undefined): ItemEventParam<TX, TY, TItem> {
+    /** Return data cell that is being pointed by the mouse in `event` */
+    getPointedCell(event: MouseEvent | undefined): CellEventParam<TX, TY, TDatum> {
         if (!event) {
             return undefined;
         }
         const xIndex = Math.floor(this.scales.canvasToWorld.x(event.offsetX));
         const yIndex = Math.floor(this.scales.canvasToWorld.y(event.offsetY));
-        const datum = Array2D.getItem(this.dataArray, xIndex, yIndex);
+        const datum = Array2D.get(this.dataArray, xIndex, yIndex);
         if (!datum) {
             return undefined;
         }
@@ -194,7 +194,7 @@ export class State<TX, TY, TItem> {
         this.emitZoom('setAlignment');
     }
 
-    private zoomParamFromVisWorld(box: Box | undefined, origin?: string): ZoomEventParam<TX, TY, TItem> {
+    private zoomParamFromVisWorld(box: Box | undefined, origin?: string): ZoomEventParam<TX, TY> {
         if (!box) return undefined;
 
         const xMinIndex_ = round(box.xmin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
@@ -234,7 +234,7 @@ export class State<TX, TY, TItem> {
 
     }
 
-    private getZoomRequestIndexMagic(axis: 'x' | 'y', end: 'Min' | 'Max', z: Partial<ZoomEventParam<TX, TY, TItem>>): number | undefined {
+    private getZoomRequestIndexMagic(axis: 'x' | 'y', end: 'Min' | 'Max', z: Partial<ZoomEventParam<TX, TY>>): number | undefined {
         if (isNil(z)) return undefined;
 
         const fl = end === 'Min' ? 'First' : 'Last';
@@ -278,7 +278,7 @@ export class State<TX, TY, TItem> {
     }
 
     /** Enforce change of zoom and return the zoom value after the change */
-    zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined): ZoomEventParam<TX, TY, TItem> {
+    zoom(z: Partial<ZoomEventParam<TX, TY>> | undefined): ZoomEventParam<TX, TY> {
         const visWorldBox = Box.clamp({
             xmin: this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.boxes.wholeWorld.xmin,
             xmax: this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.boxes.wholeWorld.xmax,
@@ -297,7 +297,7 @@ export class State<TX, TY, TItem> {
     }
 
     /** Return current zoom */
-    getZoom(): ZoomEventParam<TX, TY, TItem> {
+    getZoom(): ZoomEventParam<TX, TY> {
         return this.zoomParamFromVisWorld(this.boxes.visWorld, undefined);
     }
 

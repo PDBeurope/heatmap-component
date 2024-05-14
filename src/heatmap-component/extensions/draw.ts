@@ -26,9 +26,9 @@ export interface VisualParams {
     minRectSizeForGaps: number,
 }
 
-export interface DrawExtensionParams<TX, TY, TItem> extends VisualParams {
-    /** Function that returns color for each data item */
-    colorProvider: Provider<TX, TY, TItem, string | Color>,
+export interface DrawExtensionParams<TX, TY, TDatum> extends VisualParams {
+    /** Function that returns color for each data cell */
+    colorProvider: Provider<TX, TY, TDatum, string | Color>,
 }
 
 export const DefaultDrawExtensionParams: DrawExtensionParams<unknown, unknown, unknown> = {
@@ -44,7 +44,7 @@ export const DefaultDrawExtensionParams: DrawExtensionParams<unknown, unknown, u
 export const DrawExtension: HeatmapExtension<DrawExtensionParams<never, never, never>, typeof DefaultDrawExtensionParams> = HeatmapExtension.fromClass({
     name: 'builtin.sample',
     defaultParams: DefaultDrawExtensionParams,
-    behavior: class <TX, TY, TItem> extends HeatmapBehaviorBase<DrawExtensionParams<TX, TY, TItem>> {
+    behavior: class <TX, TY, TDatum> extends HeatmapBehaviorBase<DrawExtensionParams<TX, TY, TDatum>> {
         /** Canvas rendering context */
         private ctx?: CanvasRenderingContext2D;
         /** Manager for downsampled images */
@@ -69,7 +69,7 @@ export const DrawExtension: HeatmapExtension<DrawExtensionParams<never, never, n
                 this.requestDraw();
             });
         }
-        update(params: Partial<DrawExtensionParams<TX, TY, TItem>>) {
+        update(params: Partial<DrawExtensionParams<TX, TY, TDatum>>) {
             if (params.colorProvider !== this.params.colorProvider) {
                 this.downsampler = undefined;
             }
@@ -85,9 +85,9 @@ export const DrawExtension: HeatmapExtension<DrawExtensionParams<never, never, n
             const image = Image.create(this.state.dataArray.nColumns, this.state.dataArray.nRows);
             for (let iy = 0; iy < this.state.dataArray.nRows; iy++) {
                 for (let ix = 0; ix < this.state.dataArray.nColumns; ix++) {
-                    const item = Array2D.getItem(this.state.dataArray, ix, iy);
-                    if (item === undefined) continue; // keep transparent black
-                    const color = this.params.colorProvider(item, this.state.xDomain.values[ix], this.state.yDomain.values[iy], ix, iy);
+                    const datum = Array2D.get(this.state.dataArray, ix, iy);
+                    if (datum === undefined) continue; // keep transparent black
+                    const color = this.params.colorProvider(datum, this.state.xDomain.values[ix], this.state.yDomain.values[iy], ix, iy);
                     const c = (typeof color === 'string') ? Color.fromString(color) : color;
                     Color.toImage(c, image, ix, iy);
                 }

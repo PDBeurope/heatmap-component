@@ -5,8 +5,10 @@ All notable changes to this project will be documented in this file, following t
 ## [Unreleased]
 
 -   `Heatmap.create` callable without `data` parameter
+-   Renamed item/items to datum/data in several places
 -   Can manipulate markers via `hm.extensions.marker?.drawMarkers({...})`
 -   Default coloring is "everything gray", even for numeric values
+-   Dropped `formatDataItem` function
 
 ## [0.9.0] - 2024-04-29
 

@@ -10,18 +10,18 @@ export interface Image {
     /** Pixel colors saved in "ARaGaBa" 4-tuples (`alpha*255`, `red*alpha`, `green*alpha`, `blue*alpha`).
      * This is a good representation for image downsampling.
      * Values for column `x`, row `y` are saved at index `(y*nColumn+x)*4` and three following indices. */
-    items: Uint8ClampedArray,
+    values: Uint8ClampedArray,
 }
 
 export const Image = {
     /** Create a new image filled with transparent black */
     create(width: number, height: number): Image {
-        return { nColumns: width, nRows: height, items: new Uint8ClampedArray(width * height * 4) };
+        return { nColumns: width, nRows: height, values: new Uint8ClampedArray(width * height * 4) };
     },
 
     /** Clear the whole image to transparent black */
     clear(image: Image) {
-        image.items.fill(0);
+        image.values.fill(0);
     },
 
     /** Draw a filled rectangle to the image. Only use for non-overlapping rectangles!!! */
@@ -46,17 +46,17 @@ export const Image = {
 
     /** Convert `Image` (ARaGaBa) to regular `ImageData` (RGBA) */
     toImageData(image: Image, out: ImageData): ImageData {
-        for (let i = 0, n = image.items.length; i < n; i += 4) {
-            const color = Color.fromAragabaArray(image.items, i);
+        for (let i = 0, n = image.values.length; i < n; i += 4) {
+            const color = Color.fromAragabaArray(image.values, i);
             Color.toRgbaArray(color, out.data, i);
         }
         return out;
     },
 
-    /** Throw error if the length of `items` does not correspond to image size */
+    /** Throw error if the length of `values` does not correspond to image size */
     validateLength(image: Image) {
-        if (image.items.length !== 4 * image.nColumns * image.nRows) {
-            throw new Error('ValueError: length of Image.items must be 4 * Image.nColumns * Image.nRows');
+        if (image.values.length !== 4 * image.nColumns * image.nRows) {
+            throw new Error('ValueError: length of image.values must be 4 * image.nColumns * image.nRows');
         }
     },
 };

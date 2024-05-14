@@ -2,18 +2,18 @@ import { Class } from '../class-names';
 import { Provider } from '../data/data-description';
 import { HeatmapExtension, HeatmapBehaviorBase } from '../extension';
 import { Box, XY } from '../scales';
-import { ItemEventParam } from '../state';
-import { attrd, formatDataItem } from '../utils';
+import { CellEventParam } from '../state';
+import { attrd } from '../utils';
 
 
-function DefaultTooltipProvider(dataItem: unknown, x: unknown, y: unknown, xIndex: number, yIndex: number): string {
-    return `x index: ${xIndex}<br>y index: ${yIndex}<br>x value: ${x}<br>y value: ${y}<br>item: ${formatDataItem(dataItem)}`;
+function DefaultTooltipProvider(datum: unknown, x: unknown, y: unknown, xIndex: number, yIndex: number): string {
+    return `x: ${JSON.stringify(x)} (index ${xIndex}) <br> y: ${JSON.stringify(y)} (index ${yIndex}) <br> datum: ${JSON.stringify(datum)}`;
 }
 
 
-/** Parameters for `TooltipExtension`. Contravariant on `TX`, `TY`, `TItem`.  */
-export interface TooltipExtensionParams<TX, TY, TItem> {
-    tooltipProvider: Provider<TX, TY, TItem, string> | null;
+/** Parameters for `TooltipExtension`. Contravariant on `TX`, `TY`, `TDatum`.  */
+export interface TooltipExtensionParams<TX, TY, TDatum> {
+    tooltipProvider: Provider<TX, TY, TDatum, string> | null;
     pinnable: boolean,
 }
 
@@ -27,7 +27,7 @@ export const TooltipExtension: HeatmapExtension<TooltipExtensionParams<never, ne
     = HeatmapExtension.fromClass({
         name: 'builtin.tooltip',
         defaultParams: DefaultTooltipExtensionParams,
-        behavior: class <TX, TY, TItem> extends HeatmapBehaviorBase<TooltipExtensionParams<TX, TY, TItem>, TX, TY, TItem> {
+        behavior: class <TX, TY, TDatum> extends HeatmapBehaviorBase<TooltipExtensionParams<TX, TY, TDatum>, TX, TY, TDatum> {
             /** Position of the pinned tooltip, if any. In world coordinates, continuous. Use `Math.floor` to get column/row index. */
             private pinnedTooltip?: XY = undefined;
 
@@ -39,7 +39,7 @@ export const TooltipExtension: HeatmapExtension<TooltipExtensionParams<never, ne
                 this.subscribe(this.state.events.resize, () => this.updatePinnedTooltipPosition());
             }
 
-            private drawTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
+            private drawTooltip(pointed: CellEventParam<TX, TY, TDatum>) {
                 if (!this.state.dom) return;
                 const thisTooltipPinned = pointed && this.pinnedTooltip && pointed.xIndex === Math.floor(this.pinnedTooltip.x) && pointed.yIndex === Math.floor(this.pinnedTooltip.y);
                 if (pointed && !thisTooltipPinned && this.params.tooltipProvider) {
@@ -65,7 +65,7 @@ export const TooltipExtension: HeatmapExtension<TooltipExtensionParams<never, ne
                 }
             }
 
-            private drawPinnedTooltip(pointed: ItemEventParam<TX, TY, TItem>) {
+            private drawPinnedTooltip(pointed: CellEventParam<TX, TY, TDatum>) {
                 if (!this.state.dom) return;
                 this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
                 if (pointed && this.params.tooltipProvider && this.params.pinnable) {

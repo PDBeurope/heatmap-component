@@ -25,8 +25,8 @@ export interface Extension<TState, TParams extends {}, TDefaults extends TParams
 export type HeatmapExtension<TParams extends {}, TDefaults extends TParams> = Extension<State<any, any, any>, TParams, TDefaults>
 
 
-export class HeatmapBehaviorBase<TParams extends {}, TX = any, TY = any, TItem = any> implements Behavior<TParams> {
-    constructor(protected state: State<TX, TY, TItem>, protected params: TParams) { }
+export class HeatmapBehaviorBase<TParams extends {}, TX = any, TY = any, TDatum = any> implements Behavior<TParams> {
+    constructor(protected state: State<TX, TY, TDatum>, protected params: TParams) { }
     private readonly subscriptions: Unsubscribable[] = [];
     register() { };
     update(params: Partial<TParams>) {

@@ -24,7 +24,7 @@ export function demo1(divElementOrId: HTMLDivElement | string) {
     const hm = Heatmap.create({
         xDomain: [1, 2, 3, 4],
         yDomain: ['A', 'B', 'C'],
-        items: items,
+        data: items,
         x: d => d.col,
         y: d => d.row,
         filter: (d, x, y, xIndex, yIndex) => d.score > 0,
@@ -33,28 +33,7 @@ export function demo1(divElementOrId: HTMLDivElement | string) {
     hm.setColor(d => colorScale(d.score));
     hm.setTooltip((d, x, y, xIndex, yIndex) => `<div style="font-weight: bold; margin-bottom: 0.5em;">Score: ${d.score}</div>Column ${x}, Row ${y}<br>Indices [${xIndex},${yIndex}]`);
     setTimeout(() => hm.setFilter(undefined), 2000);
-    // setTimeout(() => hm.setData({
-    //     xDomain: [1, 2, 0, 3, 4],
-    //     yDomain: ['C', 'B', 'A'],
-    //     items: items,
-    //     x: d => d.col,
-    //     y: d => d.row,
-    // }), 3000);
     hm.setVisualParams({ xGapPixels: 0, yGapPixels: 0 });
-    // hm.events.resize.subscribe(e => {
-    //     if (!e) {
-    //         console.log('resizing nothing');
-    //     } else {
-    //         console.log('resizing', e);
-    //     }
-    // });
-    // hm.events.hover.subscribe(e => {
-    //     if (!e) {
-    //         console.log('hovering nothing');
-    //     } else {
-    //         console.log('hovering', e.datum, e.x, e.y, e.xIndex, e.yIndex, e.sourceEvent);
-    //     }
-    // });
     hm.events.select.subscribe(e => {
         if (!e) {
             console.log('selecting nothing');
@@ -121,7 +100,7 @@ export function demo3(divElementOrId: HTMLDivElement | string) {
     const hm = Heatmap.create({
         xDomain: [1, 2, 3],
         yDomain: ['A', 'B', 'C'],
-        items: items,
+        data: items,
         x: d => d.col,
         y: d => d.row,
     });

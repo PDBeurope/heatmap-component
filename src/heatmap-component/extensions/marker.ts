@@ -67,7 +67,7 @@ export class MarkerBehavior extends HeatmapBehaviorBase<MarkerExtensionParams> {
         } else {
             this.state.dom.svg.selectAll('.' + Class.MarkerY).remove();
         }
-        // Item marker
+        // Cell marker
         if (xCoord !== undefined && yCoord !== undefined) {
             this.addOrUpdateMarker(Class.Marker, staticAttrs, {
                 x: xCoord, y: yCoord, width, height,

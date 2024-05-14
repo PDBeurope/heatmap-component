@@ -3,38 +3,38 @@ import { Array2D } from './array2d';
 import { Domain } from './domain';
 
 
-/** A function that returns something (of type `TResult`) for a data item (such functions are passed to setTooltip, setColor etc.). */
-export type Provider<TX, TY, TItem, TResult> = (d: TItem, x: TX, y: TY, xIndex: number, yIndex: number) => TResult
+/** A function that returns something (of type `TResult`) for a data cell (such functions are passed to `setTooltip`, `setColor` etc.). */
+export type Provider<TX, TY, TDatum, TResult> = (datum: TDatum, x: TX, y: TY, xIndex: number, yIndex: number) => TResult
 
 
-export type DataDescription<TX, TY, TItem> = {
+export type DataDescription<TX, TY, TDatum> = {
     /** Array of X values assigned to columns, from left to right ("column names") */
     xDomain: TX[],
     /** Array of Y values assigned to rows, from top to bottom ("row names") */
     yDomain: TY[],
     /** Data items to show in the heatmap (each item is visualized as a rectangle) */
-    items: TItem[],
-    /** X values for the data items (either an array with the X values (must have the same length as `items`), or a function that computes X value for given item)  */
-    x: ((dataItem: TItem, index: number) => TX) | TX[],
-    /** Y values for the data items (either an array with the Y values (must have the same length as `items`), or a function that computes Y value for given item)  */
-    y: ((dataItem: TItem, index: number) => TY) | TY[],
-    /** Optional filter function that can be used to show only a subset of data items */
-    filter?: Provider<TX, TY, TItem, boolean>,
+    data: TDatum[],
+    /** X values for the data items (either a function that computes X value for given datum, or an array with the X values (must have the same length as `data`))  */
+    x: ((datum: TDatum, index: number) => TX) | TX[],
+    /** Y values for the data items (either a function that computes Y value for given datum, or an array with the Y values (must have the same length as `data`) )  */
+    y: ((datum: TDatum, index: number) => TY) | TY[],
+    /** Optional filter function that can be used to show only a subset of data */
+    filter?: Provider<TX, TY, TDatum, boolean>,
 }
 
 export const DataDescription = {
-    /** Return a DataDescription with no data. */
-    empty<TX, TY, TItem>(): DataDescription<TX, TY, TItem> {
-        return { items: [], xDomain: [null as TX], yDomain: [null as TY], x: () => null as TX, y: () => null as TY };
+    /** Return a `DataDescription` with no data. */
+    empty<TX, TY, TDatum>(): DataDescription<TX, TY, TDatum> {
+        return { data: [], xDomain: [null as TX], yDomain: [null as TY], x: () => null as TX, y: () => null as TY };
     },
-    /** Place items into a 2D array, return the 2D array and domains. */
-    toArray2D<TX, TY, TItem>(data: DataDescription<TX, TY, TItem>): { array2d: Array2D<TItem>, xDomain: Domain<TX>, yDomain: Domain<TY> } {
-        const { items, x, y, filter } = data;
+    /** Place data items into a 2D array, return the 2D array and domains. */
+    toArray2D<TX, TY, TDatum>(data: DataDescription<TX, TY, TDatum>): { array2d: Array2D<TDatum>, xDomain: Domain<TX>, yDomain: Domain<TY> } {
+        const { data: items, x, y, filter } = data;
         const xDomain = Domain.create(data.xDomain);
         const yDomain = Domain.create(data.yDomain);
         const nColumns = xDomain.values.length;
         const nRows = yDomain.values.length;
-        const arr = new Array<TItem | undefined>(nColumns * nRows).fill(undefined);
+        const arr = new Array<TDatum | undefined>(nColumns * nRows).fill(undefined);
         const xs = (typeof x === 'function') ? items.map(x) : x;
         const ys = (typeof y === 'function') ? items.map(y) : y;
         let warnedX = false;
@@ -69,7 +69,7 @@ export const DataDescription = {
     createRandom(nColumns: number, nRows: number): DataDescription<number, number, number> {
         const raw = Array2D.createRandom(nColumns, nRows);
         return {
-            items: raw.items as number[],
+            data: raw.values as number[],
             x: (d, i) => i % nColumns,
             y: (d, i) => Math.floor(i / nColumns),
             xDomain: range(nColumns),
@@ -82,7 +82,7 @@ export const DataDescription = {
         const data = this.createRandom(nColumns, nRows);
         return {
             ...data,
-            items: data.items.map((d, i) => (d * 0.5) + (i % nColumns / nColumns * 0.5)),
+            data: data.data.map((d, i) => (d * 0.5) + (i % nColumns / nColumns * 0.5)),
         };
     },
 };

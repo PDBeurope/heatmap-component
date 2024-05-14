@@ -152,12 +152,12 @@ function downsampleNumbers_general(input: Array2D<number>, newSize: { x: number,
         const y_to_offset = y.to[i] * w1;
         const y_weight = y.weight[i];
         for (let j = 0; j < x.from.length; j++) { // column index
-            const inputValue = input.items[y_from_offset + x.from[j]];
+            const inputValue = input.values[y_from_offset + x.from[j]];
             if (inputValue === undefined) throw new Error('NotImplementedError: undefined values in data');
             out[y_to_offset + x.to[j]] += inputValue * y_weight * x.weight[j];
         }
     }
-    const result: Array2D<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true };
+    const result: Array2D<number> = { nColumns: w1, nRows: h1, values: out, isNumeric: true };
     return result;
 }
 
@@ -171,14 +171,14 @@ function downsampleNumbers_halveX(input: Array2D<number>): Array2D<number> {
     const out = new Float32Array(w1 * h1);
     for (let i = 0; i < h1; i++) { // row index
         for (let j = 0; j < w1; j++) { // column index
-            const old1 = input.items[i * w0 + 2 * j];
-            const old2 = input.items[i * w0 + 2 * j + 1];
+            const old1 = input.values[i * w0 + 2 * j];
+            const old2 = input.values[i * w0 + 2 * j + 1];
             if (old1 === undefined || old2 === undefined) throw new Error('NotImplementedError: undefined values in data');
             const val = 0.5 * (old1 + old2);
             out[i * w1 + j] = val;
         }
     }
-    const result: Array2D<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true };
+    const result: Array2D<number> = { nColumns: w1, nRows: h1, values: out, isNumeric: true };
     return result;
 }
 /** Downsample 2D array of numbers to a new size - simplified implementation for special cases when newX===oldX, newY===oldY/2. */
@@ -191,14 +191,14 @@ function downsampleNumbers_halveY(input: Array2D<number>): Array2D<number> {
     const out = new Float32Array(w1 * h1);
     for (let i = 0; i < h1; i++) { // row index
         for (let j = 0; j < w1; j++) { // column index
-            const old1 = input.items[2 * i * w0 + j];
-            const old2 = input.items[(2 * i + 1) * w0 + j];
+            const old1 = input.values[2 * i * w0 + j];
+            const old2 = input.values[(2 * i + 1) * w0 + j];
             if (old1 === undefined || old2 === undefined) throw new Error('NotImplementedError: undefined values in data');
             const val = 0.5 * (old1 + old2);
             out[i * w1 + j] = val;
         }
     }
-    const result: Array2D<number> = { nColumns: w1, nRows: h1, items: out, isNumeric: true };
+    const result: Array2D<number> = { nColumns: w1, nRows: h1, values: out, isNumeric: true };
     return result;
 }
 
@@ -230,17 +230,17 @@ function downsampleImage_general(input: Image, newSize: XY): Image {
             const fromOffset = (y.from[i] * w0 + x.from[j]) * N_CHANNELS;
             const toOffset = (y.to[i] * w1 + x.to[j]) * N_CHANNELS;
             const weight = y.weight[i] * x.weight[j];
-            const a = input.items[fromOffset];
-            const ra = input.items[fromOffset + 1];
-            const ga = input.items[fromOffset + 2];
-            const ba = input.items[fromOffset + 3];
+            const a = input.values[fromOffset];
+            const ra = input.values[fromOffset + 1];
+            const ga = input.values[fromOffset + 2];
+            const ba = input.values[fromOffset + 3];
             out[toOffset] += a * weight;
             out[toOffset + 1] += ra * weight;
             out[toOffset + 2] += ga * weight;
             out[toOffset + 3] += ba * weight;
         }
     }
-    const result: Image = { nColumns: w1, nRows: h1, items: out };
+    const result: Image = { nColumns: w1, nRows: h1, values: out };
     return result;
 }
 
@@ -258,13 +258,13 @@ function downsampleImage_halveX(input: Image): Image {
             const fromOffset1 = (i * w0 + 2 * j) * N_CHANNELS;
             const fromOffset2 = (i * w0 + 2 * j + 1) * N_CHANNELS;
             const toOffset = (i * w1 + j) * N_CHANNELS;
-            out[toOffset] = 0.5 * (input.items[fromOffset1] + input.items[fromOffset2]);
-            out[toOffset + 1] = 0.5 * (input.items[fromOffset1 + 1] + input.items[fromOffset2 + 1]);
-            out[toOffset + 2] = 0.5 * (input.items[fromOffset1 + 2] + input.items[fromOffset2 + 2]);
-            out[toOffset + 3] = 0.5 * (input.items[fromOffset1 + 3] + input.items[fromOffset2 + 3]);
+            out[toOffset] = 0.5 * (input.values[fromOffset1] + input.values[fromOffset2]);
+            out[toOffset + 1] = 0.5 * (input.values[fromOffset1 + 1] + input.values[fromOffset2 + 1]);
+            out[toOffset + 2] = 0.5 * (input.values[fromOffset1 + 2] + input.values[fromOffset2 + 2]);
+            out[toOffset + 3] = 0.5 * (input.values[fromOffset1 + 3] + input.values[fromOffset2 + 3]);
         }
     }
-    const result: Image = { nColumns: w1, nRows: h1, items: out };
+    const result: Image = { nColumns: w1, nRows: h1, values: out };
     return result;
 }
 
@@ -282,13 +282,13 @@ function downsampleImage_halveY(input: Image): Image {
             const fromOffset1 = (2 * i * w0 + j) * N_CHANNELS;
             const fromOffset2 = ((2 * i + 1) * w0 + j) * N_CHANNELS;
             const toOffset = (i * w1 + j) * N_CHANNELS;
-            out[toOffset] = 0.5 * (input.items[fromOffset1] + input.items[fromOffset2]);
-            out[toOffset + 1] = 0.5 * (input.items[fromOffset1 + 1] + input.items[fromOffset2 + 1]);
-            out[toOffset + 2] = 0.5 * (input.items[fromOffset1 + 2] + input.items[fromOffset2 + 2]);
-            out[toOffset + 3] = 0.5 * (input.items[fromOffset1 + 3] + input.items[fromOffset2 + 3]);
+            out[toOffset] = 0.5 * (input.values[fromOffset1] + input.values[fromOffset2]);
+            out[toOffset + 1] = 0.5 * (input.values[fromOffset1 + 1] + input.values[fromOffset2 + 1]);
+            out[toOffset + 2] = 0.5 * (input.values[fromOffset1 + 2] + input.values[fromOffset2 + 2]);
+            out[toOffset + 3] = 0.5 * (input.values[fromOffset1 + 3] + input.values[fromOffset2 + 3]);
         }
     }
-    const result: Image = { nColumns: w1, nRows: h1, items: out };
+    const result: Image = { nColumns: w1, nRows: h1, values: out };
     return result;
 }
 

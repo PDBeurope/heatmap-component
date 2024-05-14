@@ -50,7 +50,7 @@ Within the script section of the HTML file, we will define the data to be visual
 
 First, we need to define the grid by providing the "names" for columns (X domain) and rows (Y domain). These values can be of any simple type (string, number, boolean, null); objects and undefined are not allowed.
 
-Next, we define the data values that will be placed in the grid. We follow the D3.js convention and call each of these values a "datum" (plural: "data"). Each datum can be of any type, including more complex types such as objects or arrays. However, `undefined` is not allowed as a datum. In this example, we provide 9 data, each being an object with col, row, and score.
+Next, we define the data values that will be placed in the grid. We follow the D3.js convention and call each of these values a "datum" (plural: "data" or "data items"). Each datum can be of any type, including more complex types such as objects or arrays. However, `undefined` is not allowed as a datum. In this example, we provide 9 data, each being an object with col, row, and score.
 
 Finally, we define how data are placed in the grid. We do this by providing `x` function, which takes a datum and returns a column name, and `y` function, which returns row name. These functions can also take a second parameter, which is the index of the datum (e.g. `x: (d, i) => i%nColumns, y: (d, i) => Math.floor(i/nColumns)` will place the data row-by-row). Alternatively, you can provide an array of row/column names instead of a function (first name belongs to the first datum etc.).
 
@@ -58,8 +58,7 @@ Finally, we define how data are placed in the grid. We do this by providing `x` 
 const data = {
     xDomain: [1, 2, 3, 4], // "names of columns"
     yDomain: ['A', 'B', 'C'], // "names of rows"
-    items: [
-        // TODO rename to "data" to keep consistent with D3
+    data: [
         { col: 1, row: 'A', score: 0.0 },
         { col: 1, row: 'B', score: 0.2 },
         { col: 1, row: 'C', score: 0.4 },
@@ -109,7 +108,7 @@ heatmap.render('app');
 You can subscribe to events emitted by the heatmap instance to integrate it with other parts of the page. All these events are RxJS BehaviorSubjects.
 
 ```js
-heatmap.events.select.subscribe(e => console.log('Selected', e)); // fires when the user clicks a data item
+heatmap.events.select.subscribe(e => console.log('Selected', e)); // fires when the user clicks a data cell
 ```
 
 And that's it! You now have a basic heatmap visualization displayed in your web page.

@@ -139,11 +139,11 @@ export const Color = {
     },
     /** Set pixel `x,y` in `image` to `color` */
     toImage(color: Color, image: Image, x: number, y: number) {
-        return this.toAragabaArray(color, image.items, 4 * (y * image.nColumns + x));
+        return this.toAragabaArray(color, image.values, 4 * (y * image.nColumns + x));
     },
     /** Add `color` to current value of pixel `x,y` in `image` */
     addToImage(color: Color, image: Image, x: number, y: number) {
-        return this.addToAragabaArray(color, image.items, 4 * (y * image.nColumns + x));
+        return this.addToAragabaArray(color, image.values, 4 * (y * image.nColumns + x));
     },
     /** Load color from an array represented as "ARaGaBa" (i.e. quadruplet [a*255, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. */
     fromAragabaArray(array: ArrayLike<number>, offset: number): Color {
@@ -156,7 +156,7 @@ export const Color = {
     },
     /** Load color from `Image`. */
     fromImage(image: Image, x: number, y: number): Color {
-        return this.fromAragabaArray(image.items, 4 * (y * image.nColumns + x));
+        return this.fromAragabaArray(image.values, 4 * (y * image.nColumns + x));
     },
     mix(color0: Color, color1: Color, q: number): Color {
         const a0 = color0 >>> 24 & 255;

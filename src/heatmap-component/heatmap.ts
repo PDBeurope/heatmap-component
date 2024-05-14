@@ -19,20 +19,20 @@ import { XAlignmentMode, YAlignmentMode, ZoomEventParam } from './state';
 // TODO: Would: Tooltip/marker only showing on click?
 
 
-export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
+export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
     get events() { return this.state.events; }
 
     readonly extensions: {
         marker?: MarkerBehavior,
-        tooltip?: Behavior<TooltipExtensionParams<TX, TY, TItem>>,
-        draw?: Behavior<DrawExtensionParams<TX, TY, TItem>>,
+        tooltip?: Behavior<TooltipExtensionParams<TX, TY, TDatum>>,
+        draw?: Behavior<DrawExtensionParams<TX, TY, TDatum>>,
         zoom?: Behavior<ZoomExtensionParams>,
     } = {};
 
     /** Create a new `Heatmap` and optionaly set `data`.
      * If you omit the `data` parameter, you add data later via `.setData(data)`. */
-    static create<TX, TY, TItem>(data: DataDescription<TX, TY, TItem> = DataDescription.empty()): Heatmap<TX, TY, TItem> {
-        const heatmap = new this(data);
+    static create<TX, TY, TDatum>(dataDescription: DataDescription<TX, TY, TDatum> = DataDescription.empty()): Heatmap<TX, TY, TDatum> {
+        const heatmap = new this(dataDescription);
 
         heatmap.extensions.marker = heatmap.registerExtension(MarkerExtension) as MarkerBehavior;
         heatmap.extensions.tooltip = heatmap.registerExtension(TooltipExtension);
@@ -45,9 +45,9 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
     /** Replace current data by new data.
      * (If the new data are of different type, this method effectively changes the generic type parameters of `this`!
      * Returns re-typed `this`.) */
-    setData<TX_, TY_, TItem_>(data: DataDescription<TX_, TY_, TItem_>): Heatmap<TX_, TY_, TItem_> {
-        this.state.setData(data);
-        return this as unknown as Heatmap<TX_, TY_, TItem_>;
+    setData<TX_, TY_, TDatum_>(dataDescription: DataDescription<TX_, TY_, TDatum_>): Heatmap<TX_, TY_, TDatum_> {
+        this.state.setData(dataDescription);
+        return this as unknown as Heatmap<TX_, TY_, TDatum_>;
     }
 
     /** Change X and Y domain without changing the data (can be used for reordering or hiding columns/rows). */
@@ -60,8 +60,8 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
         return this;
     }
 
-    /** Change filter function without changing the underlying data (can be used for showing/hiding individual data items). */
-    setFilter(filter: Provider<TX, TY, TItem, boolean> | undefined): this {
+    /** Change filter function without changing the underlying data (can be used for showing/hiding individual data cells). */
+    setFilter(filter: Provider<TX, TY, TDatum, boolean> | undefined): this {
         this.setData({
             ...this.state.originalData,
             filter: filter,
@@ -69,7 +69,7 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
         return this;
     }
 
-    /** Set a color provider function (takes data item and position and returns color).
+    /** Set a color provider function (takes a datum and position and returns color).
      * Example:
      * ```
      * hm.setColor((d, x, y, xIndex, yIndex) => d >= 0.5 ? 'black' : '#ff0000');
@@ -79,12 +79,12 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
      * hm.setColor(Color.createScale('YlOrRd', [0, 100]));
      * ```
      */
-    setColor(colorProvider: Provider<TX, TY, TItem, string | Color>): this {
+    setColor(colorProvider: Provider<TX, TY, TDatum, string | Color>): this {
         this.extensions.draw?.update({ colorProvider });
         return this;
     }
 
-    setTooltip(tooltipProvider: Provider<TX, TY, TItem, string> | 'default' | null): this {
+    setTooltip(tooltipProvider: Provider<TX, TY, TDatum, string> | 'default' | null): this {
         this.extensions.tooltip?.update({
             tooltipProvider: (tooltipProvider === 'default') ? DefaultTooltipExtensionParams.tooltipProvider : tooltipProvider,
         });
@@ -109,12 +109,12 @@ export class Heatmap<TX, TY, TItem> extends HeatmapCore<TX, TY, TItem> {
     }
 
     /** Enforce change of zoom and return the zoom value after the change */
-    zoom(z: Partial<ZoomEventParam<TX, TY, TItem>> | undefined): ZoomEventParam<TX, TY, TItem> {
+    zoom(z: Partial<ZoomEventParam<TX, TY>> | undefined): ZoomEventParam<TX, TY> {
         return this.state.zoom(z);
     }
 
     /** Return current zoom */
-    getZoom(): ZoomEventParam<TX, TY, TItem> {
+    getZoom(): ZoomEventParam<TX, TY> {
         return this.state.getZoom();
     }
 }

@@ -7,8 +7,8 @@ import { State } from './state';
 import { attrd } from './utils';
 
 
-export class HeatmapCore<TX, TY, TItem> {
-    protected readonly state: State<TX, TY, TItem>;
+export class HeatmapCore<TX, TY, TDatum> {
+    protected readonly state: State<TX, TY, TDatum>;
 
     registerExtension<TParams extends {}, TDefaults extends TParams>(extension: HeatmapExtension<TParams, TDefaults>, params?: Partial<TParams>): Behavior<TParams> {
         const behavior = extension.create(this.state, params);
@@ -16,8 +16,8 @@ export class HeatmapCore<TX, TY, TItem> {
         return behavior;
     }
 
-    constructor(data: DataDescription<TX, TY, TItem>) {
-        this.state = new State(data);
+    constructor(dataDescription: DataDescription<TX, TY, TDatum>) {
+        this.state = new State(dataDescription);
 
         this.state.events.resize.subscribe(box => {
             if (!box) return;
@@ -59,9 +59,9 @@ export class HeatmapCore<TX, TY, TItem> {
         });
         this.state.dom = { rootDiv, mainDiv, canvasDiv, canvas, svg };
 
-        svg.on('mousemove.heatmapcore', (e: MouseEvent) => this.state.events.hover.next(this.state.getPointedItem(e)));
+        svg.on('mousemove.heatmapcore', (e: MouseEvent) => this.state.events.hover.next(this.state.getPointedCell(e)));
         svg.on('mouseleave.heatmapcore', (e: MouseEvent) => this.state.events.hover.next(undefined));
-        svg.on('click.heatmapcore', (e: MouseEvent) => this.state.events.select.next(this.state.getPointedItem(e)));
+        svg.on('click.heatmapcore', (e: MouseEvent) => this.state.events.select.next(this.state.getPointedCell(e)));
 
         this.state.events.render.next(undefined);
         this.state.emitResize();
