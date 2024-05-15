@@ -7,7 +7,7 @@
         "noImplicitThis": true,
         "sourceMap": false,
         "strict": true,
-        "noUnusedLocals": false,
+        "noUnusedLocals": true,
         "strictNullChecks": true,
         "noImplicitReturns": true,
         "strictFunctionTypes": true,

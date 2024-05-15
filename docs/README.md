@@ -2,7 +2,7 @@
 
 TODO: ways of using HeatmapComponent: build vs lib
 
-TODO: index of topics
+TODO: index of topics (Quickstart, customization, colors/scales, architecture/extensions)
 
 ## Quickstart guide
 
@@ -36,7 +36,7 @@ Add a DIV element somewhere in the page and give it a custom `id` attribute. Thi
 
 ```html
 <body>
-    <div id="app" style="width: 500px; height: 300px; border: solid gainsboro 1px"></div>
+    <div id="app" style="width: 500px; height: 300px; border: solid gainsboro 1px;"></div>
     <script>
         // Your code will go here
     </script>
@@ -86,7 +86,7 @@ You can also call `create()` with no argument and add data later via `heatmap.se
 
 ### Step 5: Customize
 
-Customize the heatmap instance as needed. Typically, you'll want to specify coloring (default coloring assigns gray color to any datum). This is done by calling `setColor` method and providing a coloring function, which takes a datum and returns a color (can be a CSS color, e.g. `'green'`, `'#f00000'`, `'rgba(255,0,0,0.5)'`, or a package-specific `Color` type (encoding each color as a 32-bit unsigned interger for better performance TODO: link to details)). The coloring function can also take multiple parameters, being datum, column name, row name, column index, row index.
+Customize the heatmap instance as needed. Typically, you'll want to specify coloring (default coloring assigns gray color to any datum). This is done by calling `setColor` method and providing a coloring function, which takes a datum and returns a color (can be a CSS color, e.g. `'green'`, `'#f00000'`, `'rgba(255,0,0,0.5)'`, or a package-specific `Color` type (encoding each color as a 32-bit unsigned integer for better performance TODO: link to details)). The coloring function can also take multiple parameters, being datum, column name, row name, column index, row index.
 
 Use `HeatmapComponent.createColorScale` to create continuous color scales (details [here](./color-scales.md)).
 

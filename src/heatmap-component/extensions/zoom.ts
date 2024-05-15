@@ -45,7 +45,7 @@ export const ZoomExtension = HeatmapExtension.fromClass({
                 this.adjustZoomExtent();
                 this.adjustZoom();
             });
-            this.subscribe(this.state.events.resize, e => {
+            this.subscribe(this.state.events.resize, () => {
                 this.adjustZoomExtent();
                 this.adjustZoom();
             });

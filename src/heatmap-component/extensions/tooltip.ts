@@ -2,7 +2,7 @@ import { Class } from '../class-names';
 import { Provider } from '../data/data-description';
 import { HeatmapExtension, HeatmapBehaviorBase } from '../extension';
 import { Box, XY } from '../scales';
-import { CellEventParam } from '../state';
+import { CellEventValue } from '../state';
 import { attrd } from '../utils';
 
 
@@ -39,7 +39,7 @@ export const TooltipExtension: HeatmapExtension<TooltipExtensionParams<never, ne
                 this.subscribe(this.state.events.resize, () => this.updatePinnedTooltipPosition());
             }
 
-            private drawTooltip(pointed: CellEventParam<TX, TY, TDatum>) {
+            private drawTooltip(pointed: CellEventValue<TX, TY, TDatum> | undefined) {
                 if (!this.state.dom) return;
                 const thisTooltipPinned = pointed && this.pinnedTooltip && pointed.xIndex === Math.floor(this.pinnedTooltip.x) && pointed.yIndex === Math.floor(this.pinnedTooltip.y);
                 if (pointed && !thisTooltipPinned && this.params.tooltipProvider) {
@@ -65,7 +65,7 @@ export const TooltipExtension: HeatmapExtension<TooltipExtensionParams<never, ne
                 }
             }
 
-            private drawPinnedTooltip(pointed: CellEventParam<TX, TY, TDatum>) {
+            private drawPinnedTooltip(pointed: CellEventValue<TX, TY, TDatum> | undefined) {
                 if (!this.state.dom) return;
                 this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
                 if (pointed && this.params.tooltipProvider && this.params.pinnable) {

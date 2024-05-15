@@ -6,7 +6,7 @@ import { MarkerBehavior, MarkerExtension } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 import { ZoomExtension, ZoomExtensionParams } from './extensions/zoom';
 import { HeatmapCore } from './heatmap-core';
-import { XAlignmentMode, YAlignmentMode, ZoomEventParam } from './state';
+import { XAlignmentMode, YAlignmentMode, ZoomEventValue } from './state';
 
 
 // TODO: Should: docs
@@ -19,9 +19,13 @@ import { XAlignmentMode, YAlignmentMode, ZoomEventParam } from './state';
 // TODO: Would: Tooltip/marker only showing on click?
 
 
+/** Main class of the `heatmap-component` package.
+ * Extends `HeatmapCore` by registering essential extensions and implementing useful public methods. */
 export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
+    /** Custom events fired by the heatmap component, all are RxJS `BehaviorSubject` */
     get events() { return this.state.events; }
 
+    /** Essential extension behaviors */
     readonly extensions: {
         marker?: MarkerBehavior,
         tooltip?: Behavior<TooltipExtensionParams<TX, TY, TDatum>>,
@@ -60,7 +64,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         return this;
     }
 
-    /** Change filter function without changing the underlying data (can be used for showing/hiding individual data cells). */
+    /** Change the filter function without changing the underlying data (can be used for showing/hiding individual data cells). */
     setFilter(filter: Provider<TX, TY, TDatum, boolean> | undefined): this {
         this.setData({
             ...this.state.originalData,
@@ -69,14 +73,17 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         return this;
     }
 
-    /** Set a color provider function (takes a datum and position and returns color).
+    /** Set a color provider function (takes a datum and cell position and returns color).
+     * The returned color can be a CSS color (e.g. 'green', '#f00000', 'rgba(255,0,0,0.5)',
+     * or `Color` type (uint32 color encoding).
+     *
      * Example:
      * ```
-     * hm.setColor((d, x, y, xIndex, yIndex) => d >= 0.5 ? 'black' : '#ff0000');
+     * heatmap.setColor((datum, x, y, xIndex, yIndex) => datum >= 0.5 ? 'black' : '#ff0000');
      * ```
-     * Use `Color.createScale` to create efficient color providers for big numeric data:
+     * Use `createColorScale` to create efficient color providers for big numeric data:
      * ```
-     * hm.setColor(Color.createScale('YlOrRd', [0, 100]));
+     * heatmap.setColor(createColorScale('YlOrRd', [0, 100]));
      * ```
      */
     setColor(colorProvider: Provider<TX, TY, TDatum, string | Color>): this {
@@ -84,6 +91,14 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         return this;
     }
 
+    /** Set a tooltip provider function (takes a datum and cell position and returns tooltip HTML content).
+     *
+     * Example:
+     * ```
+     * heatmap.setTooltip((datum, x, y, xIndex, yIndex) => `<b>${datum}<\b>`);
+     * ```
+     * Call `heatmap.setTooltip(null)` to disable tooltips; `heatmap.setTooltip('default')` to reset the default tooltip provider.
+     */
     setTooltip(tooltipProvider: Provider<TX, TY, TDatum, string> | 'default' | null): this {
         this.extensions.tooltip?.update({
             tooltipProvider: (tooltipProvider === 'default') ? DefaultTooltipExtensionParams.tooltipProvider : tooltipProvider,
@@ -91,30 +106,39 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         return this;
     }
 
+    /** Change visual parameters that cannot be changed via CSS
+     * (mainly gaps between drawn rectangles). */
     setVisualParams(params: Partial<VisualParams>): this {
         this.extensions.draw?.update(params);
         return this;
     }
 
-    /** Controls how column/row indices and names map to X and Y axes. */
+    /** Controls how column/row indices and names are aligned to X and Y axes, when using `.zoom` and `.events.zoom` */
     setAlignment(x: XAlignmentMode | undefined, y: YAlignmentMode | undefined): this {
         this.state.setAlignment(x, y);
         return this;
     }
 
-    /** Set zooming parameters. Use `axis` parameter to turn zooming on/off. */
+    /** Set zooming parameters. Use `axis` parameter to turn zooming on/off.
+     *
+     * Example:
+     * ```
+     * heatmap.setZooming({ axis: "x" });    // Turn on zooming along the x-axis
+     * heatmap.setZooming({ axis: "none" }); // Turn off zooming
+     * ```
+     */
     setZooming(params: Partial<ZoomExtensionParams>): this {
         this.extensions.zoom?.update(params);
         return this;
     }
 
     /** Enforce change of zoom and return the zoom value after the change */
-    zoom(z: Partial<ZoomEventParam<TX, TY>> | undefined): ZoomEventParam<TX, TY> {
+    zoom(z: Partial<ZoomEventValue<TX, TY>> | undefined): ZoomEventValue<TX, TY> | undefined {
         return this.state.zoom(z);
     }
 
     /** Return current zoom */
-    getZoom(): ZoomEventParam<TX, TY> {
+    getZoom(): ZoomEventValue<TX, TY> | undefined {
         return this.state.getZoom();
     }
 }

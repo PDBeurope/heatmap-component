@@ -4,27 +4,35 @@ import * as d3 from './d3-modules';
 import { Array2D } from './data/array2d';
 import { DataDescription } from './data/data-description';
 import { Domain } from './data/domain';
-import { Box, Boxes, Scales } from './scales';
+import { Box, BoxSize, Boxes, Scales } from './scales';
 import { getSize } from './utils';
 
 
 /** Avoid zooming to things like 0.4999999999999998 */
 const ZOOM_EVENT_ROUNDING_PRECISION = 9;
+
+/** Minimum zoomable width/height measured as number of columns/rows */
 const MIN_ZOOMED_DATAPOINTS_HARD = 1;
 
 
 /** Emitted on data-cell-related events (hover, click...) */
-export type CellEventParam<TX, TY, TDatum> = {
+export interface CellEventValue<TX, TY, TDatum> {
+    /** Datum stored in the data cell */
     datum: TDatum,
+    /** X value ("column name") */
     x: TX,
+    /** Y value ("row name") */
     y: TY,
+    /** Column index */
     xIndex: number,
+    /** Row index */
     yIndex: number,
+    /** Original mouse event that triggered this */
     sourceEvent: MouseEvent,
-} | undefined
+}
 
 /** Emitted on zoom event */
-export type ZoomEventParam<TX, TY> = {
+export interface ZoomEventValue<TX, TY> {
     /** Continuous X index corresponding to the left edge of the viewport */
     xMinIndex: number,
     /** Continuous X index corresponding to the right edge of the viewport */
@@ -63,7 +71,7 @@ export type ZoomEventParam<TX, TY> = {
 
     /** Identifies the originator of the zoom event (this is to avoid infinite loop when multiple component listen to zoom and change it) */
     origin?: string,
-} | undefined
+}
 
 
 /** Controls how X axis values align with the columns when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on X axis can be aligned to the left edge/center/right edge of the column showing that value) */
@@ -72,14 +80,18 @@ export type XAlignmentMode = 'left' | 'center' | 'right'
 export type YAlignmentMode = 'top' | 'center' | 'bottom'
 
 
+/** Encapsulates the state of a heatmap instance.
+ * Shared between the heatmap instance and all registered behaviors.
+ * Also provides methods for manipulating the state
+ * and takes care of emitting events related to state changes. */
 export class State<TX, TY, TDatum> {
     /** Data as provided to the `setData` method */
     originalData: DataDescription<TX, TY, TDatum> = DataDescription.empty();
-    /** A 2D array with the data values, for fast access to a specific row and column */
+    /** 2D array with the data values, for fast access to a specific row and column */
     dataArray: Array2D<TDatum | undefined> = Array2D.empty();
-    /** Values corresponding to the individual columns */
+    /** Values corresponding to the individual columns ("column names") */
     xDomain: Domain<TX> = Domain.create([]);
-    /** Values corresponding to the individual rows */
+    /** Values corresponding to the individual rows ("row names") */
     yDomain: Domain<TY> = Domain.create([]);
 
     /** Controls how X axis values align with the columns when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on X axis can be aligned to the left edge/center/right edge of the column showing that value) */
@@ -109,13 +121,13 @@ export class State<TX, TY, TDatum> {
     /** Custom events fired by the heatmap component, all are RxJS `BehaviorSubject` */
     readonly events = {
         /** Fires when the user hovers over the component */
-        hover: new BehaviorSubject<CellEventParam<TX, TY, TDatum>>(undefined),
+        hover: new BehaviorSubject<CellEventValue<TX, TY, TDatum> | undefined>(undefined),
         /** Fires when the user selects/deselects a cell (e.g. by clicking on it) */
-        select: new BehaviorSubject<CellEventParam<TX, TY, TDatum>>(undefined),
+        select: new BehaviorSubject<CellEventValue<TX, TY, TDatum> | undefined>(undefined),
         /** Fires when the component is zoomed in or out, or panned (translated) */
-        zoom: new BehaviorSubject<ZoomEventParam<TX, TY>>(undefined),
-        /** Fires when the window is resized */
-        resize: new BehaviorSubject<Box | undefined>(undefined),
+        zoom: new BehaviorSubject<ZoomEventValue<TX, TY> | undefined>(undefined),
+        /** Fires when the window is resized. Subject value is the size of the canvas in pixels. */
+        resize: new BehaviorSubject<BoxSize | undefined>(undefined),
         /** Fires when the visualized data change (including filter or domain change) */
         data: new BehaviorSubject<undefined>(undefined),
         /** Fires when the component is initially rendered in a div */
@@ -140,6 +152,7 @@ export class State<TX, TY, TDatum> {
         return self;
     }
 
+    /** Set `this.dataArray`, adjust zoom as necessary, and emit related events. */
     private setDataArray(dataArray: Array2D<TDatum | undefined>): void {
         this.dataArray = dataArray;
         const newWholeWorld = Box.create(0, 0, dataArray.nColumns, dataArray.nRows);
@@ -151,15 +164,16 @@ export class State<TX, TY, TDatum> {
             xmax: this.boxes.visWorld.xmax * xScale,
             ymin: this.boxes.visWorld.ymin * yScale,
             ymax: this.boxes.visWorld.ymax * yScale
-        }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
+        }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD); // TODO ensure preserving relative position on world size change when on maximum zoom-in
         this.scales = Scales(this.boxes);
         this.events.data.next(undefined);
         this.emitZoom('setDataArray');
     }
 
 
-    /** Return data cell that is being pointed by the mouse in `event` */
-    getPointedCell(event: MouseEvent | undefined): CellEventParam<TX, TY, TDatum> {
+    /** Return the data cell that is being pointed by the mouse in `event`.
+     * Return `undefined` if there is no such cell. */
+    getPointedCell(event: MouseEvent | undefined): CellEventValue<TX, TY, TDatum> | undefined {
         if (!event) {
             return undefined;
         }
@@ -174,27 +188,34 @@ export class State<TX, TY, TDatum> {
         return { datum, x, y, xIndex, yIndex, sourceEvent: event };
     }
 
+    /** Emit a resize event, with the current size of canvas. */
     emitResize(): void {
         if (!this.dom) return;
         const size = getSize(this.dom.canvas);
-        const box = Box.create(0, 0, size.width, size.height);
-        this.events.resize.next(box);
+        this.events.resize.next(size);
     }
 
-    emitZoom(origin?: string): void {
-        const newZoom = this.zoomParamFromVisWorld(this.boxes.visWorld, origin);
+    /** Emit a zoom event, based on the current zoom.
+     * `origin` is an identifier of the event originator
+     * (to avoid infinite loop when multiple component listen to zoom and change it). */
+    emitZoom(origin: string | undefined): void {
+        const newZoom = this.getZoomEventValue(origin);
         if (isEqual(newZoom, this.events.zoom.value)) return; // to avoid infinite loops
         this.events.zoom.next(newZoom);
     }
 
-    /** Controls how column/row indices and names map to X and Y axes. */
+    /** Controls how column/row indices and names are aligned to X and Y axes, when using `.zoom` and `.events.zoom` */
     setAlignment(x: XAlignmentMode | undefined, y: YAlignmentMode | undefined): void {
         if (x) this.xAlignment = x;
         if (y) this.yAlignment = y;
         this.emitZoom('setAlignment');
     }
 
-    private zoomParamFromVisWorld(box: Box | undefined, origin?: string): ZoomEventParam<TX, TY> {
+    /** Get value for zoom event (or related functions), based on the current zoom.
+     * `origin` is an identifier of the event originator
+     * (to avoid infinite loop when multiple component listen to zoom and change it). */
+    private getZoomEventValue(origin: string | undefined): ZoomEventValue<TX, TY> | undefined {
+        const box = this.boxes.visWorld;
         if (!box) return undefined;
 
         const xMinIndex_ = round(box.xmin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
@@ -231,10 +252,12 @@ export class State<TX, TY, TDatum> {
 
             origin: origin,
         };
-
     }
 
-    private getZoomRequestIndexMagic(axis: 'x' | 'y', end: 'Min' | 'Max', z: Partial<ZoomEventParam<TX, TY>>): number | undefined {
+    /** Retrieve xmin/xmax/ymin/ymax (float) for visible world box from a partial ZoomEventValue `z`,
+     * using `xMinIndex` or `xMin` or `xFirstVisibleIndex` or `xFirstVisible` in this order of precedence
+     * (or equivalent for x/y, min/max), and adjusting for alignment shift. */
+    private getIndexFromZoomRequest(axis: 'x' | 'y', end: 'Min' | 'Max', z: Partial<ZoomEventValue<TX, TY>> | undefined): number | undefined {
         if (isNil(z)) return undefined;
 
         const fl = end === 'Min' ? 'First' : 'Last';
@@ -278,18 +301,19 @@ export class State<TX, TY, TDatum> {
     }
 
     /** Enforce change of zoom and return the zoom value after the change */
-    zoom(z: Partial<ZoomEventParam<TX, TY>> | undefined): ZoomEventParam<TX, TY> {
+    zoom(z: Partial<ZoomEventValue<TX, TY>> | undefined): ZoomEventValue<TX, TY> | undefined {
         const visWorldBox = Box.clamp({
-            xmin: this.getZoomRequestIndexMagic('x', 'Min', z) ?? this.boxes.wholeWorld.xmin,
-            xmax: this.getZoomRequestIndexMagic('x', 'Max', z) ?? this.boxes.wholeWorld.xmax,
-            ymin: this.getZoomRequestIndexMagic('y', 'Min', z) ?? this.boxes.wholeWorld.ymin,
-            ymax: this.getZoomRequestIndexMagic('y', 'Max', z) ?? this.boxes.wholeWorld.ymax,
+            xmin: this.getIndexFromZoomRequest('x', 'Min', z) ?? this.boxes.wholeWorld.xmin,
+            xmax: this.getIndexFromZoomRequest('x', 'Max', z) ?? this.boxes.wholeWorld.xmax,
+            ymin: this.getIndexFromZoomRequest('y', 'Min', z) ?? this.boxes.wholeWorld.ymin,
+            ymax: this.getIndexFromZoomRequest('y', 'Max', z) ?? this.boxes.wholeWorld.ymax,
         }, this.boxes.wholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
 
         this.zoomVisWorldBox(visWorldBox, z?.origin);
-        return this.zoomParamFromVisWorld(this.boxes.visWorld, z?.origin);
+        return this.getZoomEventValue(z?.origin);
     }
 
+    /** Set the visible world box to `visWorldBox`, update scales and emit zoom event accordingly. */
     zoomVisWorldBox(visWorldBox: Box, origin?: string, emit: boolean = true): void {
         this.boxes.visWorld = visWorldBox;
         this.scales = Scales(this.boxes);
@@ -297,13 +321,13 @@ export class State<TX, TY, TDatum> {
     }
 
     /** Return current zoom */
-    getZoom(): ZoomEventParam<TX, TY> {
-        return this.zoomParamFromVisWorld(this.boxes.visWorld, undefined);
+    getZoom(): ZoomEventValue<TX, TY> | undefined {
+        return this.getZoomEventValue(undefined);
     }
-
 }
 
 
+/** Return a number that has to be added world coordinates to get zoom coordinates (adjustment for column/row alignment). */
 function indexAlignmentShift(alignment: XAlignmentMode | YAlignmentMode) {
     if (alignment === 'left' || alignment === 'top') return 0;
     if (alignment === 'center') return -0.5;
