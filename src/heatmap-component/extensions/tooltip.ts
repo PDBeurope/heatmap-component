@@ -6,23 +6,29 @@ import { CellEventValue } from '../state';
 import { attrd } from '../utils';
 
 
-/** TODO continue here */
 function DefaultTooltipProvider(datum: unknown, x: unknown, y: unknown, xIndex: number, yIndex: number): string {
     return `x: ${JSON.stringify(x)} (index ${xIndex}) <br> y: ${JSON.stringify(y)} (index ${yIndex}) <br> datum: ${JSON.stringify(datum)}`;
 }
 
 
-/** Parameters for `TooltipExtension`. Contravariant on `TX`, `TY`, `TDatum`.  */
+/** Parameters for `TooltipExtension`. Contravariant on `TX`, `TY`, `TDatum`. */
 export interface TooltipExtensionParams<TX, TY, TDatum> {
+    /** Function that returns tooltip content (as HTML string) for each data cell */
     tooltipProvider: Provider<TX, TY, TDatum, string> | null;
+    /** Indicates if a tooltip can be "pinned",
+     * i.e. when the user clicks on a cell, the tooltip will stay visible visible
+     * until it is closed by close button or clicking elsewhere */
     pinnable: boolean,
 }
 
+/** Default parameter values for `TooltipExtension` */
 export const DefaultTooltipExtensionParams: TooltipExtensionParams<unknown, unknown, unknown> = {
     tooltipProvider: DefaultTooltipProvider,
     pinnable: true,
 };
 
+
+/** Behavior class for `TooltipExtension` (shows a box with tooltip when hovering and/or clicking on a grid cell with data) */
 export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensionParams<TX, TY, TDatum>, TX, TY, TDatum> {
     /** Position of the pinned tooltip, if any. In world coordinates, continuous. Use `Math.floor` to get column/row index. */
     private pinnedTooltip?: XY = undefined;
@@ -34,7 +40,9 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
         this.subscribe(this.state.events.zoom, () => this.updatePinnedTooltipPosition());
         this.subscribe(this.state.events.resize, () => this.updatePinnedTooltipPosition());
     }
-
+    
+    /** Add a div with tooltip or update position of existing tooltip, for the `pointed` grid cell.
+     * Remove existing tooltip, if `pointed` is `undefined`. */
     private drawTooltip(pointed: CellEventValue<TX, TY, TDatum> | undefined): void {
         if (!this.state.dom) return;
         const thisTooltipPinned = pointed && this.pinnedTooltip && pointed.xIndex === Math.floor(this.pinnedTooltip.x) && pointed.yIndex === Math.floor(this.pinnedTooltip.y);
@@ -61,6 +69,10 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
         }
     }
 
+    /** Add a div with pinned tooltip or update position of existing pinned tooltip, for the `pointed` grid cell.
+     * Remove existing pinned tooltip, if `pointed` is `undefined`.
+     * Pinned tooltip is shown when the user selects a cell by clicking,
+     * and stays visible until it is closed by close button or clicking elsewhere. */
     private drawPinnedTooltip(pointed: CellEventValue<TX, TY, TDatum> | undefined): void {
         if (!this.state.dom) return;
         this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
@@ -101,6 +113,7 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
         }
     }
 
+    /** Update position of existing pinned tooltip without changing content (used when zooming/resizing canvas). */
     private updatePinnedTooltipPosition(): void {
         if (this.state.dom && this.pinnedTooltip) {
             const domPosition = {
@@ -123,6 +136,7 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
 }
 
 
+/** Adds behavior that shows a box with tooltip when hovering and/or clicking on a grid cell with data */
 export const TooltipExtension: Extension<TooltipExtensionParams<never, never, never>, typeof DefaultTooltipExtensionParams> = Extension.fromBehaviorClass({
     name: 'builtin.tooltip',
     defaultParams: DefaultTooltipExtensionParams,

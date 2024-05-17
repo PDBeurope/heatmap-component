@@ -10,14 +10,17 @@
 </head>
 
 <body>
-  <!-- Your visualization will be placed here -->
-  <div id="app" style="width: 1000px; height: 300px; max-width: 95%; min-width: 400px; border: solid gainsboro 1px;">
-  </div>
+  <div style="width: 1000px; max-width: 95%; min-width: 400px; margin-inline: auto; margin-top: 20px;">
+    <!-- Your visualization will be placed here -->
+    <div id="app" style="width: 100%; height: 300px; border: solid gainsboro 1px;">
+    </div>
 
-  <p style="margin-top: 30px;">
-    Use scroll to zoom, Shift+scroll (or horizontal scroll) to pan.
-  </p>
-  <div style="height: 100vh;"></div>
+    <p style="margin-top: 30px;">
+      Use scroll to zoom, Shift+scroll (or horizontal scroll) to pan.
+    </p>
+    <a href="../src/heatmap-component/demo.ts">Source code</a>
+    <div style="height: 100vh;"></div>
+  </div>
 
   <script>
     HeatmapComponent.demo2('app');

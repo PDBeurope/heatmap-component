@@ -1,4 +1,4 @@
-import { Heatmap, createColorScale } from '../main';
+import { Heatmap, ColorScale } from '../main';
 import { DataDescription } from './data/data-description';
 
 
@@ -29,7 +29,7 @@ export function demo1(divElementOrId: HTMLDivElement | string): void {
         y: d => d.row,
         filter: (d, x, y, xIndex, yIndex) => d.score > 0,
     });
-    const colorScale = createColorScale([0, 0.5, 1], ['#eeeeee', 'gold', 'red']);
+    const colorScale = ColorScale.continuous([0, 0.5, 1], ['#eeeeee', 'gold', 'red']);
     hm.setColor(d => colorScale(d.score));
     hm.setTooltip((d, x, y, xIndex, yIndex) => `<div style="font-weight: bold; margin-bottom: 0.5em;">Score: ${d.score}</div>Column ${x}, Row ${y}<br>Indices [${xIndex},${yIndex}]`);
     setTimeout(() => hm.setFilter(undefined), 2000);
@@ -71,7 +71,7 @@ export function demo2(divElementOrId: HTMLDivElement | string): void {
     const hm = Heatmap.create(data); // Heatmap<number, number, number>
     hm.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
     // hm.setColor(createScale([0, 0.5, 1], ['#00d', '#ddd', '#d00']));
-    hm.setColor(createColorScale('Magma', [0, 1]));
+    hm.setColor(ColorScale.continuous('Spectral', [0, 1]));
     // hm.setColor(createScale('Magma', [0, 1], [1, 0])); // reverse direction
     hm.render(divElementOrId);
     // hm.setFilter(d => d > 0.1);
@@ -105,7 +105,7 @@ export function demo3(divElementOrId: HTMLDivElement | string): void {
         x: d => d.col,
         y: d => d.row,
     });
-    const colorScale = createColorScale([-1, 0, 1], ['#E13D3D', 'white', '#2C8C11']); // like d3.scaleLinear([-1, 0, 1], ['#E13D3D', 'white', '#2C8C11']);
+    const colorScale = ColorScale.continuous([-1, 0, 1], ['#E13D3D', 'white', '#2C8C11']); // like d3.scaleLinear([-1, 0, 1], ['#E13D3D', 'white', '#2C8C11']);
     hm.setColor(d => colorScale(d.score));
     hm.setVisualParams({ xGapRelative: 0.1, yGapRelative: 0.1, xGapPixels: null, yGapPixels: null });
     hm.render(divElementOrId);

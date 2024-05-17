@@ -1,35 +1,31 @@
-import { clamp, range } from 'lodash';
 import * as d3 from '../d3-modules';
-import { Domain } from './domain';
-import { Image } from './image';
 
 
 /** Like ArrayLike<T> but allows writing (includes T[], Float32Array, etc.) */
 export type WritableArrayLike<T> = { [i: number]: T, length: number }
 
 
-/** Color value (with opacity) encoded as Int32 */
-export type Color = { readonly '@type': 'color' } & number
-
-
+/** Scaling factor for encoding opacity in Color (i.e. opacity values 0-1 are stored as integer in range 0-ALPHA_SCALE) */
 const ALPHA_SCALE = 255;
 const INV_ALPHA_SCALE = 1 / ALPHA_SCALE;
 
+/** Color value (with opacity) encoded as Int32 */
+export type Color = { readonly '@type': 'color' } & number
 
 export const Color = {
-    /** Cast Int32 into Int32-encoded color */
+    /** Cast Int32 to Int32-encoded `Color` */
     fromNumber(hex: number): Color {
         return hex as Color;
     },
-    /** Create Int32-encoded color from R (0-255), G (0-255), B (0-255), and opacity (0-1) */
+    /** Create Int32-encoded `Color` from R (0-255), G (0-255), B (0-255), and opacity (0-1) */
     fromRgba(r: number, g: number, b: number, a: number): Color {
         return ((ALPHA_SCALE * a) << 24 | r << 16 | g << 8 | b) as Color;
     },
-    /** Create Int32-encoded color from R (0-255), G (0-255), B (0-255), assuming full opacity */
+    /** Create Int32-encoded `Color` from R (0-255), G (0-255), B (0-255), assuming full opacity */
     fromRgb(r: number, g: number, b: number): Color {
         return (ALPHA_SCALE << 24 | r << 16 | g << 8 | b) as Color;
     },
-    /** Create Int32-encoded color from a CSS string */
+    /** Create Int32-encoded `Color` from a CSS string */
     fromString(str: string): Color {
         const named: Color | undefined = ColorNames[str];
         if (named) return named;
@@ -69,7 +65,7 @@ export const Color = {
         if (isNaN(r) || isNaN(g) || isNaN(b) || isNaN(opacity)) return Color.fromRgba(0, 0, 0, 0);
         return Color.fromRgba(r, g, b, opacity);
     },
-    /** Convert Int32-encoded color to a CSS-style hex string (#RRGGBB if full opacity, #RRGGBBAA otherwise) */
+    /** Convert Int32-encoded `Color` to a CSS-style hex string (#RRGGBB if full opacity, #RRGGBBAA otherwise) */
     toString(color: Color): string {
         const a255 = color >>> 24 & 255;
         if (a255 === ALPHA_SCALE) {
@@ -85,7 +81,7 @@ export const Color = {
                 hexDigitCode(a255 >>> 4 & 15), hexDigitCode(a255 & 15));
         }
     },
-    /** Return object with R, G, B (0-255), and opacity (0-1) values. */
+    /** Convert Int32-encoded `Color` to object with R, G, B (0-255), and opacity (0-1) values. */
     toRgba(color: Color): { r: number, g: number, b: number, opacity: number } | undefined {
         const a = INV_ALPHA_SCALE * (color >>> 24 & 255);
         const r = color >>> 16 & 255;
@@ -113,7 +109,7 @@ export const Color = {
         out[offset + 1] = g;
         out[offset + 2] = b;
     },
-    /** Save `color` in an array represented as "ARaGaBa" (i.e. quadruplet [a*255, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. */
+    /** Save `color` in an array represented as "ARaGaBa" (i.e. quadruplet `[a*255, r*a, g*a, b*a]`). This representation is useful for averaging colors, and can be stored in a `Uint8ClampedArray`. (See `Image`.) */
     toAragabaArray(color: Color, out: WritableArrayLike<number>, offset: number): void {
         const a255 = (color >>> 24 & 255);
         const a = INV_ALPHA_SCALE * a255;
@@ -125,7 +121,7 @@ export const Color = {
         out[offset + 2] = g * a;
         out[offset + 3] = b * a;
     },
-    /** Add `color` to the current value in an array represented as "ARaGaBa" (i.e. quadruplet [a*255, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. */
+    /** Add `color` to the current value in an array represented as "ARaGaBa" (i.e. quadruplet [a*255, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. (See `Image`.) */
     addToAragabaArray(color: Color, out: WritableArrayLike<number>, offset: number): void {
         const a255 = (color >>> 24 & 255);
         const a = INV_ALPHA_SCALE * a255;
@@ -137,14 +133,6 @@ export const Color = {
         out[offset + 2] += g * a;
         out[offset + 3] += b * a;
     },
-    /** Set pixel `x,y` in `image` to `color` */
-    toImage(color: Color, image: Image, x: number, y: number): void {
-        return this.toAragabaArray(color, image.values, 4 * (y * image.nColumns + x));
-    },
-    /** Add `color` to current value of pixel `x,y` in `image` */
-    addToImage(color: Color, image: Image, x: number, y: number): void {
-        return this.addToAragabaArray(color, image.values, 4 * (y * image.nColumns + x));
-    },
     /** Load color from an array represented as "ARaGaBa" (i.e. quadruplet [a*255, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. */
     fromAragabaArray(array: ArrayLike<number>, offset: number): Color {
         const a255 = array[offset];
@@ -154,10 +142,7 @@ export const Color = {
         const b = invA * array[offset + 3];
         return (a255 << 24 | r << 16 | g << 8 | b) as Color;
     },
-    /** Load color from `Image`. */
-    fromImage(image: Image, x: number, y: number): Color {
-        return this.fromAragabaArray(image.values, 4 * (y * image.nColumns + x));
-    },
+    /** Mix two colors, using `1-q` ratio of `color0` and `q` ratio of `color1` */
     mix(color0: Color, color1: Color, q: number): Color {
         const a0 = color0 >>> 24 & 255;
         const r0 = color0 >>> 16 & 255;
@@ -173,6 +158,7 @@ export const Color = {
         const b = (1 - q) * b0 + q * b1;
         return (a << 24 | r << 16 | g << 8 | b) as Color;
     },
+    /** Multiply opacity channel of color by `scale` (must between 0-1) */
     scaleAlpha(color: Color, scale: number): Color {
         const oldA = color >>> 24 & 255;
         const newA = scale * oldA;
@@ -361,6 +347,7 @@ export const ColorNames: { [name: string]: Color } = {
 } as any;
 
 
+/** Benchmarking performace of `Color` parsing compared to D3. */
 export function benchmarkColor(str: string, n: number, m: number = 3): void {
     const c1 = Color.fromString(str);
     const c3 = d3.rgb(str);
@@ -407,48 +394,4 @@ export function benchmarkColor(str: string, n: number, m: number = 3): void {
         }
         console.timeEnd('toString');
     }
-}
-
-
-type KeysWith<T, V> = { [key in keyof T]: T[key] extends V ? key : never }[keyof T]
-type RemovePrefix<P extends string, T> = T extends `${P}${infer S}` ? S : never
-type D3ColorSchemeName = RemovePrefix<'interpolate', KeysWith<typeof d3, (t: number) => string>>
-
-
-function createScaleFromColors(domain: number[], colors: (Color | string)[]): ((x: number) => Color) {
-    if (domain.length !== colors.length) throw new Error('Domain and colors must have the same length');
-    const n = domain.length;
-    const theDomain = Domain.create(domain);
-    const theColors = colors.map(c => typeof c === 'string' ? Color.fromString(c) : c);
-    if (!theDomain.isNumeric || theDomain.sortDirection === 'none') {
-        throw new Error('Provided domain is not numeric and monotonous');
-    }
-    return (x: number) => {
-        const contIndex = clamp(Domain.interpolateIndex(theDomain, x)!, 0, n - 1);
-        const index = Math.floor(contIndex);
-        if (index === n) return theColors[n];
-        else return Color.mix(theColors[index], theColors[index + 1], contIndex - index);
-    };
-}
-
-function createScaleFromScheme(schemeName: D3ColorSchemeName, domain: [number, number] = [0, 1], range_: [number, number] = [0, 1]): ((x: number) => Color) {
-    const colorInterpolator = d3[`interpolate${schemeName}`];
-    if (!colorInterpolator) {
-        const schemes = Object.keys(d3).filter(k => k.indexOf('interpolate') === 0).map(k => k.replace(/^interpolate/, ''));
-        throw new Error(`Invalid color scheme name: "${schemeName}".\n(Available schemes: ${schemes})`);
-    }
-    const n = 100;
-    const domSc = d3.scaleLinear([0, n], domain);
-    const ranSc = d3.scaleLinear([0, n], range_);
-    const dom = range(n + 1).map(i => domSc(i));
-    const cols = range(n + 1).map(i => Color.fromString(colorInterpolator(ranSc(i))));
-    return createScaleFromColors(dom, cols);
-}
-
-/** Create a color scale, e.g. `createColorScale('Magma', [0, 1], [0, 1])` or `createColorScale([0, 0.5, 1], ['white', 'orange', 'brown'])` */
-export function createColorScale(schemeName: D3ColorSchemeName, domain?: [number, number], range?: [number, number]): ((x: number) => Color);
-export function createColorScale(domain: number[], colors: (Color | string)[]): ((x: number) => Color);
-export function createColorScale(a: D3ColorSchemeName | number[], b?: any, c?: any): ((x: number) => Color) {
-    if (typeof a === 'string') return createScaleFromScheme(a, b, c);
-    else return createScaleFromColors(a, b);
 }

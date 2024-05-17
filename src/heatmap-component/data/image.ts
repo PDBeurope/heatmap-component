@@ -1,7 +1,7 @@
 import { Color } from './color';
 
 
-/** Represents a 2D image in RGB with alpha channel (saved in a special way to simplify downsampling) */
+/** Represents a 2D image in RGB with alpha channel (saved in a special way ("ARaGaBa") to simplify downsampling) */
 export interface Image {
     /** Number of columns */
     nColumns: number,
@@ -24,6 +24,21 @@ export const Image = {
         image.values.fill(0);
     },
 
+    /** Get color of pixel `x,y` in `image`. */
+    getColor(image: Image, x: number, y: number): Color {
+        return Color.fromAragabaArray(image.values, 4 * (y * image.nColumns + x));
+    },
+
+    /** Set pixel `x,y` in `image` to `color` */
+    setColor(image: Image, x: number, y: number, color: Color): void {
+        return Color.toAragabaArray(color, image.values, 4 * (y * image.nColumns + x));
+    },
+
+    /** Add `color` to current value of pixel `x,y` in `image` (i.e. set the pixel to the sum of its current color + `color`) */
+    addColor(image: Image, x: number, y: number, color: Color): void {
+        return Color.addToAragabaArray(color, image.values, 4 * (y * image.nColumns + x));
+    },
+
     /** Draw a filled rectangle to the image. Only use for non-overlapping rectangles!!! */
     addRect(image: Image, xmin: number, ymin: number, xmax: number, ymax: number, fill: Color): void {
         xmin = Math.min(Math.max(xmin, 0), image.nColumns); // uglier but faster than lodash clamp
@@ -39,7 +54,8 @@ export const Image = {
             for (let x = xFrom; x < xTo; x++) {
                 const xWeight = Math.min(x + 1, xmax) - Math.max(x, xmin);
                 const effectiveFill = Color.scaleAlpha(fill, xWeight * yWeight);
-                Color.addToImage(effectiveFill, image, x, y);
+                Image.addColor(image, x, y, effectiveFill);
+                // Color.addToImage(effectiveFill, image, x, y);
             }
         }
     },

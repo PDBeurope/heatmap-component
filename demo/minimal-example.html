@@ -41,13 +41,14 @@
 
         // Create and customize a heatmap instance
         const heatmap = HeatmapComponent.Heatmap.create(data, 0);
-        const colorScale = HeatmapComponent.createColorScale('YlOrRd', [0, 1]); // yellow-orange-red color scale for values from 0 to 1
+        const colorScale = HeatmapComponent.ColorScale.continuous('YlOrRd', [0, 1]); // yellow-orange-red color scale for values from 0 to 1
         heatmap.setColor(d => colorScale(d.score)); // function that takes a datum and returns color
 
         // Render in div with id="app"
         heatmap.render('app');
 
-        heatmap.events.select.subscribe(e => console.log('Selected', e))
+        heatmap.events.select.subscribe(e => console.log('Selected', e));
+
     </script>
 </body>
 

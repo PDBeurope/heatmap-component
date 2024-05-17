@@ -85,6 +85,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
      * ```
      * heatmap.setColor(createColorScale('YlOrRd', [0, 100]));
      * ```
+     * TODO: update this
      */
     setColor(colorProvider: Provider<TX, TY, TDatum, string | Color>): this {
         this.extensions.draw?.update({ colorProvider });

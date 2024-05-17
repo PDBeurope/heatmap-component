@@ -94,6 +94,7 @@ Use `HeatmapComponent.createColorScale` to create continuous color scales (detai
 const colorScale = HeatmapComponent.createColorScale('YlOrRd', [0, 1]); // yellow-orange-red color scale for values from 0 to 1
 heatmap.setColor(d => colorScale(d.score)); // function that takes a datum and returns color
 ```
+// TODO update this
 
 ### Step 6: Render heatmap
 

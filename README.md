@@ -80,7 +80,7 @@ To release a new version of this package:
 -   Commit and push to `main` branch (use the version with prepended "v" as the commit message, e.g. `v1.0.0`)
 -   Create a git tag matching the version with prepended "v" (e.g. `v1.0.0`)
 -   GitHub workflow will automatically publish npm package (https://www.npmjs.com/package/heatmap-component)
--   The files will become available via jsDelivr
+-   The files will become available via jsDelivr (`@latest` can be replaced by a specific version (e.g. `@1.0.0`)):
     -   https://cdn.jsdelivr.net/npm/heatmap-component@latest/build/heatmap-component.js
     -   https://cdn.jsdelivr.net/npm/heatmap-component@latest/build/heatmap-component.css
-    -   It might take up to 12 hours before `@latest` starts pointing to the new version. You can also replace `@latest` by a specific version (e.g. `@1.0.0`).
+-   Go to https://www.jsdelivr.com/tools/purge and purge the cache for abovementioned URLs (otherwise it might take up to 7 days to before `@latest` starts pointing to the new version)

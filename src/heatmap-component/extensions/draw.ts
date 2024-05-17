@@ -90,7 +90,8 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
                 if (datum === undefined) continue; // keep transparent black
                 const color = this.params.colorProvider(datum, this.state.xDomain.values[ix], this.state.yDomain.values[iy], ix, iy);
                 const c = (typeof color === 'string') ? Color.fromString(color) : color;
-                Color.toImage(c, image, ix, iy);
+                // Color.toImage(c, image, ix, iy);
+                Image.setColor(image, ix, iy, c);
             }
         }
         return image;
@@ -171,7 +172,8 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
                 const x = this.state.scales.worldToCanvas.x(ix * xScale);
                 const xFrom = x + xHalfGap;
                 const xTo = x + rectWidth - xHalfGap;
-                const color = Color.fromImage(image, ix, iy);
+                // const color = Color.fromImage(image, ix, iy);
+                const color = Image.getColor(image, ix, iy);
                 Image.addRect(canvasImage, xFrom, yFrom, xTo, yTo, color);
             }
         }
@@ -209,7 +211,7 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
 }
 
 
-/** Adds behavior that draws heatmap data in the canvas element. */
+/** Adds behavior that draws heatmap data in the canvas element (uses downsampling when the heatmap is zoomed out, to achieve efficient rendering). */
 export const DrawExtension: Extension<DrawExtensionParams<never, never, never>, typeof DefaultDrawExtensionParams> = Extension.fromBehaviorClass({
     name: 'builtin.draw',
     defaultParams: DefaultDrawExtensionParams,

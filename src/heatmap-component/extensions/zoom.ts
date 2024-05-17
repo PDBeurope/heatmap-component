@@ -6,7 +6,9 @@ import { MIN_ZOOMED_DATAPOINTS_HARD } from '../state';
 import { attrd } from '../utils';
 
 
+/** Parameters for `ZoomExtension` */
 export interface ZoomExtensionParams {
+    /** Zooming mode: 'none' = zooming is off, 'x' = can zoom along X axis, Y axis stays the same. */
     axis: 'none' | 'x',
     /** Only interpret scrolling as zoom when the Control key is pressed (or Meta key, i.e. Command/Windows).  If `false`, zooming is allowed always, but Ctrl or Meta key makes it faster. */
     scrollRequireCtrl: boolean,
@@ -18,6 +20,7 @@ export interface ZoomExtensionParams {
     minZoomedDatapoints: number;
 }
 
+/** Default parameter values for `ZoomExtension` */
 export const DefaultZoomExtensionParams: ZoomExtensionParams = {
     axis: 'none',
     scrollRequireCtrl: false,
@@ -26,6 +29,7 @@ export const DefaultZoomExtensionParams: ZoomExtensionParams = {
     minZoomedDatapoints: 1,
 };
 
+/** Behavior class for `ZoomExtension` (allows zooming and panning the heatmap by mouse) */
 export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
     private zoomBehavior?: d3.ZoomBehavior<Element, unknown>;
     /** Used to merge multiple wheel events into one gesture (needed for correct functioning on Mac touchpad) */
@@ -60,6 +64,7 @@ export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
         this.adjustZoom();
     }
 
+    /** Initialize zoom behavior (also remove any existing zoom behavior) */
     private addZoomBehavior(): void {
         if (!this.targetElement) return;
         if (this.zoomBehavior) {
@@ -127,6 +132,8 @@ export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
         this.currentWheelGesture.lastAbsDelta = absDelta;
     }
 
+    /** Adjust zoom extent based on current data and canvas size
+     * (limit maximum zoom in/out and translation to avoid getting out of the data world) */
     private adjustZoomExtent(): void {
         if (!this.state.dom) return;
         if (!this.zoomBehavior) return;
@@ -150,6 +157,7 @@ export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
         this.suppressEmit = false;
     }
 
+    /** Convert zoom transform to visWorld box */
     private zoomTransformToVisWorld(transform: { k: number, x: number, y: number }): Box {
         return {
             ...this.state.boxes.visWorld, // preserve Y zoom
@@ -158,6 +166,7 @@ export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
         };
     }
 
+    /** Convert visWorld box to zoom transform */
     private visWorldToZoomTransform(visWorld: Box): d3.ZoomTransform {
         const k = (this.state.boxes.canvas.xmax - this.state.boxes.canvas.xmin) / (visWorld.xmax - visWorld.xmin);
         const x = this.state.boxes.canvas.xmin - k * visWorld.xmin;
@@ -165,6 +174,7 @@ export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
         return new d3.ZoomTransform(k, x, y);
     }
 
+    /** Show overlay with message about how to use scrolling */
     private showScrollingMessage(): void {
         if (!this.state.dom) return;
         if (!this.state.dom.mainDiv.selectAll(`.${Class.Overlay}`).empty()) return;
@@ -202,6 +212,8 @@ export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
 }
 
 
+/** Adds behavior that allows zooming and panning the heatmap by mouse (scroll, drag, double-click)
+ * (programmatic zooming via `heatmap.zoom` is independent from this extension) */
 export const ZoomExtension = Extension.fromBehaviorClass({
     name: 'builtin.zoom',
     defaultParams: DefaultZoomExtensionParams,
