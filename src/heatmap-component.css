@@ -14,6 +14,25 @@
     background-color: none;
 }
 
+
+/* Marker extension */
+
+.heatmap-marker {
+    stroke: black;
+    stroke-width: 4;
+    fill: none;
+}
+
+.heatmap-marker-x,
+.heatmap-marker-y {
+    stroke: black;
+    stroke-width: 2;
+    fill: none;
+}
+
+
+/* Tooltip extension */
+
 .heatmap-tooltip-box,
 .heatmap-pinned-tooltip-box {
     z-index: 0;
@@ -68,6 +87,9 @@
     fill: black;
 }
 
+
+/* Overlay (Zoom extension) */
+
 .heatmap-overlay {
     position: absolute;
     width: 100%;
@@ -99,17 +121,4 @@
     background-color: white;
     border: solid black 1px;
     box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.75);
-}
-
-.heatmap-marker {
-    stroke: black;
-    stroke-width: 4;
-    fill: none;
-}
-
-.heatmap-marker-x,
-.heatmap-marker-y {
-    stroke: black;
-    stroke-width: 2;
-    fill: none;
 }

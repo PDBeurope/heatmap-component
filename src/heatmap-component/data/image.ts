@@ -20,12 +20,12 @@ export const Image = {
     },
 
     /** Clear the whole image to transparent black */
-    clear(image: Image) {
+    clear(image: Image): void {
         image.values.fill(0);
     },
 
     /** Draw a filled rectangle to the image. Only use for non-overlapping rectangles!!! */
-    addRect(image: Image, xmin: number, ymin: number, xmax: number, ymax: number, fill: Color) {
+    addRect(image: Image, xmin: number, ymin: number, xmax: number, ymax: number, fill: Color): void {
         xmin = Math.min(Math.max(xmin, 0), image.nColumns); // uglier but faster than lodash clamp
         xmax = Math.min(Math.max(xmax, 0), image.nColumns);
         ymin = Math.min(Math.max(ymin, 0), image.nRows);
@@ -54,7 +54,7 @@ export const Image = {
     },
 
     /** Throw error if the length of `values` does not correspond to image size */
-    validateLength(image: Image) {
+    validateLength(image: Image): void {
         if (image.values.length !== 4 * image.nColumns * image.nRows) {
             throw new Error('ValueError: length of image.values must be 4 * image.nColumns * image.nRows');
         }

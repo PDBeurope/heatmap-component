@@ -1,7 +1,7 @@
 import { Class } from './class-names';
 import * as d3 from './d3-modules';
 import { DataDescription } from './data/data-description';
-import { Behavior, HeatmapExtension } from './extension';
+import { Behavior, Extension } from './extension';
 import { Box, Scales } from './scales';
 import { State } from './state';
 import { attrd } from './utils';
@@ -16,13 +16,6 @@ export class HeatmapCore<TX, TY, TDatum> {
      * Shared between the heatmap instance and all registered behaviors. */
     protected readonly state: State<TX, TY, TDatum>;
 
-    /** Register an extension with this heatmap, i.e. create a behavior bound to the state of this heatmap. */
-    registerExtension<TParams extends {}, TDefaults extends TParams>(extension: HeatmapExtension<TParams, TDefaults>, params?: Partial<TParams>): Behavior<TParams> {
-        const behavior = extension.create(this.state, params);
-        behavior.register();
-        return behavior;
-    }
-
     constructor(dataDescription: DataDescription<TX, TY, TDatum>) {
         this.state = new State(dataDescription);
 
@@ -32,6 +25,13 @@ export class HeatmapCore<TX, TY, TDatum> {
             this.state.boxes.canvas = box;
             this.state.scales = Scales(this.state.boxes);
         });
+    }
+
+    /** Register an extension with this heatmap, i.e. create a behavior bound to the state of this heatmap. */
+    registerExtension<TParams extends {}, TDefaults extends TParams>(extension: Extension<TParams, TDefaults>, params?: Partial<TParams>): Behavior<TParams> {
+        const behavior = extension.create(this.state, params);
+        behavior.register();
+        return behavior;
     }
 
     /** Render this heatmap in the given DIV element. */

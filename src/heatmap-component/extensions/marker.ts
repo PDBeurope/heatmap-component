@@ -1,25 +1,28 @@
 import { Class } from '../class-names';
-import { HeatmapExtension, HeatmapBehaviorBase } from '../extension';
+import { BehaviorBase, Extension } from '../extension';
 import { Box, scaleDistance } from '../scales';
 import { attrd } from '../utils';
 
 
+/** Parameters for `MarkerExtension` */
 export interface MarkerExtensionParams {
     /** Radius for rounding the corners of the marker rectangle */
     markerCornerRadius: number,
-    /** Ignore mouse events (when markers are managed programmaticaly) */
+    /** Ignore mouse events (useful when markers are managed programmaticaly) */
     freeze: boolean,
 }
 
+/** Default parameter values for `MarkerExtension` */
 export const DefaultMarkerExtensionParams: MarkerExtensionParams = {
     markerCornerRadius: 1,
     freeze: false,
 };
 
-export class MarkerBehavior extends HeatmapBehaviorBase<MarkerExtensionParams> {
+/** Behavior class for `MarkerExtension` (highlights hovered grid cell and column and row) */
+export class MarkerBehavior extends BehaviorBase<MarkerExtensionParams> {
     private readonly currentlyMarked: { xIndex: number | undefined, yIndex: number | undefined } = { xIndex: undefined, yIndex: undefined };
 
-    register() {
+    register(): void {
         super.register();
         this.subscribe(this.state.events.hover, pointed => {
             if (!this.params.freeze) {
@@ -34,7 +37,9 @@ export class MarkerBehavior extends HeatmapBehaviorBase<MarkerExtensionParams> {
         });
     }
 
-    drawMarkers(pointed: { xIndex?: number, yIndex?: number, x?: unknown, y?: unknown } | undefined) {
+    /** Add markers or update position of existing markers, to highlight the `pointed` grid cell.
+     * Remove existing markers, if `pointed` is `undefined`. */
+    drawMarkers(pointed: { xIndex?: number, yIndex?: number, x?: unknown, y?: unknown } | undefined): void {
         if (!this.state.dom) return;
         const xIndex = (pointed?.xIndex !== undefined) ? pointed.xIndex : this.state.xDomain.index.get(pointed?.x);
         const yIndex = (pointed?.yIndex !== undefined) ? pointed.yIndex : this.state.yDomain.index.get(pointed?.y);
@@ -54,7 +59,7 @@ export class MarkerBehavior extends HeatmapBehaviorBase<MarkerExtensionParams> {
                 height: Box.height(this.state.boxes.canvas),
             });
         } else {
-            this.state.dom.svg.selectAll('.' + Class.MarkerX).remove();
+            this.removeMarker(Class.MarkerX);
         }
         // Row marker
         if (yCoord !== undefined) {
@@ -65,7 +70,7 @@ export class MarkerBehavior extends HeatmapBehaviorBase<MarkerExtensionParams> {
                 height,
             });
         } else {
-            this.state.dom.svg.selectAll('.' + Class.MarkerY).remove();
+            this.removeMarker(Class.MarkerY);
         }
         // Cell marker
         if (xCoord !== undefined && yCoord !== undefined) {
@@ -73,20 +78,25 @@ export class MarkerBehavior extends HeatmapBehaviorBase<MarkerExtensionParams> {
                 x: xCoord, y: yCoord, width, height,
             });
         } else {
-            this.state.dom.svg.selectAll('.' + Class.Marker).remove();
+            this.removeMarker(Class.Marker);
         }
     }
 
-    private addOrUpdateMarker(className: string, staticAttrs: Parameters<typeof attrd>[1], dynamicAttrs: Parameters<typeof attrd>[1]) {
+    private addOrUpdateMarker(className: string, staticAttrs: Parameters<typeof attrd>[1], dynamicAttrs: Parameters<typeof attrd>[1]): void {
         if (!this.state.dom) return;
         const marker = this.state.dom.svg.selectAll('.' + className).data([1]);
         attrd(marker.enter().append('rect'), { class: className, ...staticAttrs, ...dynamicAttrs });
         attrd(marker, dynamicAttrs);
     }
+    private removeMarker(className: string): void {
+        if (!this.state.dom) return;
+        this.state.dom.svg.selectAll('.' + className).remove();
+    }
 }
 
 
-export const MarkerExtension = HeatmapExtension.fromClass({
+/** Adds behavior that highlights hovered grid cell and column and row */
+export const MarkerExtension = Extension.fromBehaviorClass({
     name: 'builtin.marker',
     defaultParams: DefaultMarkerExtensionParams,
     behavior: MarkerBehavior,

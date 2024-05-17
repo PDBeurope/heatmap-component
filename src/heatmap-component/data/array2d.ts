@@ -60,7 +60,7 @@ export const Array2D = {
         return { min, max };
     },
 
-    validateLength(data: Array2D<any>) {
+    validateLength(data: Array2D<any>): void {
         if (data.values.length !== data.nColumns * data.nRows) {
             throw new Error('ValueError: length of data.values must be data.nColumns * data.nRows');
         }

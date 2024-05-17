@@ -26,7 +26,7 @@ First, make sure you include the HeatmapComponent script and styles in your HTML
 </html>
 ```
 
-In this example we use pre-bundled JS and CSS files via jsDelivr CDN. You can replace `@latest` in the URLs by a specific version, e.g. `@1.0.0`.
+In this example we use pre-bundled JS and CSS files via jsDelivr CDN. You can replace `@latest` in the URLs by a specific version, e.g. `@1.0.0`, or use your own bundles (if using HeatmapComponent as a library).
 
 Including the `heatmap-component.js` script creates a global object `HeatmapComponent` that we will use later.
 

@@ -297,7 +297,7 @@ function downsampleImage_halveY(input: Image): Image {
  * Typically one old pixel will contribute to more new pixels and vice versa.
  * Sum of weights contributed to each new pixel must be equal to 1.
  * To use for 2D images, calculate row-wise and column-wise weights and multiply them. */
-export function resamplingCoefficients(nOld: number, nNew: number) {
+export function resamplingCoefficients(nOld: number, nNew: number): { from: number[], to: number[], weight: number[] } {
     const scale = nNew / nOld;
     let i = 0; // Current pixel in the old image
     let j = 0; // Current pixel in the new image

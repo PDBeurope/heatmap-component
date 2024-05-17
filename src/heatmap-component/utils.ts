@@ -6,21 +6,22 @@ import { BoxSize } from './scales';
 /** `true` if type `T` is number, `false` for any other type */
 export type IsNumeric<T> = T extends number ? true : false;
 
-export async function sleep(ms: number) {
+/** Pause asynchronous execution for `ms` miliseconds.
+ * (Use `await sleep(0)` to let other async things happen (this pushes the rest of the calling function to the end of the queue).) */
+export async function sleep(ms: number): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export type AnySelection = d3.Selection<any, any, any, any>
-
 /** Return size of a DOM element `selection` */
-export function getSize(selection: AnySelection): BoxSize {
+export function getSize(selection: d3.Selection<any, any, any, any>): BoxSize {
     const { width, height } = selection.node()!.getBoundingClientRect();
     return { width, height };
 }
 
 /** Syntax sugar for applying attributes and styles to D3 selections.
- * Automatically converts camelCase to kebab-case (don't use for really camelCase attributes, like `viewBox`). */
-export function attrd<S extends AnySelection>(selection: S, attributes: Record<string, any> & { style?: Record<string, any> }): S {
+ * Automatically converts camelCase to kebab-case.
+ * (Don't use for attributes that are really camelCase, e.g. `viewBox`). */
+export function attrd<S extends d3.Selection<any, any, any, any>>(selection: S, attributes: Record<string, any> & { style?: Record<string, any> }): S {
     for (const name in attributes) {
         if (name !== 'style') selection.attr(kebabCase(name), attributes[name]);
     }
@@ -31,7 +32,7 @@ export function attrd<S extends AnySelection>(selection: S, attributes: Record<s
 }
 
 /** Convert camelCaseString to kebab-case-string */
-export function kebabCase(str: string) {
+export function kebabCase(str: string): string {
     return str.replace(/([A-Z])/g, '-$1').toLowerCase();
 }
 
@@ -62,30 +63,25 @@ export function sortDirection(array: number[]): 'asc' | 'desc' | 'none' {
     }
 }
 
-/** Run `f()` and return its running time in ms */
-export function runWithTiming(f: () => any) {
-    const start = Date.now();
-    f();
-    const end = Date.now();
-    return end - start;
-}
-
 /** Helper for running potentially time-consuming "refresh" actions (e.g. canvas draw) in a non-blocking way.
  * If the caller calls `requestRefresh()`, this call returns immediately but it is guaranteed
  * that `refresh` will be run asynchronously in the future.
- * However, if the caller calls `requestRefresh()` multiple times, it is NOT guaranteed
+ * If the caller calls `requestRefresh()` multiple times, it is NOT guaranteed
  * that `refresh` will be run the same number of times, only that it will be run
  * at least once after the last call to `requestRefresh()`. */
-export function Refresher(refresh: () => any) {
+export interface Refresher {
+    requestRefresh: () => void,
+}
+export function Refresher(refresh: () => any): Refresher {
     let requested = false;
     let running = false;
-    function requestRefresh() {
+    function requestRefresh(): void {
         requested = true;
         if (!running) {
             handleRequests(); // do not await
         }
     }
-    async function handleRequests() {
+    async function handleRequests(): Promise<void> {
         while (requested) {
             requested = false;
             running = true;
@@ -121,13 +117,4 @@ export function shallowMerge<T>(old: T, new_?: Partial<T>): T {
         }
     }
     return result;
-}
-
-/** Create a copy of object `object`, fill in missing/undefined keys using `defaults` */
-export function addDefaults<T extends {}>(new_: Partial<T> | undefined, old: T): T {
-    const result: Partial<T> = { ...new_ };
-    for (const key in old) {
-        result[key] ??= old[key];
-    }
-    return result as T;
 }

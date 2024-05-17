@@ -1,7 +1,7 @@
 import { Color } from './data/color';
 import { DataDescription, Provider } from './data/data-description';
 import { Behavior } from './extension';
-import { DrawExtension, DrawExtensionParams, VisualParams } from './extensions/draw';
+import { DrawExtension, DrawExtensionParams } from './extensions/draw';
 import { MarkerBehavior, MarkerExtension } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 import { ZoomExtension, ZoomExtensionParams } from './extensions/zoom';
@@ -142,3 +142,6 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         return this.state.getZoom();
     }
 }
+
+
+type VisualParams = Pick<DrawExtensionParams<unknown, unknown, unknown>, 'xGapPixels' | 'xGapRelative' | 'yGapPixels' | 'yGapRelative' | 'minRectSizeForGaps'>

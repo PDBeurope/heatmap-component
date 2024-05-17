@@ -3,7 +3,7 @@ import { DataDescription } from './data/data-description';
 
 
 /** Demo showing small data with a lot of customizations */
-export function demo1(divElementOrId: HTMLDivElement | string) {
+export function demo1(divElementOrId: HTMLDivElement | string): void {
     const items = [
         { col: 1, row: 'A', score: 0.0 },
         { col: 1, row: 'B', score: 0.2 },
@@ -59,13 +59,14 @@ export function demo1(divElementOrId: HTMLDivElement | string) {
 
 /** Set text content to all HTML elements selected by `elementSelector`.
  * Example: `setTextContent('#element-to-change', 'changed text here');` */
-function setTextContent(elementSelector: string, content: unknown): void {
+function setTextContent(elementSelector: string, content: unknown, numberPrecision: number = 4): void {
     const elements = document.querySelectorAll(elementSelector);
+    if (typeof content === 'number' && numberPrecision >= 0) content = content.toFixed(numberPrecision);
     elements.forEach(element => element.textContent = `${content}`);
 }
 
 /** Demo showing a big data example (200_000 x 20) */
-export function demo2(divElementOrId: HTMLDivElement | string) {
+export function demo2(divElementOrId: HTMLDivElement | string): void {
     const data = DataDescription.createRandomWithGradient(2e5, 20);
     const hm = Heatmap.create(data); // Heatmap<number, number, number>
     hm.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
@@ -87,7 +88,7 @@ export function demo2(divElementOrId: HTMLDivElement | string) {
 
 
 /** Demo generating the heatmap-component logo */
-export function demo3(divElementOrId: HTMLDivElement | string) {
+export function demo3(divElementOrId: HTMLDivElement | string): void {
     const items = [
         { col: 1, row: 'A', score: 0.6 },
         { col: 1, row: 'B', score: 0.4 },

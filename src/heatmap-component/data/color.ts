@@ -94,7 +94,7 @@ export const Color = {
         return { r, g, b, opacity: a };
     },
     /** Save `color` in an array represented as RGBA (i.e. quadruplet [r, g, b, a], all in 0-255). */
-    toRgbaArray(color: Color, out: WritableArrayLike<number>, offset: number) {
+    toRgbaArray(color: Color, out: WritableArrayLike<number>, offset: number): void {
         const a255 = color >>> 24 & 255;
         const r = color >>> 16 & 255;
         const g = color >>> 8 & 255;
@@ -105,7 +105,7 @@ export const Color = {
         out[offset + 3] = a255;
     },
     /** Save `color` in an array represented as RGB (i.e. triplet [r, g, b]), ignoring the opacity channel. */
-    toRgbArray(color: Color, out: WritableArrayLike<number>, offset: number) {
+    toRgbArray(color: Color, out: WritableArrayLike<number>, offset: number): void {
         const r = color >>> 16 & 255;
         const g = color >>> 8 & 255;
         const b = color & 255;
@@ -114,7 +114,7 @@ export const Color = {
         out[offset + 2] = b;
     },
     /** Save `color` in an array represented as "ARaGaBa" (i.e. quadruplet [a*255, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. */
-    toAragabaArray(color: Color, out: WritableArrayLike<number>, offset: number) {
+    toAragabaArray(color: Color, out: WritableArrayLike<number>, offset: number): void {
         const a255 = (color >>> 24 & 255);
         const a = INV_ALPHA_SCALE * a255;
         const r = color >>> 16 & 255;
@@ -126,7 +126,7 @@ export const Color = {
         out[offset + 3] = b * a;
     },
     /** Add `color` to the current value in an array represented as "ARaGaBa" (i.e. quadruplet [a*255, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. */
-    addToAragabaArray(color: Color, out: WritableArrayLike<number>, offset: number) {
+    addToAragabaArray(color: Color, out: WritableArrayLike<number>, offset: number): void {
         const a255 = (color >>> 24 & 255);
         const a = INV_ALPHA_SCALE * a255;
         const r = color >>> 16 & 255;
@@ -138,11 +138,11 @@ export const Color = {
         out[offset + 3] += b * a;
     },
     /** Set pixel `x,y` in `image` to `color` */
-    toImage(color: Color, image: Image, x: number, y: number) {
+    toImage(color: Color, image: Image, x: number, y: number): void {
         return this.toAragabaArray(color, image.values, 4 * (y * image.nColumns + x));
     },
     /** Add `color` to current value of pixel `x,y` in `image` */
-    addToImage(color: Color, image: Image, x: number, y: number) {
+    addToImage(color: Color, image: Image, x: number, y: number): void {
         return this.addToAragabaArray(color, image.values, 4 * (y * image.nColumns + x));
     },
     /** Load color from an array represented as "ARaGaBa" (i.e. quadruplet [a*255, r*a, g*a, b*a]). This representation is useful for averaging colors, and can be stored in a Uint8ClampedArray. */
@@ -189,7 +189,7 @@ function hexValue(charCode: number): number {
     return charCode - 87;
 }
 /** Get character code of the hexadecimal digit representing `num` (0 <= num <=15). */
-function hexDigitCode(num: number) {
+function hexDigitCode(num: number): number {
     if (num <= 9) return 48 + num;
     else return 87 + num;
 }
@@ -361,7 +361,7 @@ export const ColorNames: { [name: string]: Color } = {
 } as any;
 
 
-export function benchmarkColor(str: string, n: number, m: number = 3) {
+export function benchmarkColor(str: string, n: number, m: number = 3): void {
     const c1 = Color.fromString(str);
     const c3 = d3.rgb(str);
     console.log(str, c1, Color.toString(c1), c3, c3.formatHex8());
@@ -415,7 +415,7 @@ type RemovePrefix<P extends string, T> = T extends `${P}${infer S}` ? S : never
 type D3ColorSchemeName = RemovePrefix<'interpolate', KeysWith<typeof d3, (t: number) => string>>
 
 
-function createScaleFromColors(domain: number[], colors: (Color | string)[]) {
+function createScaleFromColors(domain: number[], colors: (Color | string)[]): ((x: number) => Color) {
     if (domain.length !== colors.length) throw new Error('Domain and colors must have the same length');
     const n = domain.length;
     const theDomain = Domain.create(domain);

@@ -12,7 +12,7 @@ import { getSize } from './utils';
 const ZOOM_EVENT_ROUNDING_PRECISION = 9;
 
 /** Minimum zoomable width/height measured as number of columns/rows */
-const MIN_ZOOMED_DATAPOINTS_HARD = 1;
+export const MIN_ZOOMED_DATAPOINTS_HARD = 1;
 
 
 /** Emitted on data-cell-related events (hover, click...) */
@@ -164,7 +164,7 @@ export class State<TX, TY, TDatum> {
             xmax: this.boxes.visWorld.xmax * xScale,
             ymin: this.boxes.visWorld.ymin * yScale,
             ymax: this.boxes.visWorld.ymax * yScale
-        }, newWholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD); // TODO ensure preserving relative position on world size change when on maximum zoom-in
+        }, newWholeWorld, { width: MIN_ZOOMED_DATAPOINTS_HARD, height: MIN_ZOOMED_DATAPOINTS_HARD });
         this.scales = Scales(this.boxes);
         this.events.data.next(undefined);
         this.emitZoom('setDataArray');
@@ -307,7 +307,7 @@ export class State<TX, TY, TDatum> {
             xmax: this.getIndexFromZoomRequest('x', 'Max', z) ?? this.boxes.wholeWorld.xmax,
             ymin: this.getIndexFromZoomRequest('y', 'Min', z) ?? this.boxes.wholeWorld.ymin,
             ymax: this.getIndexFromZoomRequest('y', 'Max', z) ?? this.boxes.wholeWorld.ymax,
-        }, this.boxes.wholeWorld, MIN_ZOOMED_DATAPOINTS_HARD, MIN_ZOOMED_DATAPOINTS_HARD);
+        }, this.boxes.wholeWorld, { width: MIN_ZOOMED_DATAPOINTS_HARD, height: MIN_ZOOMED_DATAPOINTS_HARD });
 
         this.zoomVisWorldBox(visWorldBox, z?.origin);
         return this.getZoomEventValue(z?.origin);
@@ -328,7 +328,7 @@ export class State<TX, TY, TDatum> {
 
 
 /** Return a number that has to be added world coordinates to get zoom coordinates (adjustment for column/row alignment). */
-function indexAlignmentShift(alignment: XAlignmentMode | YAlignmentMode) {
+function indexAlignmentShift(alignment: XAlignmentMode | YAlignmentMode): 0 | -0.5 | -1 {
     if (alignment === 'left' || alignment === 'top') return 0;
     if (alignment === 'center') return -0.5;
     return -1;
