@@ -40,7 +40,7 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
         this.subscribe(this.state.events.zoom, () => this.updatePinnedTooltipPosition());
         this.subscribe(this.state.events.resize, () => this.updatePinnedTooltipPosition());
     }
-    
+
     /** Add a div with tooltip or update position of existing tooltip, for the `pointed` grid cell.
      * Remove existing tooltip, if `pointed` is `undefined`. */
     private drawTooltip(pointed: CellEventValue<TX, TY, TDatum> | undefined): void {
