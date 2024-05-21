@@ -7,6 +7,7 @@ import { Domain } from './domain';
 export type Provider<TX, TY, TDatum, TResult> = (datum: TDatum, x: TX, y: TY, xIndex: number, yIndex: number) => TResult
 
 
+/** Description of heatmap data as passed to the Heatmap class. */
 export type DataDescription<TX, TY, TDatum> = {
     /** Array of X values assigned to columns, from left to right ("column names") */
     xDomain: TX[],

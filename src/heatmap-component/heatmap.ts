@@ -10,7 +10,6 @@ import { XAlignmentMode, YAlignmentMode, ZoomEventValue } from './state';
 
 
 // TODO: Should: docs
-// TODO: Could: categorical color schemes
 // TODO: Could: reorganize demos and index.html, github.io
 // TODO: Could: allow triggering markers from outside the code (and only vertical or only horizontal specifically, i.e. by handling out-of scope x/y appropriately)
 // TODO: Could: various zoom modes (horizontal, vertical, both, none...)

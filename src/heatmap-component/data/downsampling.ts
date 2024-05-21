@@ -41,6 +41,7 @@ export const Downsampler = {
         return result;
     },
 
+    /** Return the original (full-size) data */
     getOriginal<M extends DownsamplingMode>(downsampler: Downsampler<M>): DataType<M> {
         return get(downsampler, { x: downsampler.nColumns, y: downsampler.nRows })!;
     },
@@ -58,7 +59,6 @@ export const Downsampler = {
 };
 
 
-
 /** Return `m`, a power of 2 or equal to `nDatapoints`, such that:
  * `nPixels <= m < 2*nPixels`  or  `m === nDatapoints < nPixels` */
 function downsamplingTarget(nDatapoints: number, nPixels: number): number {
@@ -69,9 +69,11 @@ function downsamplingTarget(nDatapoints: number, nPixels: number): number {
     return result;
 }
 
+/** Get data downsampled to `resolution` (exactly) if already computed. Do not compute anything. */
 function get<M extends DownsamplingMode>(downsampler: Downsampler<M>, resolution: XY): DataType<M> | undefined {
     return downsampler.downsampled[resolutionString(resolution)];
 }
+/** Save data downsampled to `resolution`. */
 function set<M extends DownsamplingMode>(downsampler: Downsampler<M>, resolution: XY, value: DataType<M>): undefined {
     downsampler.downsampled[resolutionString(resolution)] = value;
 }
@@ -82,7 +84,7 @@ function getOrCompute<M extends DownsamplingMode>(downsampler: Downsampler<M>, r
     if (cached) {
         return cached;
     } else {
-        const srcResolution = downsamplingSource2D(resolution, { x: downsampler.nColumns, y: downsampler.nRows });
+        const srcResolution = downsamplingSource(resolution, { x: downsampler.nColumns, y: downsampler.nRows });
         if (!srcResolution || srcResolution.x > downsampler.nColumns || srcResolution.y > downsampler.nRows) throw new Error('AssertionError');
         const srcData = getOrCompute(downsampler, srcResolution);
         const result = downsample(downsampler.mode, srcData, resolution);
@@ -92,9 +94,10 @@ function getOrCompute<M extends DownsamplingMode>(downsampler: Downsampler<M>, r
 }
 
 /** Return resolution from which `wanted` resolution should be obtained by downsampling.
- * This will have either X length or Y length doubled (or same as in `original` if doubled would be more that original) and the other length kept the same.
+ * This will have either X length or Y length doubled relative to `wanted` (or same as in `original` if doubled would be more that original)
+ * and the other length kept the same.
  * Return `undefined` if `wanted` is already equal to `original`. */
-function downsamplingSource2D(wanted: XY, original: XY): XY | undefined {
+function downsamplingSource(wanted: XY, original: XY): XY | undefined {
     if (wanted.x > original.x || wanted.y > original.y) {
         throw new Error('ArgumentError: Cannot downsample to higher resolution than original');
     }
@@ -297,7 +300,7 @@ function downsampleImage_halveY(input: Image): Image {
  * Typically one old pixel will contribute to more new pixels and vice versa.
  * Sum of weights contributed to each new pixel must be equal to 1.
  * To use for 2D images, calculate row-wise and column-wise weights and multiply them. */
-export function resamplingCoefficients(nOld: number, nNew: number): { from: number[], to: number[], weight: number[] } {
+function resamplingCoefficients(nOld: number, nNew: number): { from: number[], to: number[], weight: number[] } {
     const scale = nNew / nOld;
     let i = 0; // Current pixel in the old image
     let j = 0; // Current pixel in the new image

@@ -90,7 +90,6 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
                 if (datum === undefined) continue; // keep transparent black
                 const color = this.params.colorProvider(datum, this.state.xDomain.values[ix], this.state.yDomain.values[iy], ix, iy);
                 const c = (typeof color === 'string') ? Color.fromString(color) : color;
-                // Color.toImage(c, image, ix, iy);
                 Image.setColor(image, ix, iy, c);
             }
         }
@@ -172,7 +171,6 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
                 const x = this.state.scales.worldToCanvas.x(ix * xScale);
                 const xFrom = x + xHalfGap;
                 const xTo = x + rectWidth - xHalfGap;
-                // const color = Color.fromImage(image, ix, iy);
                 const color = Image.getColor(image, ix, iy);
                 Image.addRect(canvasImage, xFrom, yFrom, xTo, yTo, color);
             }
