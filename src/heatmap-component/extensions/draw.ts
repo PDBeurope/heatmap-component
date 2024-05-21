@@ -61,6 +61,7 @@ export const DrawExtension: HeatmapExtension<DrawExtensionParams<never, never, n
                 const ctx = this.state.dom.canvas.node()?.getContext('2d');
                 if (ctx) this.ctx = ctx;
                 else throw new Error('Failed to initialize canvas');
+                this.state.dom.svg.on('mouseenter.DrawExtension', () => this.requestDraw());
             });
             this.subscribe(this.state.events.zoom, () => {
                 this.requestDraw();
@@ -78,6 +79,7 @@ export const DrawExtension: HeatmapExtension<DrawExtensionParams<never, never, n
             this.requestDraw();
         }
         unregister() {
+            if (this.state.dom) this.state.dom.svg.on('mouseenter.DrawExtension', null);
             super.unregister();
         }
 
