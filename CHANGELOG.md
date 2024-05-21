@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+## [0.9.1] - 2024-05-21
+
+-   Redraw heatmap on mouseenter (for when the browser erases canvas)
+
 ## [0.9.0] - 2024-04-29
 
 -   Renamed the package from `hotmap` to `heatmap-component`
