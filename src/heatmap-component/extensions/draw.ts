@@ -60,6 +60,7 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
             } else {
                 throw new Error('Failed to initialize canvas');
             }
+            this.state.dom.svg.on('mouseenter.DrawExtension', () => this.requestDraw()); // For cases when the browser erases canvas (bug in some Chrome versions)
         });
         this.subscribe(this.state.events.zoom, () => {
             this.requestDraw();
@@ -77,6 +78,7 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
         this.requestDraw();
     }
     unregister(): void {
+        if (this.state.dom) this.state.dom.svg.on('mouseenter.DrawExtension', null);
         super.unregister();
     }
 
