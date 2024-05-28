@@ -7,7 +7,7 @@ import { attrd } from '../utils';
 /** Parameters for `MarkerExtension` */
 export interface MarkerExtensionParams {
     /** Radius for rounding the corners of the marker rectangle */
-    markerCornerRadius: number,
+    markerCornerRadius: number, // rx and ry are attributes, not CSS properties, therefore cannot be changed via CSS
     /** Ignore mouse events (useful when markers are managed programmaticaly) */
     freeze: boolean,
 }

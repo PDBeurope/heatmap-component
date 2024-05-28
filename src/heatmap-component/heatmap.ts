@@ -2,7 +2,7 @@ import { Color } from './data/color';
 import { DataDescription, Provider } from './data/data-description';
 import { Behavior } from './extension';
 import { DrawExtension, DrawExtensionParams } from './extensions/draw';
-import { MarkerBehavior, MarkerExtension } from './extensions/marker';
+import { MarkerBehavior, MarkerExtension, MarkerExtensionParams } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 import { ZoomExtension, ZoomExtensionParams } from './extensions/zoom';
 import { HeatmapCore } from './heatmap-core';
@@ -10,7 +10,6 @@ import { XAlignmentMode, YAlignmentMode, ZoomEventValue } from './state';
 
 
 // TODO: Should: docs
-// TODO: Should: allow changing markerCornerRadius via setVisualParams
 // TODO: Could: cell events -> { cell: {...}|undefined, sourceEvent: MouseEvent }
 // TODO: Could: reorganize demos and index.html, github.io
 // TODO: Could: allow triggering markers from outside the code (and only vertical or only horizontal specifically, i.e. by handling out-of scope x/y appropriately)
@@ -108,9 +107,18 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
     }
 
     /** Change visual parameters that cannot be changed via CSS
-     * (mainly gaps between drawn rectangles). */
+     * (gaps between drawn rectangles, marker corner radius). */
     setVisualParams(params: Partial<VisualParams>): this {
-        this.extensions.draw?.update(params);
+        this.extensions.draw?.update({
+            xGapPixels: params.xGapPixels,
+            xGapRelative: params.xGapRelative,
+            yGapPixels: params.yGapPixels,
+            yGapRelative: params.yGapRelative,
+            minRectSizeForGaps: params.minRectSizeForGaps,
+        });
+        this.extensions.marker?.update({
+            markerCornerRadius: params.markerCornerRadius,
+        });
         return this;
     }
 
@@ -145,4 +153,11 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
 }
 
 
-type VisualParams = Pick<DrawExtensionParams<unknown, unknown, unknown>, 'xGapPixels' | 'xGapRelative' | 'yGapPixels' | 'yGapRelative' | 'minRectSizeForGaps'>
+interface VisualParams {
+    xGapPixels: DrawExtensionParams<unknown, unknown, unknown>['xGapPixels'],
+    xGapRelative: DrawExtensionParams<unknown, unknown, unknown>['xGapRelative'],
+    yGapPixels: DrawExtensionParams<unknown, unknown, unknown>['yGapPixels'],
+    yGapRelative: DrawExtensionParams<unknown, unknown, unknown>['yGapRelative'],
+    minRectSizeForGaps: DrawExtensionParams<unknown, unknown, unknown>['minRectSizeForGaps'],
+    markerCornerRadius: MarkerExtensionParams['markerCornerRadius'],
+}

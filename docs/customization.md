@@ -112,10 +112,9 @@ heatmap.setVisualParams({ xGapPixels: 0, yGapPixels: 0 }); // no gaps
 heatmap.setVisualParams({ xGapPixels: null, xGapRelative: 0.1 }); // gap between columns always 10% of column width
 heatmap.setVisualParams({ yGapPixels: 5, yGapRelative: null }); // gap between rows always 5px
 heatmap.setVisualParams({ minRectSizeForGaps: 5 }); // disable gaps when column width or row height is below 5px
-heatmap.setVisualParams({ xGapPixels: 2, xGapRelative: 0.1, yGapPixels: 2, yGapRelative: 0.1, minRectSizeForGaps: 2 }); // reset defaults
+heatmap.setVisualParams({ markerCornerRadius: 5 }); // round corners for markers
+heatmap.setVisualParams({ xGapPixels: 2, xGapRelative: 0.1, yGapPixels: 2, yGapRelative: 0.1, minRectSizeForGaps: 2, markerCornerRadius: 1 }); // reset defaults
 ```
-
-// TODO: add markerCornerRadius to this
 
 ### `setTooltip`
 
