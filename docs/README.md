@@ -1,6 +1,9 @@
 # Heatmap Component documentation
 
-TODO: ways of using HeatmapComponent: build vs lib
+Heatmap Component is an NPM package and can be used in two ways:
+
+-   (Quick and dirty) Include pre-bundled JS and CSS in your HTML and initialize the heatmap using global `HeatmapComponent` object
+-   (Recommended) Add `heatmap-component` as a dependency and import what you want
 
 TODO: index of topics (Quickstart, customization, colors/scales, architecture/extensions)
 
@@ -86,15 +89,21 @@ You can also call `create()` with no argument and add data later via `heatmap.se
 
 ### Step 5: Customize
 
-Customize the heatmap instance as needed. Typically, you'll want to specify coloring (default coloring assigns gray color to any datum). This is done by calling `setColor` method and providing a coloring function, which takes a datum and returns a color (can be a CSS color, e.g. `'green'`, `'#f00000'`, `'rgba(255,0,0,0.5)'`, or a package-specific `Color` type (encoding each color as a 32-bit unsigned integer for better performance TODO: link to details)). The coloring function can also take multiple parameters, being datum, column name, row name, column index, row index.
+Customize the heatmap instance as needed. Typically, you'll want to specify coloring (default coloring assigns gray color to any datum). This is done by calling `setColor` method and providing a coloring function, which takes a datum and returns a color (can be a CSS color, e.g. `'green'`, `'#f00000'`, `'rgba(255,0,0,0.5)'`, or a package-specific [`Color`](./color-scales.md#color-encoding) type, encoding each color as a number for better performance). The coloring function can also take multiple parameters, being datum, column name, row name, column index, row index.
 
-Use `HeatmapComponent.createColorScale` to create continuous color scales (details [here](./color-scales.md)).
+Use `HeatmapComponent.ColorScale.continuous` to create continuous color scales, `HeatmapComponent.ColorScale.discrete` for discrete (categorical) color scales (details [here](./color-scales.md)).
 
 ```js
-const colorScale = HeatmapComponent.createColorScale('YlOrRd', [0, 1]); // yellow-orange-red color scale for values from 0 to 1
+const colorScale = HeatmapComponent.ColorScale.continuous('YlOrRd', [0, 1]); // yellow-orange-red color scale for values from 0 to 1
 heatmap.setColor(d => colorScale(d.score)); // function that takes a datum and returns color
 ```
-// TODO update this
+
+Another common feature, that has to be enabled explicitely is manual zooming:
+
+```js
+const colorScale = HeatmapComponent.ColorScale.continuous('YlOrRd', [0, 1]); // yellow-orange-red color scale for values from 0 to 1
+heatmap.setColor(d => colorScale(d.score)); // function that takes a datum and returns color
+```
 
 ### Step 6: Render heatmap
 

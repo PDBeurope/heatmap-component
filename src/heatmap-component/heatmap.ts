@@ -10,6 +10,8 @@ import { XAlignmentMode, YAlignmentMode, ZoomEventValue } from './state';
 
 
 // TODO: Should: docs
+// TODO: Should: allow changing markerCornerRadius via setVisualParams
+// TODO: Could: cell events -> { cell: {...}|undefined, sourceEvent: MouseEvent }
 // TODO: Could: reorganize demos and index.html, github.io
 // TODO: Could: allow triggering markers from outside the code (and only vertical or only horizontal specifically, i.e. by handling out-of scope x/y appropriately)
 // TODO: Could: various zoom modes (horizontal, vertical, both, none...)
@@ -80,11 +82,10 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
      * ```
      * heatmap.setColor((datum, x, y, xIndex, yIndex) => datum >= 0.5 ? 'black' : '#ff0000');
      * ```
-     * Use `createColorScale` to create efficient color providers for big numeric data:
+     * Use `ColorScale` to create efficient color providers for big numeric data:
      * ```
-     * heatmap.setColor(createColorScale('YlOrRd', [0, 100]));
+     * heatmap.setColor(ColorScale.continuous('YlOrRd', [0, 100]));
      * ```
-     * TODO: update this
      */
     setColor(colorProvider: Provider<TX, TY, TDatum, string | Color>): this {
         this.extensions.draw?.update({ colorProvider });
@@ -113,12 +114,6 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         return this;
     }
 
-    /** Controls how column/row indices and names are aligned to X and Y axes, when using `.zoom` and `.events.zoom` */
-    setAlignment(x: XAlignmentMode | undefined, y: YAlignmentMode | undefined): this {
-        this.state.setAlignment(x, y);
-        return this;
-    }
-
     /** Set zooming parameters. Use `axis` parameter to turn zooming on/off.
      *
      * Example:
@@ -132,9 +127,15 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         return this;
     }
 
+    /** Controls how column/row indices and names are aligned to X and Y axes, when using `.zoom` and `.events.zoom` */
+    setAlignment(x: XAlignmentMode | undefined, y: YAlignmentMode | undefined): this {
+        this.state.setAlignment(x, y);
+        return this;
+    }
+
     /** Enforce change of zoom and return the zoom value after the change */
-    zoom(z: Partial<ZoomEventValue<TX, TY>> | undefined): ZoomEventValue<TX, TY> | undefined {
-        return this.state.zoom(z);
+    zoom(request: Partial<ZoomEventValue<TX, TY>> | undefined): ZoomEventValue<TX, TY> | undefined {
+        return this.state.zoom(request);
     }
 
     /** Return current zoom */
