@@ -215,26 +215,26 @@ This method controls how column/row indices and names are aligned to X and Y axe
 
 Let's demonstrate this on our example with 4 columns, corresponding to X values ("column names") 1, 2, 3, 4. Column indices are always 0-based, so 0, 1, 2, 3.
 
-Default alignment is `'center'`, so the reported value is aligned with the center of the column:
-
-```
-xIndex:  -0.5   0   0.5   1   1.5   2   2.5   3   3.5
-           ┌─────────┬─────────┬─────────┬─────────┐
-           │ Index 0 │ Index 1 │ Index 2 │ Index 3 │
-           │  x = 1  │  x = 2  │  x = 3  │  x = 4  │
-           └─────────┴─────────┴─────────┴─────────┘
-x:        1.5   1   1.5   2   2.5   3   3.5   4   4.5
-```
-
-When using `'left'`, the reported value is aligned with the left edge of the column:
+Default alignment is `'left'`, so the reported value is aligned with the left edge of the column:
 
 ```
 xIndex:    0   0.5   1   1.5   2   2.5   3   3.5   4
            ┌─────────┬─────────┬─────────┬─────────┐
            │ Index 0 │ Index 1 │ Index 2 │ Index 3 │
-           │  x = 1  │  x = 2  │  x = 3  │  x = 4  │
+           │ Value 1 │ Value 2 │ Value 3 │ Value 4 │
            └─────────┴─────────┴─────────┴─────────┘
 x:         1   1.5   2   2.5   3   3.5   4   4.5   5
+```
+
+When using `'center'`, the reported value is aligned with the center of the column:
+
+```
+xIndex:  -0.5   0   0.5   1   1.5   2   2.5   3   3.5
+           ┌─────────┬─────────┬─────────┬─────────┐
+           │ Index 0 │ Index 1 │ Index 2 │ Index 3 │
+           │ Value 1 │ Value 2 │ Value 3 │ Value 4 │
+           └─────────┴─────────┴─────────┴─────────┘
+x:        1.5   1   1.5   2   2.5   3   3.5   4   4.5
 ```
 
 When using `'right'`, the reported value is aligned with the right edge of the column:
@@ -243,19 +243,21 @@ When using `'right'`, the reported value is aligned with the right edge of the c
 xIndex:   -1  -0.5   0   0.5   1   1.5   2   2.5   3
            ┌─────────┬─────────┬─────────┬─────────┐
            │ Index 0 │ Index 1 │ Index 2 │ Index 3 │
-           │  x = 1  │  x = 2  │  x = 3  │  x = 4  │
+           │ Value 1 │ Value 2 │ Value 3 │ Value 4 │
            └─────────┴─────────┴─────────┴─────────┘
 x:         0   1.5   1   1.5   2   2.5   3   3.5   4
 ```
 
 Vertical alignment (rows) works in the same way, but `'top'` and `'bottom'` is used instead of `'left'` and `'right'`.
 
+Default alignment is `'left'` and `'top'`, which is also what HeatmapComponent uses internally.
+
 ```ts
 setAlignment(x: 'left' | 'center' | 'right' | undefined, y: 'top' | 'center' | 'bottom' | undefined): this
 
 // Example usage:
-heatmap.setAlignment('left', 'top');
 heatmap.setAlignment('center', 'center');
+heatmap.setAlignment('left', 'top');
 ```
 
 ---

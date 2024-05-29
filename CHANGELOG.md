@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file, following t
 -   Can manipulate markers via `hm.extensions.marker?.drawMarkers({...})`
 -   Default coloring is "everything gray", even for numeric values
 -   Color scales are created by `ColorScale.continuous`
+-   Default axis alignment for (`zoom`, `getZoom`, `events.zoom`) changed from center,center to left,top (call `setAlignment` to change)
 -   Dropped `formatDataItem` function
 
 ## [0.9.0] - 2024-04-29

@@ -94,10 +94,12 @@ export class State<TX, TY, TDatum> {
     /** Values corresponding to the individual rows ("row names") */
     yDomain: Domain<TY> = Domain.create([]);
 
-    /** Controls how X axis values align with the columns when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on X axis can be aligned to the left edge/center/right edge of the column showing that value) */
-    xAlignment: XAlignmentMode = 'center';
-    /** Controls how Y axis values align with the rows when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on Y axis is aligned to the top edge/center/bottom edge of the row showing that value) */
-    yAlignment: YAlignmentMode = 'center';
+    /** Controls how X axis values align with the columns when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on X axis can be aligned to the left edge/center/right edge of the column showing that value). Call `setAlignment` to change. */
+    get xAlignment() { return this._xAlignment; }
+    private _xAlignment: XAlignmentMode = 'left';
+    /** Controls how Y axis values align with the rows when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on Y axis is aligned to the top edge/center/bottom edge of the row showing that value). Call `setAlignment` to change. */
+    get yAlignment() { return this._yAlignment; }
+    private _yAlignment: YAlignmentMode = 'top';
 
     /** Extent of the data world and canvas */
     boxes: Boxes = { wholeWorld: Box.create(0, 0, 1, 1), visWorld: Box.create(0, 0, 1, 1), canvas: Box.create(0, 0, 1, 1) };
@@ -206,8 +208,8 @@ export class State<TX, TY, TDatum> {
 
     /** Controls how column/row indices and names are aligned to X and Y axes, when using `.zoom` and `.events.zoom` */
     setAlignment(x: XAlignmentMode | undefined, y: YAlignmentMode | undefined): void {
-        if (x) this.xAlignment = x;
-        if (y) this.yAlignment = y;
+        if (x) this._xAlignment = x;
+        if (y) this._yAlignment = y;
         this.emitZoom('setAlignment');
     }
 
