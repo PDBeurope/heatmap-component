@@ -1,5 +1,5 @@
 import { clamp, sortedIndex, sortedIndexBy } from 'lodash';
-import { IsNumeric, sortDirection } from '../utils';
+import { IsNumeric, isNumericArray, sortDirection } from '../utils';
 
 
 /** Represents a list of values corresponding to X (columns) or Y (rows) coordinates in a heatmap */
@@ -17,7 +17,7 @@ export interface Domain<T> {
 export const Domain = {
     /** Create a `Domain` object with given values. */
     create<T>(values: T[]): Domain<T> {
-        const isNumeric = values.every(v => typeof v === 'number') as IsNumeric<T>;
+        const isNumeric = isNumericArray(values);
         return {
             values,
             isNumeric,

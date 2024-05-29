@@ -1,4 +1,4 @@
-# HeatmapComponent library architecture
+# HeatmapComponent – Library architecture
 
 HeatmapComponent uses a modular architecture designed to provide flexible functionality for creating and customizing heatmap visualizations. At the core of the package is the HeatmapCore class, to which more functionality is added through extensions.
 

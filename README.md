@@ -1,10 +1,10 @@
 <!-- README for GitHub -->
 
-# Heatmap Component
+# HeatmapComponent
 
 TypeScript library for creating interactive grid heatmaps.
 
-The goal of Heatmap Component is to provide a tool for visualizing two-dimensional data in the form of grid heatmaps. It focuses on interactivity, performance, and customizability.
+The goal of HeatmapComponent is to provide a tool for visualizing two-dimensional data in the form of grid heatmaps. It focuses on interactivity, performance, and customizability.
 
 ### Features
 
@@ -25,9 +25,9 @@ The goal of Heatmap Component is to provide a tool for visualizing two-dimension
 -   Axis labeling
 -   Data loading or modification via UI
 
-### Example of Heatmap Component visualization
+### Example of HeatmapComponent visualization
 
-![Heatmap Component](./docs/heatmap-component.png)
+![HeatmapComponent](./docs/heatmap-component.png)
 
 ### Live demos
 

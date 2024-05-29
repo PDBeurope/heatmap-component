@@ -21,7 +21,7 @@ export function demo1(divElementOrId: HTMLDivElement | string): void {
 
     // Creating a heatmap with 4 columns (1, 2, 3, 4) and 3 rows (A, B, C)
     // Heatmap<number, string, { col: number, row: string, score: number }>
-    const hm = Heatmap.create({
+    const heatmap = Heatmap.create({
         xDomain: [1, 2, 3, 4],
         yDomain: ['A', 'B', 'C'],
         data: items,
@@ -30,60 +30,40 @@ export function demo1(divElementOrId: HTMLDivElement | string): void {
         filter: (d, x, y, xIndex, yIndex) => d.score > 0,
     });
     const colorScale = ColorScale.continuous([0, 0.5, 1], ['#eeeeee', 'gold', 'red']);
-    hm.setColor(d => colorScale(d.score));
-    hm.setTooltip((d, x, y, xIndex, yIndex) => `<div style="font-weight: bold; margin-bottom: 0.5em;">Score: ${d.score}</div>Column ${x}, Row ${y}<br>Indices [${xIndex},${yIndex}]`);
-    setTimeout(() => hm.setFilter(undefined), 2000);
-    hm.setVisualParams({ xGapPixels: 0, yGapPixels: 0 });
-    hm.events.select.subscribe(e => {
+    heatmap.setColor(d => colorScale(d.score));
+    heatmap.setTooltip((d, x, y, xIndex, yIndex) => `<div style="font-weight: bold; margin-bottom: 0.5em;">Score: ${d.score}</div>Column ${x}, Row ${y}<br>Indices [${xIndex},${yIndex}]`);
+    setTimeout(() => heatmap.setFilter(undefined), 2000);
+    heatmap.setVisualParams({ xGapPixels: 0, yGapPixels: 0 });
+    heatmap.events.select.subscribe(e => {
         if (!e) {
             console.log('selecting nothing');
         } else {
             console.log('selecting', e.datum, e.x, e.y, e.xIndex, e.yIndex, e.sourceEvent);
         }
     });
-    hm.events.zoom.subscribe(e => {
-        if (!e) {
-            // console.log('zooming nothing');
-        } else {
-            // console.log('zooming', e.xMinIndex, e.xMaxIndex, 'values', e.xMin, e.xMax, e);
+    heatmap.events.zoom.subscribe(e => {
+        if (e) {
             setTextContent('#xminindex', e.xMinIndex);
             setTextContent('#xmaxindex', e.xMaxIndex);
             setTextContent('#xmin', e.xMin);
             setTextContent('#xmax', e.xMax);
         }
     });
-    hm.setZooming({ axis: 'x' });
-    hm.render(divElementOrId);
-    (window as any).hm = hm;
+    heatmap.setZooming({ axis: 'x' });
+    heatmap.render(divElementOrId);
+    (window as any).heatmap = heatmap;
 }
 
-/** Set text content to all HTML elements selected by `elementSelector`.
- * Example: `setTextContent('#element-to-change', 'changed text here');` */
-function setTextContent(elementSelector: string, content: unknown, numberPrecision: number = 4): void {
-    const elements = document.querySelectorAll(elementSelector);
-    if (typeof content === 'number' && numberPrecision >= 0) content = content.toFixed(numberPrecision);
-    elements.forEach(element => element.textContent = `${content}`);
-}
 
 /** Demo showing a big data example (200_000 x 20) */
 export function demo2(divElementOrId: HTMLDivElement | string): void {
-    const data = DataDescription.createRandomWithGradient(2e5, 20);
-    const hm = Heatmap.create(data); // Heatmap<number, number, number>
-    hm.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
-    // hm.setColor(createScale([0, 0.5, 1], ['#00d', '#ddd', '#d00']));
-    hm.setColor(ColorScale.continuous('Spectral', [0, 1]));
-    // hm.setColor(createScale('Magma', [0, 1], [1, 0])); // reverse direction
-    hm.render(divElementOrId);
-    // hm.setFilter(d => d > 0.1);
-    // setTimeout(()=> hm.setFilter(undefined), 2000);
-    hm.setZooming({ axis: 'x' });
-    (window as any).hm = hm;
-    // const q = resamplingCoefficients(10, 4, { from: 2.6, to: 10 });
-    // for (let i = 0; i < q.from.length; i++) {
-    //     console.log(q.from[i], q.to[i], q.weight[i]);
-    // }
-    // console.log(sum(q.weight));
-    // benchmarkColor('#caffeeee', 1e7)
+    const data = DataDescription.createDummy(2e5, 20);
+    const heatmap = Heatmap.create(data); // Heatmap<number, number, number>
+    heatmap.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
+    heatmap.setColor(ColorScale.continuous('Magma', [0, 1]));
+    heatmap.render(divElementOrId);
+    heatmap.setZooming({ axis: 'x' });
+    (window as any).heatmap = heatmap;
 }
 
 
@@ -98,7 +78,7 @@ export function demo3(divElementOrId: HTMLDivElement | string): void {
         { col: 3, row: 'B', score: 0.8 },
         { col: 3, row: 'C', score: 1 },
     ];
-    const hm = Heatmap.create({
+    const heatmap = Heatmap.create({
         xDomain: [1, 2, 3],
         yDomain: ['A', 'B', 'C'],
         data: items,
@@ -106,8 +86,17 @@ export function demo3(divElementOrId: HTMLDivElement | string): void {
         y: d => d.row,
     });
     const colorScale = ColorScale.continuous([-1, 0, 1], ['#E13D3D', 'white', '#2C8C11']); // like d3.scaleLinear([-1, 0, 1], ['#E13D3D', 'white', '#2C8C11']);
-    hm.setColor(d => colorScale(d.score));
-    hm.setVisualParams({ xGapRelative: 0.1, yGapRelative: 0.1, xGapPixels: null, yGapPixels: null });
-    hm.render(divElementOrId);
-    (window as any).hm = hm;
+    heatmap.setColor(d => colorScale(d.score));
+    heatmap.setVisualParams({ xGapRelative: 0.1, yGapRelative: 0.1, xGapPixels: null, yGapPixels: null });
+    heatmap.render(divElementOrId);
+    (window as any).heatmap = heatmap;
+}
+
+
+/** Set text content to all HTML elements selected by `elementSelector`.
+ * Example: `setTextContent('#element-to-change', 'changed text here');` */
+function setTextContent(elementSelector: string, content: unknown, numberPrecision: number = 4): void {
+    const elements = document.querySelectorAll(elementSelector);
+    if (typeof content === 'number' && numberPrecision >= 0) content = content.toFixed(numberPrecision);
+    elements.forEach(element => element.textContent = `${content}`);
 }

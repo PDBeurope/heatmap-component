@@ -1,4 +1,4 @@
-# HeatmapComponent customization
+# HeatmapComponent – Customization
 
 ## Data
 
@@ -57,8 +57,6 @@ heatmap.setDomains([1, 2, 3, 4], ['A', 'B', 'C']); // reset original domains
 ### `setFilter`
 
 This method can be used for showing/hiding individual data cells without changing the underlying heatmap data. This is achieved by providing a **filter function**. This function will be executed for each non-empty cell and only cells where is returns `true` will be shown.
-
-// TODO: link to Provider functions?
 
 ```ts
 setFilter(filter: ((datum: TDatum, x: TX, y: TY, xIndex: number, yIndex: number) => boolean) | undefined): this
@@ -176,19 +174,19 @@ console.log(heatmap.getZoom());
 // Returns:
 // {
 //     xMinIndex: -0.5, xMaxIndex: 3.5, yMinIndex: -0.5, yMaxIndex: 2.5,
-//     xMin: 0.5, xMax: 4.5,
 //     xFirstVisibleIndex: 0, xLastVisibleIndex: 3, yFirstVisibleIndex: 0, yLastVisibleIndex: 2,
+//     xMin: 0.5, xMax: 4.5,
 //     xFirstVisible: 1, xLastVisible: 4,  yFirstVisible: "A", yLastVisible: "C"
 // }
 ```
 
-TODO: short intro about index-based vs name-based values
+The `ZoomEventValue` object returned by this method contains the information about the edges of the viewport in relation to the visualized data. It provides two sets of properties: index-based properties (having `Index` suffix) use column and row indices counted from 0 (in our example, it's columns 0, 1, 2, 3, and rows 0, 1, 2); value-based properties (without `Index` suffix) use the values ("names") assigned to the columns and rows (in our example, it's columns 1, 2, 3, 4 and rows 'A', 'B', 'C').
 
 `xMinIndex, xMaxIndex, yMinIndex, yMaxIndex` are continuous column/row indices corresponding to the left/right/top/bottom edge of the viewport. These values depend on current alignment settings (see [`setAlignment`](#setAlignment)).
 
-`xMin, xMax, yMin, yMax` are continuous X/Y values corresponding to the left/right/top/bottom edge of the viewport. These values are only available if the column/row names are numbers in either increasing or decreasing order. These values depend on current alignment settings (see [`setAlignment`](#setAlignment)).
-
 `xFirstVisibleIndex, xLastVisibleIndex, yFirstVisibleIndex, yLastVisibleIndex` are indices of the first/last column/row that is at least partially visible.
+
+`xMin, xMax, yMin, yMax` are continuous X/Y values corresponding to the left/right/top/bottom edge of the viewport. These values are only available if the column/row names are numbers in either increasing or decreasing order. These values depend on current alignment settings (see [`setAlignment`](#setAlignment)).
 
 `xFirstVisible, xLastVisible, yFirstVisible, yLastVisible` are the names of the first/last column/row that is at least partially visible.
 
@@ -196,7 +194,7 @@ TODO: short intro about index-based vs name-based values
 
 This method is used to change the zoom state of the heatmap. It is always enabled, regardless of the manual zooming settings. Returns the zoom state after the requested change (this is not necessarily the same as the requested zoom state, because of the restrictions on zoom scale and translation), or undefined if the heatmap is not rendered yet.
 
-The properties of the `request` parameter have the same meaning as those returned by `getZoom` but at most one value should be provided to specify each edge (left/right/top/bottom) of the zoomed area (e.g. do not provide `xMin` and `xFirstVisible` at the same time as they would conflict). If no value is provided for any of the edges, this edge will be set to the outermost available position (i.e. zoom "from the beginning" / "to the end") – this can be used to fully zoom out horizontally, vertically, or both. Note that `xMin, xMax, yMin, yMax` can only be used if the column/row names are numbers in either increasing or decreasing order.
+The properties of the `request` parameter have the same meaning as those returned by `getZoom` but at most one property should be provided to specify each edge (left/right/top/bottom) of the zoomed area (e.g. do not provide `xMin` and `xFirstVisible` at the same time as they would conflict). If no property is provided for any of the edges, this edge will be set to the outermost available position (i.e. zoom "from the beginning" / "to the end") – this can be used to fully zoom out horizontally, vertically, or both. Interpretation of some properties depends on current alignment settings, in the same way as with `getZoom` (see [`setAlignment`](#setAlignment)). Note that `xMin, xMax, yMin, yMax` can only be used if the column/row names are numbers in either increasing or decreasing order.
 
 ```ts
 zoom(request: Partial<ZoomEventValue<TX, TY>> | undefined): ZoomEventValue<TX, TY> | undefined
@@ -213,9 +211,9 @@ heatmap.zoom(undefined); // Reset zoom (zoom out)
 
 ### `setAlignment`
 
-This method controls how column/row indices and names are aligned to X and Y axes, when using `getZoom` and `zoom` methods and `zoom` event.
+This method controls how column/row indices and names are aligned to X and Y axes, when using `getZoom` method, `zoom` method, and `zoom` event.
 
-Let's demonstrate this on an example of 4 columns, corresponding to X values ("column names") 1, 2, 3, 4. Column indices are always 0-based, so 0, 1, 2, 3.
+Let's demonstrate this on our example with 4 columns, corresponding to X values ("column names") 1, 2, 3, 4. Column indices are always 0-based, so 0, 1, 2, 3.
 
 Default alignment is `'center'`, so the reported value is aligned with the center of the column:
 
@@ -277,47 +275,9 @@ Note: Some of the extension parameters are also exposed via other methods, e.g. 
 
 ### Custom extensions
 
-Users of Heatmap Component can implement their own extensions, following the example of existing extensions (see [/src/heatmap-component/extensions](../src/heatmap-component/extensions/)).
+Users of HeatmapComponent can implement their own extensions, following the example of existing extensions (see [/src/heatmap-component/extensions](../src/heatmap-component/extensions/)).
 These extensions can then be registered by:
 
 ```ts
 heatmap.registerExtension(CustomExtension, { ...parameterValues }); // extension parameter values are optional
 ```
-
-TODO: implement one example extension?
-TODO: add Behavior onUnregister?
-
----
-
-## Events
-
-Heatmap Component provides several event that the users can subscribe to. All of these are RxJS `BehaviorSubject`, so they emit the current value to new subscribers.
-
--   `hover`: Fires when the user hovers over the component.
--   `select`: Fires when the user selects/deselects a cell (e.g. by clicking on it).
--   `zoom`: Fires when the component is zoomed in or out, or panned (translated).
--   `resize`: Fires when the window is resized. Subject value is the size of the canvas in pixels.
--   `data`: Fires when the visualized data change (including filter or domain change).
--   `render`: Fires when the component is initially rendered in a div.
-
-```ts
-// Example usage:
-heatmap.events.select.subscribe(e => {
-    console.log('selecting:', e);
-});
-
-// Example usage from extension code (automatically unsubscribes on unregister)
-this.subscribe(this.state.events.select, e => {
-    console.log('selecting:', e);
-});
-```
-
-TODO: continue here
-
----
-
-## Work with large data
-
-TODO:
-
-...?

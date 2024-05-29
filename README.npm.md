@@ -1,6 +1,6 @@
 <!-- README for NPM package -->
 
-# Heatmap Component
+# HeatmapComponent
 
 TypeScript library for creating interactive grid heatmaps
 

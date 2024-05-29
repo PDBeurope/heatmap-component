@@ -1,4 +1,4 @@
-# HeatmapComponent color scales
+# HeatmapComponent – Color scales
 
 [**ColorScale**](../src/heatmap-component/data/color-scale.ts) constant provides useful functions for creating continuous and discrete (categorical) color scales.
 
@@ -55,7 +55,7 @@ The difference is that scales from `ColorScale` work with numeric color encoding
 
 ### Color encoding
 
-The numeric color encoding used by Heatmap Component represents each color by a 32-bit integer (type `Color` is alias for `number`):
+The numeric color encoding used by HeatmapComponent represents each color by a 32-bit integer (type `Color` is alias for `number`):
 
 ```
 AAAAAAAARRRRRRRRGGGGGGGGBBBBBBBB

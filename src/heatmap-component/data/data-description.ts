@@ -14,7 +14,7 @@ export type DataDescription<TX, TY, TDatum> = {
     /** Array of Y values assigned to rows, from top to bottom ("row names") */
     yDomain: TY[],
     /** Data items to show in the heatmap (each item is visualized as a rectangle) */
-    data: TDatum[],
+    data: ArrayLike<TDatum>,
     /** X values for the data items (either a function that computes X value for given datum, or an array with the X values (must have the same length as `data`))  */
     x: ((datum: TDatum, index: number) => TX) | TX[],
     /** Y values for the data items (either a function that computes Y value for given datum, or an array with the Y values (must have the same length as `data`) )  */
@@ -36,27 +36,27 @@ export const DataDescription = {
         const nColumns = xDomain.values.length;
         const nRows = yDomain.values.length;
         const arr = new Array<TDatum | undefined>(nColumns * nRows).fill(undefined);
-        const xs = (typeof x === 'function') ? items.map(x) : x;
-        const ys = (typeof y === 'function') ? items.map(y) : y;
+        const xFunction = (typeof x === 'function') ? x : (d: TDatum, i: number) => x[i];
+        const yFunction = (typeof y === 'function') ? y : (d: TDatum, i: number) => y[i];
         let warnedX = false;
         let warnedY = false;
         for (let i = 0; i < items.length; i++) {
             const d = items[i];
-            const x = xs[i];
-            const y = ys[i];
-            const ix = xDomain.index.get(x);
-            const iy = yDomain.index.get(y);
+            const xValue = xFunction(d, i);
+            const yValue = yFunction(d, i);
+            const ix = xDomain.index.get(xValue);
+            const iy = yDomain.index.get(yValue);
             if (ix === undefined) {
                 if (!warnedX) {
-                    console.warn('Some data items map to X values out of the X domain:', d, 'maps to X', x);
+                    console.warn('Some data items map to X values out of the X domain:', d, 'maps to X', xValue);
                     warnedX = true;
                 }
             } else if (iy === undefined) {
                 if (!warnedY) {
-                    console.warn('Some data items map to Y values out of the Y domain:', d, 'maps to Y', y);
+                    console.warn('Some data items map to Y values out of the Y domain:', d, 'maps to Y', yValue);
                     warnedY = true;
                 }
-            } else if (filter !== undefined && !filter(d, x, y, ix, iy)) {
+            } else if (filter !== undefined && !filter(d, xValue, yValue, ix, iy)) {
                 // skipping this item
             } else {
                 arr[nColumns * iy + ix] = d;
@@ -70,7 +70,7 @@ export const DataDescription = {
     createRandom(nColumns: number, nRows: number): DataDescription<number, number, number> {
         const raw = Array2D.createRandom(nColumns, nRows);
         return {
-            data: raw.values as number[],
+            data: raw.values,
             x: (d, i) => i % nColumns,
             y: (d, i) => Math.floor(i / nColumns),
             xDomain: range(nColumns),
@@ -78,12 +78,15 @@ export const DataDescription = {
         };
     },
 
-    /** Create partly random data having a gradient from left to right */
-    createRandomWithGradient(nColumns: number, nRows: number): DataDescription<number, number, number> {
-        const data = this.createRandom(nColumns, nRows);
+    /** Create partly random data having a gradient from left to right, and special values around the edges */
+    createDummy(nColumns: number, nRows: number): DataDescription<number, number, number> {
+        const raw = Array2D.createDummy(nColumns, nRows);
         return {
-            ...data,
-            data: data.data.map((d, i) => (d * 0.5) + (i % nColumns / nColumns * 0.5)),
+            data: raw.values,
+            x: (d, i) => i % nColumns,
+            y: (d, i) => Math.floor(i / nColumns),
+            xDomain: range(nColumns),
+            yDomain: range(nRows),
         };
     },
 };

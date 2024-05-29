@@ -10,13 +10,15 @@ import { XAlignmentMode, YAlignmentMode, ZoomEventValue } from './state';
 
 
 // TODO: Should: docs
+// TODO: Should: default alignment left-top to keep things simple
 // TODO: Could: cell events -> { cell: {...}|undefined, sourceEvent: MouseEvent }
 // TODO: Could: reorganize demos and index.html, github.io
-// TODO: Could: allow triggering markers from outside the code (and only vertical or only horizontal specifically, i.e. by handling out-of scope x/y appropriately)
 // TODO: Could: various zoom modes (horizontal, vertical, both, none...)
+// TODO: Could: DataDescription.toArray2D - use Float32Array/Int32Array/... (+ mask array) when possible instead of Array (might speed up initialization up to 4x)
 // TODO: Would: try setting `downsamplingPixelsPerRect` dynamically, based on rendering times
 // TODO: Would: Smoothen zooming and panning with mouse wheel?
 // TODO: Would: Tooltip/marker only showing on click?
+// TODO: Would: add Behavior.onUnregister, use to keep a list of currently register extensions?
 
 
 /** Main class of the `heatmap-component` package.

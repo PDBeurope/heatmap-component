@@ -1,5 +1,4 @@
-import { range } from 'lodash';
-import { IsNumeric } from '../utils';
+import { IsNumeric, isNumericArray } from '../utils';
 
 
 /** Represents a 2D array of values of type `T` */
@@ -29,20 +28,32 @@ export const Array2D = {
     },
 
     /** Return an Array2D with dimensions nColumns x nRows. */
-    create<T>(nColumns: number, nRows: number, values: T[]): Array2D<T> {
+    create<T>(nColumns: number, nRows: number, values: ArrayLike<T>): Array2D<T> {
         if (values.length !== nColumns * nRows) throw new Error('ValueError: length of `values` must be nColumns * nRows');
-        const isNumeric = values.every(d => typeof d === 'number') as IsNumeric<T>;
+        const isNumeric = isNumericArray(values);
         return { nColumns, nRows, values, isNumeric };
     },
 
     /** Return new `Data` with random values between 0 and 1 */
     createRandom(nColumns: number, nRows: number): Array2D<number> {
-        const values = range(nColumns * nRows).map(i => {
+        const n = nColumns * nRows;
+        const values = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+            values[i] = Math.random();
+        }
+        return { nColumns, nRows, values, isNumeric: true };
+    },
+
+    /** Return new `Data` with partly random value having a gradient from left to right, and special values around the edges */
+    createDummy(nColumns: number, nRows: number): Array2D<number> {
+        const n = nColumns * nRows;
+        const values = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
             const x = i % nColumns;
             const y = Math.floor(i / nColumns);
-            const value = (x === 0 || y === nRows - 1) ? 0 : (x === nColumns - 1 || y === 0) ? 1 : Math.random();
-            return value;
-        });
+            const val = (x === 0 || y === nRows - 1) ? 0 : (x === nColumns - 1 || y === 0) ? 1 : Math.random();
+            values[i] = 0.5 * val + 0.5 * (i % nColumns / nColumns);
+        }
         return { nColumns, nRows, values, isNumeric: true };
     },
 

@@ -6,6 +6,16 @@ import { BoxSize } from './scales';
 /** `true` if type `T` is number, `false` for any other type */
 export type IsNumeric<T> = T extends number ? true : false;
 
+/** Decide whether all elements of `array` are of type `number`. */
+export function isNumericArray<T>(array: ArrayLike<T>): IsNumeric<T> {
+    for (let i = 0, n = array.length; i < n; i++) {
+        if (typeof array[i] !== 'number') {
+            return false as IsNumeric<T>;
+        }
+    }
+    return true as IsNumeric<T>;
+}
+
 /** Pause asynchronous execution for `ms` miliseconds.
  * (Use `await sleep(0)` to let other async things happen (this pushes the rest of the calling function to the end of the queue).) */
 export async function sleep(ms: number): Promise<void> {
