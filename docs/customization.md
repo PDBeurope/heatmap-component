@@ -171,11 +171,11 @@ getZoom(): ZoomEventValue<TX, TY> | undefined
 
 // Example usage:
 console.log(heatmap.getZoom());
-// Returns:
+// For fully-zoomed-out heatmap this would return:
 // {
-//     xMinIndex: -0.5, xMaxIndex: 3.5, yMinIndex: -0.5, yMaxIndex: 2.5,
+//     xMinIndex: 0, xMaxIndex: 4, yMinIndex: 0, yMaxIndex: 3,
 //     xFirstVisibleIndex: 0, xLastVisibleIndex: 3, yFirstVisibleIndex: 0, yLastVisibleIndex: 2,
-//     xMin: 0.5, xMax: 4.5,
+//     xMin: 1, xMax: 5,
 //     xFirstVisible: 1, xLastVisible: 4,  yFirstVisible: "A", yLastVisible: "C"
 // }
 ```
@@ -203,8 +203,8 @@ zoom(request: Partial<ZoomEventValue<TX, TY>> | undefined): ZoomEventValue<TX, T
 heatmap.zoom({ xFirstVisibleIndex: 1, xLastVisibleIndex: 2, yFirstVisibleIndex: 0, yLastVisibleIndex: 2 }); // Set zoom based on column/row indices (fully visible 2 columns and 3 rows)
 heatmap.zoom({ xFirstVisible: 2, xLastVisible: 3, yFirstVisible: 'A', yLastVisible: 'C' }); // Set zoom based on column/row names (fully visible 2 columns and 3 rows)
 
-heatmap.zoom({ xMinIndex: 0.7, xMaxIndex: 2.3, yMinIndex: 0.1, yMaxIndex: 2.2 }); // Set zoom based on column/row indices (partially visible columns/rows)
-heatmap.zoom({ xMin: 1.4, xMax: 3.6 }); // Set horizontal zoom based on column names (partially visible columns); vertically zoom out to show all rows
+heatmap.zoom({ xMinIndex: 1.2, xMaxIndex: 2.8, yMinIndex: 0.6, yMaxIndex: 2.7 }); // Set zoom based on column/row indices (partially visible columns/rows)
+heatmap.zoom({ xMin: 1.9, xMax: 4.1 }); // Set horizontal zoom based on column names (partially visible columns); vertically zoom out to show all rows
 
 heatmap.zoom(undefined); // Reset zoom (zoom out)
 ```
