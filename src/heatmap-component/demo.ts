@@ -35,10 +35,10 @@ export function demo1(divElementOrId: HTMLDivElement | string): void {
     setTimeout(() => heatmap.setFilter(undefined), 2000);
     heatmap.setVisualParams({ xGapPixels: 0, yGapPixels: 0 });
     heatmap.events.select.subscribe(e => {
-        if (!e) {
-            console.log('selecting nothing');
+        if (e.cell) {
+            console.log('selecting', e.cell.datum, e.cell.x, e.cell.y, e.cell.xIndex, e.cell.yIndex, e.sourceEvent);
         } else {
-            console.log('selecting', e.datum, e.x, e.y, e.xIndex, e.yIndex, e.sourceEvent);
+            console.log('selecting nothing');
         }
     });
     heatmap.events.zoom.subscribe(e => {

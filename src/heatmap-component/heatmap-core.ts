@@ -79,9 +79,18 @@ export class HeatmapCore<TX, TY, TDatum> {
         this.state.dom = { rootDiv, mainDiv, canvasDiv, canvas, svg };
 
         // Add event listeners
-        svg.on('mousemove.heatmapcore', (e: MouseEvent) => this.state.events.hover.next(this.state.getPointedCell(e)));
-        svg.on('mouseleave.heatmapcore', (e: MouseEvent) => this.state.events.hover.next(undefined));
-        svg.on('click.heatmapcore', (e: MouseEvent) => this.state.events.select.next(this.state.getPointedCell(e)));
+        svg.on('mousemove.heatmapcore', (e: MouseEvent) => this.state.events.hover.next({
+            cell: this.state.getPointedCell(e),
+            sourceEvent: e,
+        }));
+        svg.on('mouseleave.heatmapcore', (e: MouseEvent) => this.state.events.hover.next({
+            cell: undefined,
+            sourceEvent: e,
+        }));
+        svg.on('click.heatmapcore', (e: MouseEvent) => this.state.events.select.next({
+            cell: this.state.getPointedCell(e),
+            sourceEvent: e,
+        }));
 
         this.state.events.render.next(undefined);
         this.state.emitResize();

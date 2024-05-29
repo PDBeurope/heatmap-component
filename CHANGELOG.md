@@ -4,13 +4,14 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+-   Breaking change: Renamed item/items to datum/data in several places
+-   Breaking change: Default coloring is "everything gray", even for numeric values
+-   Breaking change: Color scales are created by `ColorScale.continuous`
+-   Breaking change: Default axis alignment for (`zoom`, `getZoom`, `events.zoom`) changed from center,center to left,top (call `setAlignment` to change)
+-   Breaking change: Changed value type for `hover` and `select` events -> `{ cell?: { datum?: TDatum, ... }, sourceEvent?: MouseEvent }`
+-   Breaking change: Dropped `formatDataItem` function
 -   `Heatmap.create` callable without `data` parameter
--   Renamed item/items to datum/data in several places
 -   Can manipulate markers via `hm.extensions.marker?.drawMarkers({...})`
--   Default coloring is "everything gray", even for numeric values
--   Color scales are created by `ColorScale.continuous`
--   Default axis alignment for (`zoom`, `getZoom`, `events.zoom`) changed from center,center to left,top (call `setAlignment` to change)
--   Dropped `formatDataItem` function
 
 ## [0.9.0] - 2024-04-29
 

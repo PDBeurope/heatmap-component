@@ -26,7 +26,8 @@ export class MarkerBehavior extends BehaviorBase<MarkerExtensionParams> {
         super.register();
         this.subscribe(this.state.events.hover, pointed => {
             if (!this.params.freeze) {
-                this.drawMarkers(pointed);
+                const hasDatum = pointed.cell?.datum !== undefined;
+                this.drawMarkers(hasDatum ? pointed.cell : undefined);
             }
         });
         this.subscribe(this.state.events.resize, () => {

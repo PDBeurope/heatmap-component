@@ -43,12 +43,12 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
 
     /** Add a div with tooltip or update position of existing tooltip, for the `pointed` grid cell.
      * Remove existing tooltip, if `pointed` is `undefined`. */
-    private drawTooltip(pointed: CellEventValue<TX, TY, TDatum> | undefined): void {
+    private drawTooltip(pointed: CellEventValue<TX, TY, TDatum>): void {
         if (!this.state.dom) return;
-        const thisTooltipPinned = pointed && this.pinnedTooltip && pointed.xIndex === Math.floor(this.pinnedTooltip.x) && pointed.yIndex === Math.floor(this.pinnedTooltip.y);
-        if (pointed && !thisTooltipPinned && this.params.tooltipProvider) {
+        const thisTooltipPinned = pointed.cell && this.pinnedTooltip && pointed.cell.xIndex === Math.floor(this.pinnedTooltip.x) && pointed.cell.yIndex === Math.floor(this.pinnedTooltip.y);
+        if ((pointed.cell?.datum !== undefined) && !thisTooltipPinned && this.params.tooltipProvider && pointed.sourceEvent) {
             const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
-            const tooltipText = this.params.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
+            const tooltipText = this.params.tooltipProvider(pointed.cell.datum, pointed.cell.x, pointed.cell.y, pointed.cell.xIndex, pointed.cell.yIndex);
             let tooltip = this.state.dom.canvasDiv.selectAll<HTMLDivElement, any>('.' + Class.TooltipBox);
             if (tooltip.empty()) {
                 // Create tooltip if doesn't exist
@@ -73,13 +73,16 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
      * Remove existing pinned tooltip, if `pointed` is `undefined`.
      * Pinned tooltip is shown when the user selects a cell by clicking,
      * and stays visible until it is closed by close button or clicking elsewhere. */
-    private drawPinnedTooltip(pointed: CellEventValue<TX, TY, TDatum> | undefined): void {
+    private drawPinnedTooltip(pointed: CellEventValue<TX, TY, TDatum>): void {
         if (!this.state.dom) return;
         this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
-        if (pointed && this.params.tooltipProvider && this.params.pinnable) {
-            this.pinnedTooltip = { x: this.state.scales.canvasToWorld.x(pointed.sourceEvent.offsetX), y: this.state.scales.canvasToWorld.y(pointed.sourceEvent.offsetY) };
+        if (pointed.cell?.datum !== undefined && this.params.tooltipProvider && this.params.pinnable && pointed.sourceEvent) {
+            this.pinnedTooltip = {
+                x: this.state.scales.canvasToWorld.x(pointed.sourceEvent.offsetX),
+                y: this.state.scales.canvasToWorld.y(pointed.sourceEvent.offsetY),
+            };
             const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
-            const tooltipText = this.params.tooltipProvider(pointed.datum, pointed.x, pointed.y, pointed.xIndex, pointed.yIndex);
+            const tooltipText = this.params.tooltipProvider(pointed.cell.datum, pointed.cell.x, pointed.cell.y, pointed.cell.xIndex, pointed.cell.yIndex);
 
             const tooltip = attrd(this.state.dom.canvasDiv.append('div'), {
                 class: Class.PinnedTooltipBox,
@@ -92,7 +95,7 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
 
             // Tooltip close button
             attrd(tooltip.append('div'), { class: Class.PinnedTooltipClose })
-                .on('click', () => this.state.events.select.next(undefined))
+                .on('click.TooltipExtension', (e: MouseEvent) => this.state.events.select.next({ cell: undefined, sourceEvent: e }))
                 .append('svg')
                 .attr('viewBox', '0 0 24 24')
                 .attr('preserveAspectRatio', 'none')
@@ -107,7 +110,7 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
                 .attr('d', 'M0,100 L100,40 L60,0 Z');
 
             // Remove any non-pinned tooltip
-            this.drawTooltip(undefined);
+            this.drawTooltip({ cell: undefined, sourceEvent: pointed.sourceEvent });
         } else {
             this.pinnedTooltip = undefined;
         }

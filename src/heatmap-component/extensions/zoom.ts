@@ -71,6 +71,7 @@ export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
             // Remove any old behavior
             this.zoomBehavior.on('zoom', null);
             this.targetElement.on('.zoom', null);
+            this.targetElement.on('.customzoom', null);
             this.zoomBehavior = undefined;
         }
         if (this.params.axis === 'none') return;
@@ -92,7 +93,10 @@ export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
         const visWorld = this.zoomTransformToVisWorld(e.transform);
         this.state.zoomVisWorldBox(visWorld, ZoomExtension.name, !this.suppressEmit);
         if (e.sourceEvent) {
-            this.state.events.hover.next(this.state.getPointedCell(e.sourceEvent));
+            this.state.events.hover.next({
+                cell: this.state.getPointedCell(e.sourceEvent),
+                sourceEvent: e.sourceEvent,
+            });
         }
     }
 
@@ -114,7 +118,10 @@ export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
                 this.showScrollingMessage();
             }
         }
-        this.state.events.hover.next(this.state.getPointedCell(e));
+        this.state.events.hover.next({
+            cell: this.state.getPointedCell(e),
+            sourceEvent: e,
+        });
     }
 
     /** Magic to handle touchpad scrolling on Mac (when user lifts fingers from touchpad, but the browser is still getting wheel events) */

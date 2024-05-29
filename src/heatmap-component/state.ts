@@ -17,18 +17,21 @@ export const MIN_ZOOMED_DATAPOINTS_HARD = 1;
 
 /** Emitted on data-cell-related events (hover, click...) */
 export interface CellEventValue<TX, TY, TDatum> {
-    /** Datum stored in the data cell */
-    datum: TDatum,
-    /** X value ("column name") */
-    x: TX,
-    /** Y value ("row name") */
-    y: TY,
-    /** Column index */
-    xIndex: number,
-    /** Row index */
-    yIndex: number,
+    /** Pointed cell (can have a datum in it or can be empty) */
+    cell: {
+        /** Datum stored in the data cell, unless this is empty cell */
+        datum?: TDatum,
+        /** X value ("column name") */
+        x: TX,
+        /** Y value ("row name") */
+        y: TY,
+        /** Column index */
+        xIndex: number,
+        /** Row index */
+        yIndex: number,
+    } | undefined,
     /** Original mouse event that triggered this */
-    sourceEvent: MouseEvent,
+    sourceEvent: MouseEvent | undefined,
 }
 
 /** Emitted on zoom event */
@@ -123,9 +126,9 @@ export class State<TX, TY, TDatum> {
     /** Custom events fired by the heatmap component, all are RxJS `BehaviorSubject` */
     readonly events = {
         /** Fires when the user hovers over the component */
-        hover: new BehaviorSubject<CellEventValue<TX, TY, TDatum> | undefined>(undefined),
+        hover: new BehaviorSubject<CellEventValue<TX, TY, TDatum>>({ cell: undefined, sourceEvent: undefined }),
         /** Fires when the user selects/deselects a cell (e.g. by clicking on it) */
-        select: new BehaviorSubject<CellEventValue<TX, TY, TDatum> | undefined>(undefined),
+        select: new BehaviorSubject<CellEventValue<TX, TY, TDatum>>({ cell: undefined, sourceEvent: undefined }),
         /** Fires when the component is zoomed in or out, or panned (translated) */
         zoom: new BehaviorSubject<ZoomEventValue<TX, TY> | undefined>(undefined),
         /** Fires when the window is resized. Subject value is the size of the canvas in pixels. */
@@ -174,20 +177,18 @@ export class State<TX, TY, TDatum> {
 
 
     /** Return the data cell that is being pointed by the mouse in `event`.
-     * Return `undefined` if there is no such cell. */
-    getPointedCell(event: MouseEvent | undefined): CellEventValue<TX, TY, TDatum> | undefined {
+     * Return `undefined` if there is no such cell.
+     * Return a cell with `datum: undefined` if there is a cell but it is empty. */
+    getPointedCell(event: MouseEvent | undefined): CellEventValue<TX, TY, TDatum>['cell'] {
         if (!event) {
             return undefined;
         }
         const xIndex = Math.floor(this.scales.canvasToWorld.x(event.offsetX));
         const yIndex = Math.floor(this.scales.canvasToWorld.y(event.offsetY));
         const datum = Array2D.get(this.dataArray, xIndex, yIndex);
-        if (!datum) {
-            return undefined;
-        }
         const x = this.xDomain.values[xIndex];
         const y = this.yDomain.values[yIndex];
-        return { datum, x, y, xIndex, yIndex, sourceEvent: event };
+        return { datum, x, y, xIndex, yIndex };
     }
 
     /** Emit a resize event, with the current size of canvas. */
