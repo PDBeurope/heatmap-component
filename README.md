@@ -36,7 +36,7 @@ The goal of HeatmapComponent is to provide a tool for visualizing two-dimensiona
 ## Documentation
 
 -   Documentation for the current repository: [./docs/README.md](./docs/README.md)
--   Documentation for the latest release: <https://github.com/PDBeurope/heatmap-component/blob/v0.9.0/docs/README.md>
+-   Documentation for the latest release: <https://github.com/PDBeurope/heatmap-component/blob/v0.10.0/docs/README.md>
 
 ## npm package
 
@@ -76,7 +76,7 @@ To release a new version of this package:
 -   Change version in the documentation link in `README.md` and `README.npm.md`
 -   Update `CHANGELOG.md`
 -   Run `npm install` (to update `package-lock.json`)
--   Ensure `npm lint && npm rebuild && npm test` works properly
+-   Ensure `npm run lint && npm run rebuild && npm run test` works properly
 -   Commit and push to `main` branch (use the version with prepended "v" as the commit message, e.g. `v1.0.0`)
 -   Create a git tag matching the version with prepended "v" (e.g. `v1.0.0`)
 -   GitHub workflow will automatically publish npm package (https://www.npmjs.com/package/heatmap-component)

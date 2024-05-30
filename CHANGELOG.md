@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+## [0.10.0] - 2024-05-29
+
 -   Breaking change: Renamed item/items to datum/data in several places
 -   Breaking change: Default coloring is "everything gray", even for numeric values
 -   Breaking change: Color scales are created by `ColorScale.continuous`

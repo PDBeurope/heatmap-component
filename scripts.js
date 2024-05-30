@@ -2,7 +2,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const argparse = require('argparse');
 
 const PACKAGE = require(path.join(__dirname, 'package.json'));
 
@@ -37,7 +36,7 @@ const scripts = {
     },
 
     /** Move a file */
-    mv: (src, dest) => {
+    'mv': (src, dest) => {
         if (src === undefined) throw new Error('`src` parameter missing');
         if (dest === undefined) throw new Error('`dest` parameter missing');
         console.log('Moving file:', src, '->', dest);
@@ -45,15 +44,21 @@ const scripts = {
     },
 
     /** Remove files */
-    rm: (...paths) => {
+    'rm': (...paths) => {
         console.log('Removing files:', paths);
         removeFiles(...paths);
     },
 };
 
-const parser = new argparse.ArgumentParser({ description: 'Auxiliary scripts for use in package.json scripts' });
-parser.add_argument('script_name', { choices: Object.keys(scripts) });
-parser.add_argument('params', { nargs: '*' });
-const args = parser.parse_args();
+// Parse command-line arguments
+const [_node, _file, scriptName, ...params] = process.argv;
 
-scripts[args.script_name](...args.params);
+// Check if script name is provided and valid
+if (!(scriptName in scripts)) {
+    console.error(`usage: scripts.js [-h] {${Object.keys(scripts).join(',')}} [params ...]`);
+    console.error(`scripts.js: error: argument script_name: invalid choice: ${scriptName} (choose from ${Object.keys(scripts).join(', ')})`);
+    process.exit(2);
+}
+
+// Run selected script
+scripts[scriptName](...params);

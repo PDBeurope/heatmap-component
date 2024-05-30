@@ -31,4 +31,4 @@ The goal of HeatmapComponent is to provide a tool for visualizing two-dimensiona
 
 ## Documentation
 
--   [Documentation for the latest release (v0.9.0)](https://github.com/PDBeurope/heatmap-component/blob/v0.9.0/docs/README.md)
+-   [Documentation for the latest release (v0.10.0)](https://github.com/PDBeurope/heatmap-component/blob/v0.10.0/docs/README.md)
