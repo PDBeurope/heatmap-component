@@ -15,7 +15,7 @@ const ZOOM_EVENT_ROUNDING_PRECISION = 9;
 export const MIN_ZOOMED_DATAPOINTS_HARD = 1;
 
 
-/** Emitted on data-cell-related events (hover, click...) */
+/** Emitted on data-cell-related events (hover, select...) */
 export interface CellEventValue<TX, TY, TDatum> {
     /** Pointed cell (can have a datum in it or can be empty) */
     cell: {
