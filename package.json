@@ -1,6 +1,6 @@
 {
   "name": "heatmap-component",
-  "version": "0.10.0",
+  "version": "1.0.1",
   "description": "TypeScript library for creating interactive grid heatmaps",
   "repository": {
     "type": "git",

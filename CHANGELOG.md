@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+## [1.0.1] - 2024-07-04
+
+-   No changes since 0.10.0
+
 ## [0.10.0] - 2024-05-29
 
 -   Breaking change: Renamed item/items to datum/data in several places
