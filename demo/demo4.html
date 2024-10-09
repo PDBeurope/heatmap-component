@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>HeatmapComponent demo 4</title>
+  <link rel="shortcut icon" type="image/x-icon" href="../favicon.ico">
+  <link rel="stylesheet" type="text/css" href="../build/heatmap-component.css" />
+  <script src="../build/heatmap-component.js"></script>
+</head>
+
+<body>
+  <h1>Demo 4</h1>
+  <p>This demo shows AlphaFold PAE matrix for <span id="uniprot-id">?</span>.</p><span id="error"></span>
+  <div style="padding: 15px; background-color: white;">
+    <!-- Your visualization will be placed here -->
+    <div id="app" style="width: 320px; aspect-ratio: 1; border: 1px solid black;"></div>
+    <a href="../src/heatmap-component/demo.ts">Source code</a>
+  </div>
+
+  <script>
+    HeatmapComponent.demos.demo4('app');
+  </script>
+</body>
+
+</html>

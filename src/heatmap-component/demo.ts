@@ -1,4 +1,5 @@
-import { Heatmap, ColorScale } from '../main';
+import { range } from 'lodash';
+import { ColorScale, Heatmap } from '../main';
 import { DataDescription } from './data/data-description';
 
 
@@ -90,6 +91,45 @@ export function demo3(divElementOrId: HTMLDivElement | string): void {
     heatmap.setVisualParams({ xGapRelative: 0.1, yGapRelative: 0.1, xGapPixels: null, yGapPixels: null });
     heatmap.render(divElementOrId);
     (window as any).heatmap = heatmap;
+}
+
+
+/** Demo showing an AlphaFold PAE matrix from real data */
+export async function demo4(divElementOrId: HTMLDivElement | string): Promise<void> {
+    const uniprotIdFromUrl = new URL(window.location as unknown as string).searchParams.get('uniprot-id');
+    const uniprotId = uniprotIdFromUrl ?? 'P06213'; // try Q5VSL9, P06213
+    setTextContent('#uniprot-id', uniprotId);
+    const pae = await fetchPAEMatrix(uniprotId);
+    if (!pae) {
+        const msg = `Failed to fetch data for ${uniprotId}.`;
+        setTextContent('#error', `Error: ${msg}`);
+        throw new Error(msg);
+    }
+    const heatmap = Heatmap.create({
+        xDomain: range(1, pae.n + 1),
+        yDomain: range(1, pae.n + 1),
+        data: pae.data,
+        x: (d, i) => i % pae.n + 1,
+        y: (d, i) => Math.floor(i / pae.n) + 1,
+    });
+    const colorScale = ColorScale.continuous('Greens', [0, 32], [1, 0]);
+    heatmap.setColor(d => colorScale(d));
+    heatmap.setTooltip((d, x, y) => `Residue ${y} \\ ${x}<br>PAE: ${d}`);
+    heatmap.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
+    heatmap.render(divElementOrId);
+    (window as any).heatmap = heatmap;
+}
+
+async function fetchPAEMatrix(uniprotId: string) {
+    const url = `https://alphafold.ebi.ac.uk/files/AF-${uniprotId}-F1-predicted_aligned_error_v4.json`;
+    const response = await fetch(url);
+    if (!response.ok) return undefined;
+    const js = await response.json();
+    const values = js[0].predicted_aligned_error as number[][];
+    return {
+        n: values.length,
+        data: values.flatMap(x => x),
+    };
 }
 
 
