@@ -99,7 +99,7 @@ export async function demo4(divElementOrId: HTMLDivElement | string): Promise<vo
     const uniprotIdFromUrl = new URL(window.location as unknown as string).searchParams.get('uniprot-id');
     const uniprotId = uniprotIdFromUrl ?? 'P06213'; // try Q5VSL9, P06213
     setTextContent('#uniprot-id', uniprotId);
-    const pae = await fetchPAEMatrix(uniprotId);
+    const pae = await fetchPAEMatrix(uniprotId, 10);
     if (!pae) {
         const msg = `Failed to fetch data for ${uniprotId}.`;
         setTextContent('#error', `Error: ${msg}`);
@@ -115,17 +115,29 @@ export async function demo4(divElementOrId: HTMLDivElement | string): Promise<vo
     const colorScale = ColorScale.continuous('Greens', [0, 32], [1, 0]);
     heatmap.setColor(d => colorScale(d));
     heatmap.setTooltip((d, x, y) => `Residue ${y} \\ ${x}<br>PAE: ${d}`);
+    heatmap.extensions.marker?.update({ freeze: true });
+    heatmap.events.brush.subscribe(e => {
+        console.log('BRUSH OUT', e)
+        if (e?.selection) {
+            setTextContent('#selection', `x ${e.selection.xFirstIndex}-${e.selection.xLastIndex}  / y ${e.selection.yFirstIndex}-${e.selection.yLastIndex}`);
+        } else {
+            setTextContent('#selection', 'none');
+        }
+    });
     heatmap.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
     heatmap.render(divElementOrId);
     (window as any).heatmap = heatmap;
 }
 
-async function fetchPAEMatrix(uniprotId: string) {
+async function fetchPAEMatrix(uniprotId: string, cut?: number) {
     const url = `https://alphafold.ebi.ac.uk/files/AF-${uniprotId}-F1-predicted_aligned_error_v4.json`;
     const response = await fetch(url);
     if (!response.ok) return undefined;
     const js = await response.json();
-    const values = js[0].predicted_aligned_error as number[][];
+    let values = js[0].predicted_aligned_error as number[][];
+    if (cut !== undefined) {
+        values = values.slice(0, cut).map(row => row.slice(0, cut));
+    }
     return {
         n: values.length,
         data: values.flatMap(x => x),

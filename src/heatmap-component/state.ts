@@ -76,6 +76,17 @@ export interface ZoomEventValue<TX, TY> {
     origin?: string,
 }
 
+/** Emitted on brush event */
+export interface BrushEventValue {
+    selection: {
+        xFirstIndex: number,
+        xLastIndex: number,
+        yFirstIndex: number,
+        yLastIndex: number,
+    } | undefined;
+    sourceEvent: MouseEvent | undefined,
+}
+
 
 /** Controls how X axis values align with the columns when using `Heatmap.zoom` and `Heatmap.events.zoom` (position of a value on X axis can be aligned to the left edge/center/right edge of the column showing that value) */
 export type XAlignmentMode = 'left' | 'center' | 'right'
@@ -129,6 +140,8 @@ export class State<TX, TY, TDatum> {
         hover: new BehaviorSubject<CellEventValue<TX, TY, TDatum>>({ cell: undefined, sourceEvent: undefined }),
         /** Fires when the user selects/deselects a cell (e.g. by clicking on it) */
         select: new BehaviorSubject<CellEventValue<TX, TY, TDatum>>({ cell: undefined, sourceEvent: undefined }),
+        /** Fires when the user selects/deselects a region by brushing */
+        brush: new BehaviorSubject<BrushEventValue>({ selection: undefined, sourceEvent: undefined }),
         /** Fires when the component is zoomed in or out, or panned (translated) */
         zoom: new BehaviorSubject<ZoomEventValue<TX, TY> | undefined>(undefined),
         /** Fires when the window is resized. Subject value is the size of the canvas in pixels. */
