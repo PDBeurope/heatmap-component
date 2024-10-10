@@ -77,12 +77,16 @@ export interface ZoomEventValue<TX, TY> {
 }
 
 /** Emitted on brush event */
-export interface BrushEventValue {
+export interface BrushEventValue<TX, TY> {
     selection: {
         xFirstIndex: number,
         xLastIndex: number,
         yFirstIndex: number,
         yLastIndex: number,
+        xFirst: TX,
+        xLast: TX,
+        yFirst: TY,
+        yLast: TY,
     } | undefined;
     sourceEvent: MouseEvent | undefined,
 }
@@ -141,7 +145,7 @@ export class State<TX, TY, TDatum> {
         /** Fires when the user selects/deselects a cell (e.g. by clicking on it) */
         select: new BehaviorSubject<CellEventValue<TX, TY, TDatum>>({ cell: undefined, sourceEvent: undefined }),
         /** Fires when the user selects/deselects a region by brushing */
-        brush: new BehaviorSubject<BrushEventValue>({ selection: undefined, sourceEvent: undefined }),
+        brush: new BehaviorSubject<BrushEventValue<TX, TY>>({ selection: undefined, sourceEvent: undefined }),
         /** Fires when the component is zoomed in or out, or panned (translated) */
         zoom: new BehaviorSubject<ZoomEventValue<TX, TY> | undefined>(undefined),
         /** Fires when the window is resized. Subject value is the size of the canvas in pixels. */

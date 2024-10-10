@@ -1,17 +1,15 @@
+import { clamp } from 'lodash';
 import * as d3 from '../d3-modules';
 import { BehaviorBase, Extension } from '../extension';
 
 
 /** Parameters for `BrushExtension` */
 export interface BrushExtensionParams {
-    /** TODO docstring */
-    snap: boolean,
     // TODO allow disabling brush (default)
 }
 
 /** Default parameter values for `BrushExtension` */
 export const DefaultBrushExtensionParams: BrushExtensionParams = {
-    snap: true,
 };
 
 
@@ -25,7 +23,6 @@ export class BrushBehavior extends BehaviorBase<BrushExtensionParams> {
         super.register();
         this.subscribe(this.state.events.render, () => this.addBrushBehavior());
     }
-    // TODO snap in `update`
 
     /** Initialize zoom behavior (also remove any existing zoom behavior) */
     private addBrushBehavior(): void {
@@ -55,28 +52,40 @@ export class BrushBehavior extends BehaviorBase<BrushExtensionParams> {
         console.log('brush brush', event)
     }
     private handleBrushEnd(event: any) {
+        if (!event.sourceEvent) return;
+
         if (event.selection) {
             const [[left, top], [right, bottom]] = event.selection;
             console.log('brush end', event.sourceEvent, left, right, top, bottom)
 
-            const xMinIndex = this.state.scales.canvasToWorld.x(left);
-            const xMaxIndex = this.state.scales.canvasToWorld.x(right);
-            const yMinIndex = this.state.scales.canvasToWorld.y(top);
-            const yMaxIndex = this.state.scales.canvasToWorld.y(bottom);
+            const worldLeft = this.state.scales.canvasToWorld.x(left);
+            const worldRight = this.state.scales.canvasToWorld.x(right);
+            const worldTop = this.state.scales.canvasToWorld.y(top);
+            const worldBottom = this.state.scales.canvasToWorld.y(bottom);
 
-            // TODO snap
-            // if (this.params.snap && event.sourceEvent) { // avoid infinite loop
-            //     this.brushBehavior?.move(this.targetElement as any, [
-            //         [this.state.scales.worldToCanvas.x(Math.round(xMinIndex)), this.state.scales.worldToCanvas.y(Math.round(yMinIndex))],
-            //         [this.state.scales.worldToCanvas.x(Math.round(xMaxIndex)), this.state.scales.worldToCanvas.y(Math.round(yMaxIndex))],
-            //     ]);
-            // }
-            const xFirstIndex = Math.floor(xMinIndex);
-            const xLastIndex = Math.ceil(xMaxIndex) - 1;
-            const yFirstIndex = Math.floor(yMinIndex);
-            const yLastIndex = Math.ceil(yMaxIndex) - 1;
+            const xFirstIndex = clamp(Math.round(worldLeft), 0, this.state.dataArray.nColumns - 1);
+            const xLastIndex = clamp(Math.round(worldRight) - 1, 0, this.state.dataArray.nColumns - 1);
+            const yFirstIndex = clamp(Math.round(worldTop), 0, this.state.dataArray.nRows - 1);
+            const yLastIndex = clamp(Math.round(worldBottom) - 1, 0, this.state.dataArray.nRows - 1);
 
-            this.state.events.brush.next({ selection: { xFirstIndex, xLastIndex, yFirstIndex, yLastIndex }, sourceEvent: event });
+            const xFirst = this.state.xDomain.values[xFirstIndex];
+            const xLast = this.state.xDomain.values[xLastIndex];
+            const yFirst = this.state.yDomain.values[yFirstIndex];
+            const yLast = this.state.yDomain.values[yLastIndex];
+
+            // Snap selection
+            this.brushBehavior?.move(this.targetElement as any, [
+                [this.state.scales.worldToCanvas.x(xFirstIndex), this.state.scales.worldToCanvas.y(yFirstIndex)],
+                [this.state.scales.worldToCanvas.x(xLastIndex + 1), this.state.scales.worldToCanvas.y(yLastIndex + 1)],
+            ], undefined);
+
+            this.state.events.brush.next({
+                selection: {
+                    xFirstIndex, xLastIndex, yFirstIndex, yLastIndex,
+                    xFirst, xLast, yFirst, yLast,
+                },
+                sourceEvent: event,
+            });
         } else {
             this.state.events.brush.next({ selection: undefined, sourceEvent: event });
         }
