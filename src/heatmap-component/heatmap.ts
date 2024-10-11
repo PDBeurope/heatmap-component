@@ -1,7 +1,7 @@
 import { Color } from './data/color';
 import { DataDescription, Provider } from './data/data-description';
 import { Behavior } from './extension';
-import { BrushBehavior, BrushExtension, BrushExtensionParams } from './extensions/brush';
+import { BrushExtension, BrushExtensionParams } from './extensions/brush';
 import { DrawExtension, DrawExtensionParams } from './extensions/draw';
 import { MarkerBehavior, MarkerExtension, MarkerExtensionParams } from './extensions/marker';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
@@ -18,7 +18,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
 
     /** Essential extension behaviors */
     readonly extensions: {
-        marker?: MarkerBehavior,
+        marker?: Behavior<MarkerExtensionParams> & MarkerBehavior,
         tooltip?: Behavior<TooltipExtensionParams<TX, TY, TDatum>>,
         draw?: Behavior<DrawExtensionParams<TX, TY, TDatum>>,
         zoom?: Behavior<ZoomExtensionParams>,
@@ -34,7 +34,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         heatmap.extensions.tooltip = heatmap.registerExtension(TooltipExtension);
         heatmap.extensions.draw = heatmap.registerExtension(DrawExtension);
         heatmap.extensions.zoom = heatmap.registerExtension(ZoomExtension);
-        heatmap.extensions.brush = heatmap.registerExtension(BrushExtension) as BrushBehavior;
+        heatmap.extensions.brush = heatmap.registerExtension(BrushExtension);
 
         return heatmap;
     }
@@ -142,6 +142,19 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
     /** Return current zoom */
     getZoom(): ZoomEventValue<TX, TY> | undefined {
         return this.state.getZoom();
+    }
+
+    /** Set brushing parameters. Use `enabled` parameter to turn brushing on/off.
+     *
+     * Example:
+     * ```
+     * heatmap.setBrushing({ enabled: true }); // Turn on brushing
+     * heatmap.events.brush.subscribe(e => console.log('Brushed', e)); // Listen to brush selection changes
+     * ```
+     */
+    setBrushing(params: Partial<BrushExtensionParams>): this {
+        this.extensions.brush?.update(params);
+        return this;
     }
 }
 

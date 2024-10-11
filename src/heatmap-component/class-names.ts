@@ -16,4 +16,5 @@ export const Class = {
     Overlay: 'heatmap-overlay',
     OverlayShade: 'heatmap-overlay-shade',
     OverlayMessage: 'heatmap-overlay-message',
+    BrushClose: 'heatmap-brush-close',
 } as const;

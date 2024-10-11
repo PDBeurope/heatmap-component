@@ -1,62 +1,79 @@
 import { clamp } from 'lodash';
+import { Class } from '../class-names';
 import * as d3 from '../d3-modules';
 import { BehaviorBase, Extension } from '../extension';
+import { XY } from '../scales';
 
 
 /** Parameters for `BrushExtension` */
 export interface BrushExtensionParams {
-    // TODO allow disabling brush (default)
+    /** Switches brushing on/off */
+    enabled: boolean,
 }
 
 /** Default parameter values for `BrushExtension` */
 export const DefaultBrushExtensionParams: BrushExtensionParams = {
+    enabled: false,
 };
 
 
-/** Behavior class for `BrushExtension` (highlights hovered grid cell and column and row) */
+/** Behavior class for `BrushExtension` (allows selecting a rectangular region by mouse brush gesture, not compatible with zooming!) */
 export class BrushBehavior extends BehaviorBase<BrushExtensionParams> {
-    private brushBehavior?: d3.BrushBehavior<unknown>;
-    /** DOM element to which the the zoom behavior is bound */
-    private get targetElement() { return this.state.dom?.svg; }
+    /** D3 brush behavior */
+    private readonly brushBehavior: d3.BrushBehavior<unknown> = d3.brush()
+        .on('start', event => this.handleBrushStart(event))
+        .on('end', event => this.handleBrushEnd(event));
 
-    register(): void {
+    private get svg() { return this.state.dom?.svg; }
+
+    /** DOM element to which the brush behavior is bound */
+    private targetElement?: d3.Selection<SVGGElement, any, any, any>;
+
+    override register(): void {
         super.register();
-        this.subscribe(this.state.events.render, () => this.addBrushBehavior());
+        this.subscribe(this.state.events.render, () => {
+            if (this.params.enabled) this.addBrushBehavior();
+        });
+    }
+    override update(params: Partial<BrushExtensionParams>): void {
+        super.update(params);
+        if (this.params.enabled && !this.targetElement) this.addBrushBehavior();
+        if (!this.params.enabled && this.targetElement) this.removeBrushBehavior();
+    }
+    override unregister(): void {
+        this.removeBrushBehavior();
+        super.unregister();
     }
 
-    /** Initialize zoom behavior (also remove any existing zoom behavior) */
+    /** Bind brush behavior (also remove any existing) */
     private addBrushBehavior(): void {
-        if (!this.targetElement) return;
-        if (this.brushBehavior) {
-            // Remove any old behavior
-            this.brushBehavior.on('start', null);
-            this.brushBehavior.on('brush', null);
-            this.brushBehavior.on('end', null);
-            // this.targetElement.on('.zoom', null);
-            // this.targetElement.on('.customzoom', null);
-            this.brushBehavior = undefined;
-        }
-        this.brushBehavior = d3.brush();
-        // this.brushBehavior.filter(e => (e instanceof WheelEvent) ? (this.wheelAction(e).kind === 'zoom') : true);
-        this.brushBehavior.on('start', event => this.handleBrushStart(event));
-        this.brushBehavior.on('brush', event => this.handleBrushBrush(event));
-        this.brushBehavior.on('end', event => this.handleBrushEnd(event));
+        if (!this.svg) return;
+        this.removeBrushBehavior();
+        this.targetElement = this.svg.append('g').attr('class', 'brush-target').call(this.brushBehavior);
+        d3.select(document).on('keydown.BrushExtension', event => { if (event.key === 'Escape') this.deselect(event); });
+    }
 
-        this.targetElement.call(this.brushBehavior as any);
-        // this.targetElement.on('wheel.customzoom', e => this.handleWheel(e)); // Avoid calling the event 'wheel.zoom', that would conflict with zoom behavior
+    /** Remove existing brush behavior (if any) */
+    private removeBrushBehavior(): void {
+        if (this.targetElement) {
+            if (this.state.events.brush.value.selection) {
+                this.deselect();
+            }
+            this.targetElement.remove();
+            this.targetElement = undefined;
+            d3.select(document).on('keydown.BrushExtension', null);
+        }
     }
+
     private handleBrushStart(event: any) {
-        console.log('brush start', event)
+        this.placeCloseIcon(undefined);
     }
-    private handleBrushBrush(event: any) {
-        console.log('brush brush', event)
-    }
+
     private handleBrushEnd(event: any) {
-        if (!event.sourceEvent) return;
+        if (!event.sourceEvent) return; // avoid infinite loop from snapping
 
         if (event.selection) {
             const [[left, top], [right, bottom]] = event.selection;
-            console.log('brush end', event.sourceEvent, left, right, top, bottom)
 
             const worldLeft = this.state.scales.canvasToWorld.x(left);
             const worldRight = this.state.scales.canvasToWorld.x(right);
@@ -74,10 +91,15 @@ export class BrushBehavior extends BehaviorBase<BrushExtensionParams> {
             const yLast = this.state.yDomain.values[yLastIndex];
 
             // Snap selection
-            this.brushBehavior?.move(this.targetElement as any, [
-                [this.state.scales.worldToCanvas.x(xFirstIndex), this.state.scales.worldToCanvas.y(yFirstIndex)],
-                [this.state.scales.worldToCanvas.x(xLastIndex + 1), this.state.scales.worldToCanvas.y(yLastIndex + 1)],
+            const snapLeft = this.state.scales.worldToCanvas.x(xFirstIndex);
+            const snapRight = this.state.scales.worldToCanvas.x(xLastIndex + 1);
+            const snapTop = this.state.scales.worldToCanvas.y(yFirstIndex);
+            const snapBottom = this.state.scales.worldToCanvas.y(yLastIndex + 1);
+            this.brushBehavior.move(this.targetElement as any, [
+                [snapLeft, snapTop],
+                [snapRight, snapBottom],
             ], undefined);
+            this.placeCloseIcon({ x: snapRight, y: snapTop });
 
             this.state.events.brush.next({
                 selection: {
@@ -87,10 +109,46 @@ export class BrushBehavior extends BehaviorBase<BrushExtensionParams> {
                 sourceEvent: event,
             });
         } else {
+            this.placeCloseIcon(undefined);
             this.state.events.brush.next({ selection: undefined, sourceEvent: event });
         }
     }
 
+    /** Add or remove "close" icon */
+    private placeCloseIcon(canvasPosition: XY | undefined): void {
+        if (!this.svg) return;
+        this.svg.selectAll(`.${Class.BrushClose}`).remove();
+        if (canvasPosition) {
+            const group = this.svg
+                .append('g')
+                .classed(Class.BrushClose, true)
+                .attr('transform', `translate(${canvasPosition.x} ${canvasPosition.y}) scale(${16 / 24})`)
+                .on('mousemove', e => {
+                    // avoid default hover behavior
+                    this.state.events.hover.next({ cell: undefined, sourceEvent: e });
+                    e.stopPropagation();
+                })
+                .on('click', e => {
+                    this.deselect();
+                    e.stopPropagation(); // avoid messing up with pinnable tooltips
+                });
+            group
+                .append('circle')
+                .classed('circle', true)
+                .attr('cx', '0')
+                .attr('cy', '0')
+                .attr('r', '14');
+            group
+                .append('path')
+                .classed('cross', true)
+                .attr('d', 'M7,-5.59 L5.59,-7 L0,-1.41 L-5.59,-7 L-7,-5.59 L-1.41,0 L-7,5.59 L-5.59,7 L0,1.41 L5.59,7 L7,5.59 L1.41,0 L7,-5.59 Z');
+        }
+    }
+
+    private deselect(event?: any) {
+        this.brushBehavior.clear(this.targetElement as any);
+        this.state.events.brush.next({ selection: undefined, sourceEvent: event });
+    }
 }
 
 

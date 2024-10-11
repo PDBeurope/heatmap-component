@@ -50,7 +50,7 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
      * (higher value means more responsive but lower-resolution visualization) */
     private downsamplingPixelsPerRect = 1;
 
-    register(): void {
+    override register(): void {
         super.register();
         this.subscribe(this.state.events.render, () => {
             if (!this.state.dom) return;
@@ -70,14 +70,14 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
             this.requestDraw();
         });
     }
-    update(params: Partial<DrawExtensionParams<TX, TY, TDatum>>): void {
+    override update(params: Partial<DrawExtensionParams<TX, TY, TDatum>>): void {
         if (params.colorProvider !== this.params.colorProvider) {
             this.downsampler = undefined;
         }
         super.update(params);
         this.requestDraw();
     }
-    unregister(): void {
+    override unregister(): void {
         if (this.state.dom) this.state.dom.svg.on('mouseenter.DrawExtension', null);
         super.unregister();
     }

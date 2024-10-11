@@ -99,7 +99,7 @@ export async function demo4(divElementOrId: HTMLDivElement | string): Promise<vo
     const uniprotIdFromUrl = new URL(window.location as unknown as string).searchParams.get('uniprot-id');
     const uniprotId = uniprotIdFromUrl ?? 'P06213'; // try Q5VSL9, P06213
     setTextContent('#uniprot-id', uniprotId);
-    const pae = await fetchPAEMatrix(uniprotId, 10);
+    const pae = await fetchPAEMatrix(uniprotId, undefined);
     if (!pae) {
         const msg = `Failed to fetch data for ${uniprotId}.`;
         setTextContent('#error', `Error: ${msg}`);
@@ -114,15 +114,13 @@ export async function demo4(divElementOrId: HTMLDivElement | string): Promise<vo
     });
     const colorScale = ColorScale.continuous('Greens', [0, 32], [1, 0]);
     heatmap.setColor(d => colorScale(d));
-    heatmap.setTooltip((d, x, y) => `Residue ${y} \\ ${x}<br>PAE: ${d}`);
+    heatmap.setTooltip((d, x, y) => `Scored residue (x): ${x}<br>Aligned residue (y): ${y}<br>PAE: ${d}`);
+    // heatmap.extensions.tooltip?.update({ pinnable: false });
     heatmap.extensions.marker?.update({ freeze: true });
+    heatmap.setBrushing({ enabled: true });
     heatmap.events.brush.subscribe(e => {
-        console.log('BRUSH OUT', e)
-        if (e?.selection) {
-            setTextContent('#selection', `x ${e.selection.xFirstIndex}-${e.selection.xLastIndex}  / y ${e.selection.yFirstIndex}-${e.selection.yLastIndex}`);
-        } else {
-            setTextContent('#selection', 'none');
-        }
+        const selection = e?.selection ? `Scored residue (x): ${e.selection.xFirst}-${e.selection.xLast} / Aligned residue (y): ${e.selection.yFirst}-${e.selection.yLast}` : 'none';
+        setTextContent('#selection', selection);
     });
     heatmap.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
     heatmap.render(divElementOrId);

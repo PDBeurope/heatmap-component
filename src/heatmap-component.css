@@ -124,3 +124,20 @@
     border: solid black 1px;
     box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.75);
 }
+
+
+/* Brush extension */
+
+.heatmap-brush-close {
+    cursor: pointer;
+}
+
+.heatmap-brush-close .cross {
+    fill: black;
+    stroke: black;
+}
+
+.heatmap-brush-close .circle {
+    fill: white;
+    stroke: white;
+}

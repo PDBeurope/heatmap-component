@@ -22,7 +22,7 @@ export const DefaultMarkerExtensionParams: MarkerExtensionParams = {
 export class MarkerBehavior extends BehaviorBase<MarkerExtensionParams> {
     private readonly currentlyMarked: { xIndex: number | undefined, yIndex: number | undefined } = { xIndex: undefined, yIndex: undefined };
 
-    register(): void {
+    override register(): void {
         super.register();
         this.subscribe(this.state.events.hover, pointed => {
             if (!this.params.freeze) {

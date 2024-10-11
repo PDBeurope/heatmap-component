@@ -36,10 +36,10 @@ export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
     private readonly currentWheelGesture = { lastTimestamp: 0, lastAbsDelta: 0, ctrlKey: false, shiftKey: false, altKey: false, metaKey: false };
     /** Used to avoid emitting a new zoom event when adjusting D3 zoom behavior to zoom changes from elsewhere */
     private suppressEmit: boolean = false;
-    /** DOM element to which the the zoom behavior is bound */
+    /** DOM element to which the zoom behavior is bound */
     private get targetElement() { return this.state.dom?.svg; }
 
-    register(): void {
+    override register(): void {
         super.register();
         this.subscribe(this.state.events.render, () => this.addZoomBehavior());
         this.subscribe(this.state.events.data, () => {
@@ -56,7 +56,7 @@ export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
             }
         });
     }
-    update(params: Partial<ZoomExtensionParams>): void {
+    override update(params: Partial<ZoomExtensionParams>): void {
         const needsReapply = params.axis !== undefined && params.axis !== this.params.axis;
         super.update(params);
         if (needsReapply) this.addZoomBehavior();

@@ -88,7 +88,7 @@ export interface BrushEventValue<TX, TY> {
         yFirst: TY,
         yLast: TY,
     } | undefined;
-    sourceEvent: MouseEvent | undefined,
+    sourceEvent: MouseEvent | KeyboardEvent | undefined,
 }
 
 

@@ -33,7 +33,7 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
     /** Position of the pinned tooltip, if any. In world coordinates, continuous. Use `Math.floor` to get column/row index. */
     private pinnedTooltip?: XY = undefined;
 
-    register(): void {
+    override register(): void {
         super.register();
         this.subscribe(this.state.events.hover, pointed => this.drawTooltip(pointed));
         this.subscribe(this.state.events.select, pointed => this.drawPinnedTooltip(pointed));
