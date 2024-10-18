@@ -112,8 +112,12 @@ export class BrushBehavior<TX, TY> extends BehaviorBase<BrushExtensionParams> {
 
     /** Add or remove "Close" icon */
     private placeCloseButton(worldBox: Box | undefined): void {
+        const BUTTON_SIZE = 16;
         const canvasPosition: XY | undefined = worldBox ?
-            { x: this.state.scales.worldToCanvas.x(worldBox.xmax), y: this.state.scales.worldToCanvas.y(worldBox.ymin) }
+            {
+                x: Math.min(this.state.scales.worldToCanvas.x(worldBox.xmax), this.state.boxes.canvas.xmax - 0.7 * BUTTON_SIZE),
+                y: Math.max(this.state.scales.worldToCanvas.y(worldBox.ymin), this.state.boxes.canvas.ymin + 0.7 * BUTTON_SIZE),
+            }
             : undefined;
         if (!this.svg) return;
         this.svg.selectAll(`.${Class.BrushClose}`).remove();
@@ -121,7 +125,7 @@ export class BrushBehavior<TX, TY> extends BehaviorBase<BrushExtensionParams> {
             const group = this.svg
                 .append('g')
                 .classed(Class.BrushClose, true)
-                .attr('transform', `translate(${canvasPosition.x} ${canvasPosition.y}) scale(${16 / 24})`)
+                .attr('transform', `translate(${canvasPosition.x} ${canvasPosition.y}) scale(${BUTTON_SIZE / 24})`)
                 .on('mousemove', e => {
                     // avoid default hover behavior
                     this.state.events.hover.next({ cell: undefined, sourceEvent: e });
@@ -134,9 +138,9 @@ export class BrushBehavior<TX, TY> extends BehaviorBase<BrushExtensionParams> {
             group
                 .append('circle')
                 .classed('circle', true)
-                .attr('cx', '0')
-                .attr('cy', '0')
-                .attr('r', '14');
+                .attr('cx', 0)
+                .attr('cy', 0)
+                .attr('r', 14);
             group
                 .append('path')
                 .classed('cross', true)

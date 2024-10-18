@@ -148,7 +148,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
      *
      * Example:
      * ```
-     * heatmap.setBrushing({ enabled: true }); // Turn on brushing
+     * heatmap.setBrushing({ enabled: true, snap: true, closeButton: true }); // Turn on brushing
      * heatmap.events.brush.subscribe(e => console.log('Brushed', e)); // Listen to brush selection changes
      * ```
      */

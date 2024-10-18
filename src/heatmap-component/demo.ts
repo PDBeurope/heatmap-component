@@ -103,7 +103,7 @@ export async function demo4(divElementOrId: HTMLDivElement | string): Promise<vo
     const uniprotIdFromUrl = new URL(window.location as unknown as string).searchParams.get('uniprot-id');
     const uniprotId = uniprotIdFromUrl ?? 'P06213'; // try Q5VSL9, P06213
     setTextContent('#uniprot-id', uniprotId);
-    const pae = await fetchPAEMatrix(uniprotId, 10);
+    const pae = await fetchPAEMatrix(uniprotId, undefined);
     if (!pae) {
         const msg = `Failed to fetch data for ${uniprotId}.`;
         setTextContent('#error', `Error: ${msg}`);
@@ -119,13 +119,20 @@ export async function demo4(divElementOrId: HTMLDivElement | string): Promise<vo
     const colorScale = ColorScale.continuous('Greens', [0, 32], [1, 0]);
     heatmap.setColor(d => colorScale(d));
     heatmap.setTooltip(null);
+    heatmap.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
     heatmap.extensions.marker?.update({ freeze: true });
     heatmap.setBrushing({ enabled: true });
     heatmap.events.brush.subscribe(e => {
-        const selection = e?.selection ? `Scored residue (x): ${e.selection.xFirst}-${e.selection.xLast} / Aligned residue (y): ${e.selection.yFirst}-${e.selection.yLast}` : 'none';
+        const selection = e?.selection ? `Scored residue (x): ${e.selection.xFirst}-${e.selection.xLast} / Aligned residue (y): ${e.selection.yFirst}-${e.selection.yLast}` : 'None';
+        const left = e.selection ? e.selection.xMinIndex / pae.n : 0;
+        const width = e.selection ? (e.selection.xMaxIndex - e.selection.xMinIndex) / pae.n : 0;
+        const top = e.selection ? e.selection.yMinIndex / pae.n : 0;
+        const height = e.selection ? (e.selection.yMaxIndex - e.selection.yMinIndex) / pae.n : 0;
+        const color = e.type === 'end' ? '#777777' : '#aaaaaa';
         setTextContent('#selection', selection);
+        document.getElementById('xindicator')?.setAttribute('style', `left: ${left * 100}%; width: ${width * 100}%; background-color: ${color};`);
+        document.getElementById('yindicator')?.setAttribute('style', `top: ${top * 100}%; height: ${height * 100}%; background-color: ${color};`);
     });
-    heatmap.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
     heatmap.render(divElementOrId);
     (window as any).heatmap = heatmap;
 }

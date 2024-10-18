@@ -7,16 +7,43 @@
   <link rel="shortcut icon" type="image/x-icon" href="../favicon.ico">
   <link rel="stylesheet" type="text/css" href="../build/heatmap-component.css" />
   <script src="../build/heatmap-component.js"></script>
+  <style>
+    #xindicator {
+      background-color: #777777;
+      position: relative;
+      height: 100%;
+      left: 0%;
+      width: 0%;
+      border-radius: 3px;
+    }
+
+    #yindicator {
+      background-color: #777777;
+      position: relative;
+      width: 100%;
+      top: 0%;
+      height: 0%;
+      border-radius: 3px;
+    }
+  </style>
 </head>
 
 <body>
   <h1>Demo 4</h1>
   <p>This demo shows AlphaFold PAE matrix for <span id="uniprot-id">?</span>.</p><span id="error"></span>
+  <p>Brush selection: <span id="selection"></span></p>
   <div style="padding: 15px; background-color: white;">
-    <!-- Your visualization will be placed here -->
-    <div id="app" style="width: 633px; aspect-ratio: 1; border: 1px solid black;"></div>
-    <a href="../src/heatmap-component/demo.ts">Source code</a>
-    <p>Brush selection: <span id="selection"></span></p>
+    <div id="xaxis" style="width: 500px; height: 10px; background-color: #dddddd; margin-left: 16px; margin-bottom: 5px;">
+      <div id="xindicator"></div>
+    </div>
+    <div style="display: flex; flex-direction: row;">
+      <div id="yaxis" style="display: initial; width: 10px; height: 500px; background-color: #dddddd; margin-top: 1px; margin-right: 5px;">
+        <div id="yindicator"></div>
+      </div>
+      <!-- Your visualization will be placed here -->
+      <div id="app" style="width: 500px; aspect-ratio: 1; border: 1px solid black;"></div>
+    </div>
+    <p><a href="../src/heatmap-component/demo.ts">Source code</a></p>
   </div>
 
   <script>
