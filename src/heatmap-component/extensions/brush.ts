@@ -22,23 +22,20 @@ export const DefaultBrushExtensionParams: BrushExtensionParams = {
 };
 
 
-/** Behavior class for `BrushExtension` (allows selecting a rectangular region by mouse brush gesture, not compatible with zooming!) */
+/** Behavior class for `BrushExtension` (allows selecting a rectangular region by mouse brush gesture; not compatible with zooming!) */
 export class BrushBehavior<TX, TY> extends BehaviorBase<BrushExtensionParams> {
     /** D3 brush behavior */
     private readonly brushBehavior: d3.BrushBehavior<unknown> = d3.brush()
         .on('start', event => this.handleBrushStart(event))
         .on('brush', event => this.handleBrushBrush(event))
         .on('end', event => this.handleBrushEnd(event));
-
     private get svg() { return this.state.dom?.svg; }
-
     /** DOM element to which the brush behavior is bound */
     private targetElement?: d3.Selection<SVGGElement, any, any, any>;
-
     /** Distinguish between creating a new selection and modifying an existing selection (for snapping purposes) */
-    private _currentBrushAction: 'create' | 'update' | undefined;
-    private _currentSelection: Box | undefined;
-
+    private currentBrushAction?: 'create' | 'update';
+    /** Current completed selection */
+    private currentSelection?: Box;
 
     override register(): void {
         super.register();
@@ -50,14 +47,14 @@ export class BrushBehavior<TX, TY> extends BehaviorBase<BrushExtensionParams> {
         super.update(params);
         if (this.params.enabled && !this.targetElement) this.addBrushBehavior();
         if (!this.params.enabled && this.targetElement) this.removeBrushBehavior();
-        if (this._currentSelection) {
+        if (this.currentSelection) {
             if (this.params.snap) {
-                this._currentSelection = Box.snap(this._currentSelection, 'out', this.state.boxes.wholeWorld);
-                this.brushBehavior.move(this.targetElement as any, this.worldBoxToBrushSelection(this._currentSelection));
+                this.currentSelection = Box.snap(this.currentSelection, 'out', this.state.boxes.wholeWorld);
+                this.brushBehavior.move(this.targetElement as any, this.worldBoxToBrushSelection(this.currentSelection));
+                this.state.events.brush.next({ type: 'end', selection: this.state.worldBoxToBoxSelection(this.currentSelection), sourceEvent: undefined });
             }
-            this.placeCloseButton(this._currentSelection);
+            this.placeCloseButton(this.currentSelection);
         }
-
     }
     override unregister(): void {
         this.removeBrushBehavior();
@@ -86,31 +83,31 @@ export class BrushBehavior<TX, TY> extends BehaviorBase<BrushExtensionParams> {
 
     private handleBrushStart(event: any) {
         if (!event.sourceEvent) return; // avoid infinite loop
+        const worldBox = this.brushSelectionToWorldBox(event.selection);
         this.placeCloseButton(undefined);
-        if (event.selection) {
-            const [[left, top], [right, bottom]] = event.selection;
-            this._currentBrushAction = left === right && top === bottom ? 'create' : 'update';
-        }
-        this._currentSelection = undefined;
-        // TODO
+        this.currentBrushAction = (worldBox?.xmin === worldBox?.xmax && worldBox?.ymin === worldBox?.ymax) ? 'create' : 'update';
+        this.currentSelection = undefined;
+        this.state.events.brush.next({ type: 'start', selection: this.state.worldBoxToBoxSelection(worldBox), sourceEvent: event });
     }
 
     private handleBrushBrush(event: any) {
         if (!event.sourceEvent) return; // avoid infinite loop
-        // TODO
+        const worldBox = this.brushSelectionToWorldBox(event.selection);
+        this.state.events.brush.next({ type: 'brush', selection: this.state.worldBoxToBoxSelection(worldBox), sourceEvent: event });
     }
 
     private handleBrushEnd(event: any) {
-        if (!event.sourceEvent) return; // avoid infinite loop from snapping or deselect
+        if (!event.sourceEvent) return; // avoid infinite loop
         let worldBox = this.brushSelectionToWorldBox(event.selection);
         if (this.params.snap) {
-            const snapStrategy = this._currentBrushAction === 'update' ? 'nearest' : 'out';
+            const snapStrategy = this.currentBrushAction === 'update' ? 'nearest' : 'out';
             worldBox = Box.snap(worldBox, snapStrategy, this.state.boxes.wholeWorld);
             this.brushBehavior.move(this.targetElement as any, this.worldBoxToBrushSelection(worldBox));
         }
         this.placeCloseButton(worldBox);
-        this._currentSelection = worldBox;
-        this._currentBrushAction = undefined;
+        this.state.events.brush.next({ type: 'end', selection: this.state.worldBoxToBoxSelection(worldBox), sourceEvent: event });
+        this.currentSelection = worldBox;
+        this.currentBrushAction = undefined;
     }
 
     /** Add or remove "Close" icon */
@@ -151,7 +148,7 @@ export class BrushBehavior<TX, TY> extends BehaviorBase<BrushExtensionParams> {
         this.brushBehavior.clear(this.targetElement as any);
         this.placeCloseButton(undefined);
         this.state.events.brush.next({ type: 'end', selection: undefined, sourceEvent: event });
-        this._currentSelection = undefined;
+        this.currentSelection = undefined;
     }
 
     private brushSelectionToWorldBox(selection: [[number, number], [number, number]] | null | undefined): Box | undefined {
