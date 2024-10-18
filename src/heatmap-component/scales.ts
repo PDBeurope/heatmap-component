@@ -40,6 +40,36 @@ export const Box = {
             return expandBox(clamped, constraint, minSize);
         }
     },
+    /** Snap box boundaries to integer values.
+     * If snapStrategy==='out', move boundaries outwards;
+     * if snapStrategy==='nearest', round boundaries to nearest integers.
+     * If `constraints` is provided, clamp resulting box to `constraints`.
+     * Return `undefined` if resulting box collapses to zero-width or zero-height. */
+    snap(box: Box | undefined, snapStrategy: 'out' | 'nearest', constraints?: Box): Box | undefined {
+        if (!box) return undefined;
+
+        let snapped: Box = snapStrategy === 'out' ? {
+            // Snap out
+            xmin: Math.floor(box.xmin),
+            xmax: Math.ceil(box.xmax),
+            ymin: Math.floor(box.ymin),
+            ymax: Math.ceil(box.ymax),
+        } : {
+            // Snap to nearest boundary
+            xmin: Math.round(box.xmin),
+            xmax: Math.round(box.xmax),
+            ymin: Math.round(box.ymin),
+            ymax: Math.round(box.ymax),
+        };
+        if (constraints) {
+            snapped = Box.clamp(snapped, constraints);
+        }
+        if (snapped.xmin === snapped.xmax || snapped.ymin === snapped.ymax) {
+            // Empty box
+            return undefined;
+        }
+        return snapped;
+    },
 };
 
 /** Represents an interval on real numbers */

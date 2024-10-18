@@ -1,14 +1,15 @@
-import { clamp } from 'lodash';
 import { Class } from '../class-names';
 import * as d3 from '../d3-modules';
 import { BehaviorBase, Extension } from '../extension';
-import { XY } from '../scales';
+import { Box, XY } from '../scales';
 
 
 /** Parameters for `BrushExtension` */
 export interface BrushExtensionParams {
     /** Switches brushing on/off */
     enabled: boolean,
+    // TODO snap
+    // TODO closeIcon
 }
 
 /** Default parameter values for `BrushExtension` */
@@ -18,16 +19,21 @@ export const DefaultBrushExtensionParams: BrushExtensionParams = {
 
 
 /** Behavior class for `BrushExtension` (allows selecting a rectangular region by mouse brush gesture, not compatible with zooming!) */
-export class BrushBehavior extends BehaviorBase<BrushExtensionParams> {
+export class BrushBehavior<TX, TY> extends BehaviorBase<BrushExtensionParams> {
     /** D3 brush behavior */
     private readonly brushBehavior: d3.BrushBehavior<unknown> = d3.brush()
         .on('start', event => this.handleBrushStart(event))
+        .on('brush', event => this.handleBrushBrush(event))
         .on('end', event => this.handleBrushEnd(event));
 
     private get svg() { return this.state.dom?.svg; }
 
     /** DOM element to which the brush behavior is bound */
     private targetElement?: d3.Selection<SVGGElement, any, any, any>;
+
+    /** Distinguish between creating a new selection and modifying an existing selection (for snapping purposes) */
+    private _currentBrushAction: 'create' | 'update' | undefined;
+
 
     override register(): void {
         super.register();
@@ -66,52 +72,41 @@ export class BrushBehavior extends BehaviorBase<BrushExtensionParams> {
     }
 
     private handleBrushStart(event: any) {
+        if (!event.sourceEvent) return; // avoid infinite loop
         this.placeCloseIcon(undefined);
+        if (event.selection) {
+            const [[left, top], [right, bottom]] = event.selection;
+            this._currentBrushAction = left === right && top === bottom ? 'create' : 'update';
+        }
+        // TODO
+    }
+
+    private handleBrushBrush(event: any) {
+        if (!event.sourceEvent) return; // avoid infinite loop
+        // TODO
     }
 
     private handleBrushEnd(event: any) {
-        if (!event.sourceEvent) return; // avoid infinite loop from snapping
+        if (!event.sourceEvent) return; // avoid infinite loop from snapping or deselect
+        const snap = true;
+        let worldBox = this.brushSelectionToWorldBox(event.selection);
+        if (snap) {
+            const snapStrategy = this._currentBrushAction === 'update' ? 'nearest' : 'out';
+            worldBox = Box.snap(worldBox, snapStrategy, this.state.boxes.wholeWorld);
+            this.brushBehavior.move(this.targetElement as any, this.worldBoxToBrushSelection(worldBox));
+        }
 
-        if (event.selection) {
-            const [[left, top], [right, bottom]] = event.selection;
-
-            const worldLeft = this.state.scales.canvasToWorld.x(left);
-            const worldRight = this.state.scales.canvasToWorld.x(right);
-            const worldTop = this.state.scales.canvasToWorld.y(top);
-            const worldBottom = this.state.scales.canvasToWorld.y(bottom);
-
-            const xFirstIndex = clamp(Math.round(worldLeft), 0, this.state.dataArray.nColumns - 1);
-            const xLastIndex = clamp(Math.round(worldRight) - 1, 0, this.state.dataArray.nColumns - 1);
-            const yFirstIndex = clamp(Math.round(worldTop), 0, this.state.dataArray.nRows - 1);
-            const yLastIndex = clamp(Math.round(worldBottom) - 1, 0, this.state.dataArray.nRows - 1);
-
-            const xFirst = this.state.xDomain.values[xFirstIndex];
-            const xLast = this.state.xDomain.values[xLastIndex];
-            const yFirst = this.state.yDomain.values[yFirstIndex];
-            const yLast = this.state.yDomain.values[yLastIndex];
-
-            // Snap selection
-            const snapLeft = this.state.scales.worldToCanvas.x(xFirstIndex);
-            const snapRight = this.state.scales.worldToCanvas.x(xLastIndex + 1);
-            const snapTop = this.state.scales.worldToCanvas.y(yFirstIndex);
-            const snapBottom = this.state.scales.worldToCanvas.y(yLastIndex + 1);
-            this.brushBehavior.move(this.targetElement as any, [
-                [snapLeft, snapTop],
-                [snapRight, snapBottom],
-            ], undefined);
-            this.placeCloseIcon({ x: snapRight, y: snapTop });
-
-            this.state.events.brush.next({
-                selection: {
-                    xFirstIndex, xLastIndex, yFirstIndex, yLastIndex,
-                    xFirst, xLast, yFirst, yLast,
-                },
-                sourceEvent: event,
-            });
+        if (worldBox) {
+            this.placeCloseIcon({
+                x: this.state.scales.worldToCanvas.x(worldBox.xmax),
+                y: this.state.scales.worldToCanvas.y(worldBox.ymin),
+            }); // right-top corner
+            this.state.events.brush.next({ type: 'end', selection: this.state.worldBoxToBoxSelection(worldBox), sourceEvent: event });
         } else {
             this.placeCloseIcon(undefined);
-            this.state.events.brush.next({ selection: undefined, sourceEvent: event });
+            this.state.events.brush.next({ type: 'end', selection: undefined, sourceEvent: event });
         }
+        this._currentBrushAction = undefined;
     }
 
     /** Add or remove "close" icon */
@@ -147,7 +142,28 @@ export class BrushBehavior extends BehaviorBase<BrushExtensionParams> {
 
     private deselect(event?: any) {
         this.brushBehavior.clear(this.targetElement as any);
-        this.state.events.brush.next({ selection: undefined, sourceEvent: event });
+        this.placeCloseIcon(undefined);
+        this.state.events.brush.next({ type: 'end', selection: undefined, sourceEvent: event });
+    }
+
+    private brushSelectionToWorldBox(selection: [[number, number], [number, number]] | null | undefined): Box | undefined {
+        if (!selection) return undefined;
+        const [[left, top], [right, bottom]] = selection;
+        const canvasToWorld = this.state.scales.canvasToWorld;
+        return {
+            xmin: canvasToWorld.x(left),
+            xmax: canvasToWorld.x(right),
+            ymin: canvasToWorld.y(top),
+            ymax: canvasToWorld.y(bottom),
+        };
+    }
+    private worldBoxToBrushSelection(worldBox: Box | null | undefined): [[number, number], [number, number]] | null {
+        if (!worldBox) return null;
+        const worldToCanvas = this.state.scales.worldToCanvas;
+        return [
+            [worldToCanvas.x(worldBox.xmin), worldToCanvas.y(worldBox.ymin)],
+            [worldToCanvas.x(worldBox.xmax), worldToCanvas.y(worldBox.ymax)],
+        ];
     }
 }
 

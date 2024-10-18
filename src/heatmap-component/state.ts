@@ -76,18 +76,51 @@ export interface ZoomEventValue<TX, TY> {
     origin?: string,
 }
 
+export interface BoxSelection<TX, TY> {
+    /** Continuous X index corresponding to the left edge of the selected area */
+    xMinIndex: number,
+    /** Continuous X index corresponding to the right edge of the selected area */
+    xMaxIndex: number,
+    /** (Only if the X domain is numeric, strictly sorted (asc or desc), and linear!) Continuous X value corresponding to the left edge of the selected area. */
+    xMin: TX extends number ? number : undefined,
+    /** (Only if the X domain is numeric, strictly sorted (asc or desc), and linear!) Continuous X value corresponding to the right edge of the selected area. */
+    xMax: TX extends number ? number : undefined,
+
+    /** X index of the first (at least partially) selected column` */
+    xFirstIndex: number,
+    /** X index of the last (at least partially) selected column` */
+    xLastIndex: number,
+    /** X value of the first (at least partially) selected column` */
+    xFirst: TX,
+    /** X value of the last (at least partially) selected column` */
+    xLast: TX,
+
+    /** Continuous Y-index corresponding to the top edge of the selected area */
+    yMinIndex: number,
+    /** Continuous Y-index corresponding to the bottom edge of the selected area */
+    yMaxIndex: number,
+    /** (Only if the Y domain is numeric, strictly sorted (asc or desc), and linear!) Continuous Y value corresponding to the top edge of the selected area. */
+    yMin: TY extends number ? number : undefined,
+    /** (Only if the Y domain is numeric, strictly sorted (asc or desc), and linear!) Continuous Y value corresponding to the bottom edge of the selected area. */
+    yMax: TY extends number ? number : undefined,
+
+    /** Y index of the first (at least partially) selected row` */
+    yFirstIndex: number,
+    /** Y index of the last (at least partially) selected row` */
+    yLastIndex: number,
+    /** Y value of the first (at least partially) selected row` */
+    yFirst: TY,
+    /** Y value of the last (at least partially) selected row` */
+    yLast: TY,
+}
+
 /** Emitted on brush event */
 export interface BrushEventValue<TX, TY> {
-    selection: {
-        xFirstIndex: number,
-        xLastIndex: number,
-        yFirstIndex: number,
-        yLastIndex: number,
-        xFirst: TX,
-        xLast: TX,
-        yFirst: TY,
-        yLast: TY,
-    } | undefined;
+    /** Type of brush event (start = brush gesture started, brush = brush gesture in progress, end = brush gesture completed) */
+    type: 'start' | 'brush' | 'end',
+    /** Selected area */
+    selection: BoxSelection<TX, TY> | undefined,
+    /** Source mouse or keyboard event, if any */
     sourceEvent: MouseEvent | KeyboardEvent | undefined,
 }
 
@@ -145,7 +178,7 @@ export class State<TX, TY, TDatum> {
         /** Fires when the user selects/deselects a cell (e.g. by clicking on it) */
         select: new BehaviorSubject<CellEventValue<TX, TY, TDatum>>({ cell: undefined, sourceEvent: undefined }),
         /** Fires when the user selects/deselects a region by brushing */
-        brush: new BehaviorSubject<BrushEventValue<TX, TY>>({ selection: undefined, sourceEvent: undefined }),
+        brush: new BehaviorSubject<BrushEventValue<TX, TY>>({ type: 'end', selection: undefined, sourceEvent: undefined }),
         /** Fires when the component is zoomed in or out, or panned (translated) */
         zoom: new BehaviorSubject<ZoomEventValue<TX, TY> | undefined>(undefined),
         /** Fires when the window is resized. Subject value is the size of the canvas in pixels. */
@@ -235,18 +268,42 @@ export class State<TX, TY, TDatum> {
      * `origin` is an identifier of the event originator
      * (to avoid infinite loop when multiple component listen to zoom and change it). */
     private getZoomEventValue(origin: string | undefined): ZoomEventValue<TX, TY> | undefined {
-        const box = this.boxes.visWorld;
+        const value = this.worldBoxToBoxSelection(this.boxes.visWorld);
+        if (!value) return undefined;
+        return {
+            xMinIndex: value.xMinIndex,
+            xMaxIndex: value.xMaxIndex,
+            xMin: value.xMin,
+            xMax: value.xMax,
+            xFirstVisibleIndex: value.xFirstIndex,
+            xLastVisibleIndex: value.xLastIndex,
+            xFirstVisible: value.xFirst,
+            xLastVisible: value.xLast,
+            yMinIndex: value.yMinIndex,
+            yMaxIndex: value.yMaxIndex,
+            yMin: value.yMin,
+            yMax: value.yMax,
+            yFirstVisibleIndex: value.yFirstIndex,
+            yLastVisibleIndex: value.yLastIndex,
+            yFirstVisible: value.yFirst,
+            yLastVisible: value.yLast,
+            origin,
+        };
+    }
+
+    /** Convert world box to BoxSelection (i.e. richer info about the box, considering xAlignment, yAlignment) */
+    worldBoxToBoxSelection(box: Box | undefined): BoxSelection<TX, TY> | undefined {
         if (!box) return undefined;
 
         const xMinIndex_ = round(box.xmin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
         const xMaxIndex_ = round(box.xmax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for xAlignment left
-        const xFirstVisibleIndex = clamp(Math.floor(xMinIndex_), 0, this.dataArray.nColumns - 1);
-        const xLastVisibleIndex = clamp(Math.ceil(xMaxIndex_) - 1, 0, this.dataArray.nColumns - 1);
+        const xFirstIndex = clamp(Math.floor(xMinIndex_), 0, this.dataArray.nColumns - 1);
+        const xLastIndex = clamp(Math.ceil(xMaxIndex_) - 1, 0, this.dataArray.nColumns - 1);
 
         const yMinIndex_ = round(box.ymin, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
         const yMaxIndex_ = round(box.ymax, ZOOM_EVENT_ROUNDING_PRECISION); // This only holds for yAlignment top
-        const yFirstVisibleIndex = clamp(Math.floor(yMinIndex_), 0, this.dataArray.nRows - 1);
-        const yLastVisibleIndex = clamp(Math.ceil(yMaxIndex_) - 1, 0, this.dataArray.nRows - 1);
+        const yFirstIndex = clamp(Math.floor(yMinIndex_), 0, this.dataArray.nRows - 1);
+        const yLastIndex = clamp(Math.ceil(yMaxIndex_) - 1, 0, this.dataArray.nRows - 1);
 
         const xShift = indexAlignmentShift(this.xAlignment);
         const yShift = indexAlignmentShift(this.yAlignment);
@@ -256,21 +313,19 @@ export class State<TX, TY, TDatum> {
             xMaxIndex: xMaxIndex_ + xShift,
             xMin: Domain.interpolateValue(this.xDomain, xMinIndex_ + xShift),
             xMax: Domain.interpolateValue(this.xDomain, xMaxIndex_ + xShift),
-            xFirstVisibleIndex,
-            xLastVisibleIndex,
-            xFirstVisible: this.xDomain.values[xFirstVisibleIndex],
-            xLastVisible: this.xDomain.values[xLastVisibleIndex],
+            xFirstIndex,
+            xLastIndex,
+            xFirst: this.xDomain.values[xFirstIndex],
+            xLast: this.xDomain.values[xLastIndex],
 
             yMinIndex: yMinIndex_ + yShift,
             yMaxIndex: yMaxIndex_ + yShift,
             yMin: Domain.interpolateValue(this.yDomain, yMinIndex_ + yShift),
             yMax: Domain.interpolateValue(this.yDomain, yMaxIndex_ + yShift),
-            yFirstVisibleIndex,
-            yLastVisibleIndex,
-            yFirstVisible: this.yDomain.values[yFirstVisibleIndex],
-            yLastVisible: this.yDomain.values[yLastVisibleIndex],
-
-            origin: origin,
+            yFirstIndex,
+            yLastIndex,
+            yFirst: this.yDomain.values[yFirstIndex],
+            yLast: this.yDomain.values[yLastIndex],
         };
     }
 

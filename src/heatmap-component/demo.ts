@@ -48,6 +48,10 @@ export function demo1(divElementOrId: HTMLDivElement | string): void {
             setTextContent('#xmaxindex', e.xMaxIndex);
             setTextContent('#xmin', e.xMin);
             setTextContent('#xmax', e.xMax);
+            setTextContent('#xfirstvisibleindex', e.xFirstVisibleIndex, 0);
+            setTextContent('#xlastvisibleindex', e.xLastVisibleIndex, 0);
+            setTextContent('#xfirstvisible', e.xFirstVisible, 0);
+            setTextContent('#xlastvisible', e.xLastVisible, 0);
         }
     });
     heatmap.setZooming({ axis: 'x' });
@@ -99,7 +103,7 @@ export async function demo4(divElementOrId: HTMLDivElement | string): Promise<vo
     const uniprotIdFromUrl = new URL(window.location as unknown as string).searchParams.get('uniprot-id');
     const uniprotId = uniprotIdFromUrl ?? 'P06213'; // try Q5VSL9, P06213
     setTextContent('#uniprot-id', uniprotId);
-    const pae = await fetchPAEMatrix(uniprotId, undefined);
+    const pae = await fetchPAEMatrix(uniprotId, 10);
     if (!pae) {
         const msg = `Failed to fetch data for ${uniprotId}.`;
         setTextContent('#error', `Error: ${msg}`);
@@ -114,8 +118,7 @@ export async function demo4(divElementOrId: HTMLDivElement | string): Promise<vo
     });
     const colorScale = ColorScale.continuous('Greens', [0, 32], [1, 0]);
     heatmap.setColor(d => colorScale(d));
-    heatmap.setTooltip((d, x, y) => `Scored residue (x): ${x}<br>Aligned residue (y): ${y}<br>PAE: ${d}`);
-    // heatmap.extensions.tooltip?.update({ pinnable: false });
+    heatmap.setTooltip(null);
     heatmap.extensions.marker?.update({ freeze: true });
     heatmap.setBrushing({ enabled: true });
     heatmap.events.brush.subscribe(e => {
