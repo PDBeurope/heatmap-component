@@ -262,9 +262,37 @@ heatmap.setAlignment('left', 'top');
 
 ---
 
+## Brushing
+
+Brushing is the interactive specification of a two-dimensional region using a pointing gesture, such as by clicking and dragging the mouse. This interactive behavior is implemented via `BrushExtension` and can be turned on by the `setBrushing` method. Brushing events can be listened to via `events.brush`.
+
+### `setBrushing`
+
+This method is used to enable and customize brushing behavior.
+
+```ts
+setBrushing(params: Partial<BrushExtensionParams>): this
+
+// Example usage:
+heatmap.setBrushing({ enabled: true, snap: true, closeButton: true }); // Turn on brushing
+// Selected region will be snapped to the nearest column and row boundary when mouse button is released
+// "Close" button will be shown in the corner of the selected region
+
+heatmap.events.brush.subscribe(e => {
+    // Listen to brush selection changes
+    if (e.type === 'end') {
+        console.log('Selection completed:', e);
+    } else {
+        console.log('Selection in progress:', e);
+    }
+});
+```
+
+---
+
 ## Extension customization
 
-Each of the [builtin extensions](./architecture.md#extensions) (Draw, Marker, Tooltip, Zoom) has a set of parameters, initially set to their default values. The parameter values can be changed via `update` method.
+Each of the [builtin extensions](./architecture.md#extensions) (Draw, Marker, Tooltip, Zoom, Brush) has a set of parameters, initially set to their default values. The parameter values can be changed via `update` method.
 
 ```ts
 // Example usage:
@@ -273,7 +301,7 @@ heatmap.extensions.marker?.update({ freeze: true }); // Disable markers
 heatmap.extensions.marker?.update({ freeze: false, markerCornerRadius: 5 }); // Enable markers, with round corners
 ```
 
-Note: Some of the extension parameters are also exposed via other methods, e.g. `setVisualParams` or `setZooming`.
+Note: Some of the extension parameters are also exposed via other methods, e.g. `setVisualParams`, `setZooming`, `setBrushing`.
 
 ### Custom extensions
 

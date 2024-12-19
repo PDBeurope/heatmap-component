@@ -6,9 +6,9 @@ HeatmapComponent uses a modular architecture designed to provide flexible functi
 
 - [**State**](../src/heatmap-component/state.ts) class encapsulates the state of a heatmap instance. Synchronization of the heatmap instance and registered extensions is done by sharing the same State object. State also provides events that the extensions (and client code) can subscribe to.
 
-- [**Extensions**](../src/heatmap-component/extension.ts) are used to add behavior to a heatmap instance. Each extension describes how to create, register, update, and unregister a Behavior object. Flexibility is achieved through parameters, which can be set during the Behavior creation and updated later. Essential builtin extensions (Draw, Marker, Tooltip, Zoom) are implemented in [/src/heatmap-component/extensions](../src/heatmap-component/extensions/); users can implement custom extensions in a similar manner.
+- [**Extensions**](../src/heatmap-component/extension.ts) are used to add behavior to a heatmap instance. Each extension describes how to create, register, update, and unregister a Behavior object. Flexibility is achieved through parameters, which can be set during the Behavior creation and updated later. Essential builtin extensions (Draw, Marker, Tooltip, Zoom, Brush) are implemented in [/src/heatmap-component/extensions](../src/heatmap-component/extensions/); users can implement custom extensions in a similar manner.
 
-- [**Heatmap**](../src/heatmap-component/heatmap.ts) class represents the main entry point for users of the heatmap-component package. It extends HeatmapCore by registering essential builtin extensions (Draw, Marker, Tooltip, Zoom) and implementing useful public methods for interacting with heatmap instances.
+- [**Heatmap**](../src/heatmap-component/heatmap.ts) class represents the main entry point for users of the heatmap-component package. It extends HeatmapCore by registering essential builtin extensions (Draw, Marker, Tooltip, Zoom, Brush) and implementing useful public methods for interacting with heatmap instances.
 
 - [**heatmap-component.css**](../src/heatmap-component.css) defines styling for all parts of the heatmap component. Appearance of the heatmap can be customized by overriding the styles defined here. 
 
