@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+## [1.1.0] - 2024-12-19
+
 -   BrushExtension
 
 ## [1.0.1] - 2024-07-04
