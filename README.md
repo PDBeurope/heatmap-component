@@ -16,6 +16,7 @@ The goal of HeatmapComponent is to provide a tool for visualizing two-dimensiona
     -   Zooming (currently only in x-axis direction)
     -   Markers: highlighting current column, row, and data item
     -   Tooltips: showing custom content when the user hovers or clicks a data item
+    -   Brushing: interactive selection of 2D regions
 -   Efficient canvas-based rendering: smooth visualizations even with millions of data items
 -   Integrability with other components via exposed events (hover, select, zoom...)
 -   Extensibility: new behaviors can be added via extensions
