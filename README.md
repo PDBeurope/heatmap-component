@@ -2,6 +2,8 @@
 
 # HeatmapComponent
 
+[![Published on NPM](https://img.shields.io/npm/v/heatmap-component.svg)](https://www.npmjs.com/package/heatmap-component)
+
 TypeScript library for creating interactive grid heatmaps.
 
 The goal of HeatmapComponent is to provide a tool for visualizing two-dimensional data in the form of grid heatmaps. It focuses on interactivity, performance, and customizability.
