@@ -65,6 +65,9 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
         this.subscribe(this.state.events.zoom, () => {
             this.requestDraw();
         });
+        this.subscribe(this.state.events.resize, () => {
+            this.requestDraw();
+        });
         this.subscribe(this.state.events.data, () => {
             this.downsampler = undefined;
             this.requestDraw();
@@ -101,8 +104,8 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
     /** Do not call directly! Call `requestDraw` instead to avoid browser freezing. */
     private _draw(): void {
         if (!this.state.dom) return;
-        const xResolution = Box.width(this.state.boxes.canvas) / this.downsamplingPixelsPerRect;
-        const yResolution = Box.height(this.state.boxes.canvas) / this.downsamplingPixelsPerRect;
+        const xResolution = Box.width(this.state.boxes.canvasContext) / this.downsamplingPixelsPerRect;
+        const yResolution = Box.height(this.state.boxes.canvasContext) / this.downsamplingPixelsPerRect;
         this.downsampler ??= Downsampler.fromImage(this.computeFullImage());
         const downsampledImage = Downsampler.getDownsampled(this.downsampler, {
             x: xResolution * Box.width(this.state.boxes.wholeWorld) / (Box.width(this.state.boxes.visWorld)),
@@ -148,10 +151,10 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
     private drawThisImage(image: Image, xScale: number, yScale: number): void {
         if (!this.state.dom || !this.ctx) return;
         this.resizeCanvas(); // Doing this here rather than in 'resize' event handler, to avoid flickering on resize ;)
-        const rectWidth = scaleDistance(this.state.scales.worldToCanvas.x, 1) * xScale;
-        const rectHeight = scaleDistance(this.state.scales.worldToCanvas.y, 1) * yScale;
-        const showXGaps = Box.width(this.state.boxes.canvas) > this.params.minRectSizeForGaps * Box.width(this.state.boxes.visWorld);
-        const showYGaps = Box.height(this.state.boxes.canvas) > this.params.minRectSizeForGaps * Box.height(this.state.boxes.visWorld);
+        const rectWidth = scaleDistance(this.state.scales.worldToCanvasContext.x, 1) * xScale;
+        const rectHeight = scaleDistance(this.state.scales.worldToCanvasContext.y, 1) * yScale;
+        const showXGaps = Box.width(this.state.boxes.canvasContext) > this.params.minRectSizeForGaps * Box.width(this.state.boxes.visWorld);
+        const showYGaps = Box.height(this.state.boxes.canvasContext) > this.params.minRectSizeForGaps * Box.height(this.state.boxes.visWorld);
         const xHalfGap = showXGaps ? 0.5 * this.getXGap(rectWidth) : 0;
         const yHalfGap = showYGaps ? 0.5 * this.getYGap(rectHeight) : 0;
         const globalOpacity =
@@ -166,11 +169,11 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
 
         const canvasImage = this.getCleanCanvasImage();
         for (let iy = rowFrom; iy < rowTo; iy++) {
-            const y = this.state.scales.worldToCanvas.y(iy * yScale);
+            const y = this.state.scales.worldToCanvasContext.y(iy * yScale);
             const yFrom = y + yHalfGap;
             const yTo = y + rectHeight - yHalfGap;
             for (let ix = colFrom; ix < colTo; ix++) {
-                const x = this.state.scales.worldToCanvas.x(ix * xScale);
+                const x = this.state.scales.worldToCanvasContext.x(ix * xScale);
                 const xFrom = x + xHalfGap;
                 const xTo = x + rectWidth - xHalfGap;
                 const color = Image.getColor(image, ix, iy);
@@ -179,15 +182,15 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
         }
         const imageData = Image.toImageData(canvasImage, this.getCanvasImageData());
 
-        this.ctx.clearRect(0, 0, Box.width(this.state.boxes.canvas), Box.height(this.state.boxes.canvas));
+        this.ctx.clearRect(0, 0, Box.width(this.state.boxes.canvasContext), Box.height(this.state.boxes.canvasContext));
         this.ctx.putImageData(imageData, 0, 0);
     }
 
     /** Adjust the logical size of the canvas to its current DOM size */
     private resizeCanvas(): void {
         if (!this.ctx) return;
-        const width = Math.floor(Box.width(this.state.boxes.canvas)); // Canvas context would round it down anyway
-        const height = Math.floor(Box.height(this.state.boxes.canvas)); // Canvas context would round it down anyway
+        const width = Math.floor(Box.width(this.state.boxes.canvasContext)); // Canvas context would round it down anyway
+        const height = Math.floor(Box.height(this.state.boxes.canvasContext)); // Canvas context would round it down anyway
         if (this.ctx.canvas.width !== width) {
             this.ctx.canvas.width = width;
         }

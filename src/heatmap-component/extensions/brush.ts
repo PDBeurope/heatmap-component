@@ -115,8 +115,8 @@ export class BrushBehavior<TX, TY> extends BehaviorBase<BrushExtensionParams> {
         const BUTTON_SIZE = 16;
         const canvasPosition: XY | undefined = worldBox ?
             {
-                x: Math.min(this.state.scales.worldToCanvas.x(worldBox.xmax), this.state.boxes.canvas.xmax - 0.7 * BUTTON_SIZE),
-                y: Math.max(this.state.scales.worldToCanvas.y(worldBox.ymin), this.state.boxes.canvas.ymin + 0.7 * BUTTON_SIZE),
+                x: Math.min(this.state.scales.worldToSvg.x(worldBox.xmax), this.state.boxes.svg.xmax - 0.7 * BUTTON_SIZE),
+                y: Math.max(this.state.scales.worldToSvg.y(worldBox.ymin), this.state.boxes.svg.ymin + 0.7 * BUTTON_SIZE),
             }
             : undefined;
         if (!this.svg) return;
@@ -158,20 +158,20 @@ export class BrushBehavior<TX, TY> extends BehaviorBase<BrushExtensionParams> {
     private brushSelectionToWorldBox(selection: [[number, number], [number, number]] | null | undefined): Box | undefined {
         if (!selection) return undefined;
         const [[left, top], [right, bottom]] = selection;
-        const canvasToWorld = this.state.scales.canvasToWorld;
+        const svgToWorld = this.state.scales.svgToWorld;
         return {
-            xmin: canvasToWorld.x(left),
-            xmax: canvasToWorld.x(right),
-            ymin: canvasToWorld.y(top),
-            ymax: canvasToWorld.y(bottom),
+            xmin: svgToWorld.x(left),
+            xmax: svgToWorld.x(right),
+            ymin: svgToWorld.y(top),
+            ymax: svgToWorld.y(bottom),
         };
     }
     private worldBoxToBrushSelection(worldBox: Box | null | undefined): [[number, number], [number, number]] | null {
         if (!worldBox) return null;
-        const worldToCanvas = this.state.scales.worldToCanvas;
+        const worldToSvg = this.state.scales.worldToSvg;
         return [
-            [worldToCanvas.x(worldBox.xmin), worldToCanvas.y(worldBox.ymin)],
-            [worldToCanvas.x(worldBox.xmax), worldToCanvas.y(worldBox.ymax)],
+            [worldToSvg.x(worldBox.xmin), worldToSvg.y(worldBox.ymin)],
+            [worldToSvg.x(worldBox.xmax), worldToSvg.y(worldBox.ymax)],
         ];
     }
 }

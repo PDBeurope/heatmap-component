@@ -152,10 +152,12 @@ export class State<TX, TY, TDatum> {
     get yAlignment() { return this._yAlignment; }
     private _yAlignment: YAlignmentMode = 'top';
 
-    /** Extent of the data world and canvas */
-    boxes: Boxes = { wholeWorld: Box.create(0, 0, 1, 1), visWorld: Box.create(0, 0, 1, 1), canvas: Box.create(0, 0, 1, 1) };
-    /** Conversion between the data world and canvas coordinates */
+    /** Extent of the data world, SVG, and canvas context */
+    boxes: Boxes = { wholeWorld: Box.create(0, 0, 1, 1), visWorld: Box.create(0, 0, 1, 1), svg: Box.create(0, 0, 1, 1), canvasContext: Box.create(0, 0, 1, 1) };
+    /** Conversion between the data world, SVG, and canvas context coordinates */
     scales: Scales = Scales(this.boxes);
+    /** Ratio between the size of the canvas context and CSS size of the canvas/SVG. This is dynamically adjusted so that 1 physical screen pixel corresponds to 1 canvas context pixel. */
+    canvasScale: number = 1;
 
     /** DOM elements managed by this component */
     dom?: {
@@ -233,8 +235,8 @@ export class State<TX, TY, TDatum> {
         if (!event) {
             return undefined;
         }
-        const xIndex = Math.floor(this.scales.canvasToWorld.x(event.offsetX));
-        const yIndex = Math.floor(this.scales.canvasToWorld.y(event.offsetY));
+        const xIndex = Math.floor(this.scales.svgToWorld.x(event.offsetX));
+        const yIndex = Math.floor(this.scales.svgToWorld.y(event.offsetY));
         const datum = Array2D.get(this.dataArray, xIndex, yIndex);
         const x = this.xDomain.values[xIndex];
         const y = this.yDomain.values[yIndex];

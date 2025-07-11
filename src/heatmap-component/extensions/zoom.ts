@@ -111,7 +111,7 @@ export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
         if (this.zoomBehavior) {
             const action = this.wheelAction(e);
             if (action.kind === 'pan') {
-                const shiftX = this.params.panSensitivity * scaleDistance(this.state.scales.canvasToWorld.x, action.deltaX);
+                const shiftX = this.params.panSensitivity * scaleDistance(this.state.scales.svgToWorld.x, action.deltaX);
                 this.zoomBehavior.duration(1000).translateBy(this.targetElement as any, shiftX, 0);
             }
             if (action.kind === 'showHelp') {
@@ -145,13 +145,13 @@ export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
         if (!this.state.dom) return;
         if (!this.zoomBehavior) return;
         this.zoomBehavior.translateExtent([[this.state.boxes.wholeWorld.xmin, -Infinity], [this.state.boxes.wholeWorld.xmax, Infinity]]);
-        const canvasWidth = Box.width(this.state.boxes.canvas);
+        const canvasWidth = Box.width(this.state.boxes.svg);
         const wholeWorldWidth = Box.width(this.state.boxes.wholeWorld);
         const minZoom = canvasWidth / wholeWorldWidth; // zoom-out
         const minZoomedDatapoints = Math.max(this.params.minZoomedDatapoints, MIN_ZOOMED_DATAPOINTS_HARD);
         const maxZoom = Math.max(canvasWidth / minZoomedDatapoints, minZoom); // zoom-in
         this.zoomBehavior.scaleExtent([minZoom, maxZoom]);
-        this.zoomBehavior.extent([[this.state.boxes.canvas.xmin, this.state.boxes.canvas.ymin], [this.state.boxes.canvas.xmax, this.state.boxes.canvas.ymax]]);
+        this.zoomBehavior.extent([[this.state.boxes.svg.xmin, this.state.boxes.svg.ymin], [this.state.boxes.svg.xmax, this.state.boxes.svg.ymax]]);
     }
 
     /** Synchronize the state of the zoom behavior with the visWorld box (e.g. when canvas resizes) */
@@ -168,15 +168,15 @@ export class ZoomBehavior extends BehaviorBase<ZoomExtensionParams> {
     private zoomTransformToVisWorld(transform: { k: number, x: number, y: number }): Box {
         return {
             ...this.state.boxes.visWorld, // preserve Y zoom
-            xmin: (this.state.boxes.canvas.xmin - transform.x) / transform.k,
-            xmax: (this.state.boxes.canvas.xmax - transform.x) / transform.k,
+            xmin: (this.state.boxes.svg.xmin - transform.x) / transform.k,
+            xmax: (this.state.boxes.svg.xmax - transform.x) / transform.k,
         };
     }
 
     /** Convert visWorld box to zoom transform */
     private visWorldToZoomTransform(visWorld: Box): d3.ZoomTransform {
-        const k = (this.state.boxes.canvas.xmax - this.state.boxes.canvas.xmin) / (visWorld.xmax - visWorld.xmin);
-        const x = this.state.boxes.canvas.xmin - k * visWorld.xmin;
+        const k = (this.state.boxes.svg.xmax - this.state.boxes.svg.xmin) / (visWorld.xmax - visWorld.xmin);
+        const x = this.state.boxes.svg.xmin - k * visWorld.xmin;
         const y = 0;
         return new d3.ZoomTransform(k, x, y);
     }

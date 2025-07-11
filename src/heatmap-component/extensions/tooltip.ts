@@ -78,8 +78,8 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
         this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox).remove();
         if (pointed.cell?.datum !== undefined && this.params.tooltipProvider && this.params.pinnable && pointed.sourceEvent) {
             this.pinnedTooltip = {
-                x: this.state.scales.canvasToWorld.x(pointed.sourceEvent.offsetX),
-                y: this.state.scales.canvasToWorld.y(pointed.sourceEvent.offsetY),
+                x: this.state.scales.svgToWorld.x(pointed.sourceEvent.offsetX),
+                y: this.state.scales.svgToWorld.y(pointed.sourceEvent.offsetY),
             };
             const tooltipPosition = this.getTooltipPosition(pointed.sourceEvent);
             const tooltipText = this.params.tooltipProvider(pointed.cell.datum, pointed.cell.x, pointed.cell.y, pointed.cell.xIndex, pointed.cell.yIndex);
@@ -120,8 +120,8 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
     private updatePinnedTooltipPosition(): void {
         if (this.state.dom && this.pinnedTooltip) {
             const domPosition = {
-                offsetX: this.state.scales.worldToCanvas.x(this.pinnedTooltip.x),
-                offsetY: this.state.scales.worldToCanvas.y(this.pinnedTooltip.y),
+                offsetX: this.state.scales.worldToSvg.x(this.pinnedTooltip.x),
+                offsetY: this.state.scales.worldToSvg.y(this.pinnedTooltip.y),
             };
             attrd(this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox), {
                 style: this.getTooltipPosition(domPosition),
@@ -132,8 +132,8 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
     /** Return tooltip position as CSS style parameters (for position:absolute within this.canvasDiv) for mouse event `e` triggered on this.svg.  */
     private getTooltipPosition(e: MouseEvent | { offsetX: number, offsetY: number }) {
         const left = `${(e.offsetX ?? 0)}px`;
-        const bottom = `${Box.height(this.state.boxes.canvas) - (e.offsetY ?? 0)}px`;
-        const display = Box.containsPoint(this.state.boxes.canvas, { x: e.offsetX, y: e.offsetY }) ? 'unset' : 'none';
+        const bottom = `${Box.height(this.state.boxes.svg) - (e.offsetY ?? 0)}px`;
+        const display = Box.containsPoint(this.state.boxes.svg, { x: e.offsetX, y: e.offsetY }) ? 'unset' : 'none';
         return { left, bottom, display };
     }
 }

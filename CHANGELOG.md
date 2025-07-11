@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file, following t
 
 - Fixed canvas resize handling
 - Show "pointer" cursor when hovering over a cell with data
+- Adjust canvas context size for browser zoom and physical screen resolution
 
 ## [1.1.0] - 2024-12-19
 

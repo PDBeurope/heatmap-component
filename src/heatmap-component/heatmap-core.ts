@@ -23,10 +23,20 @@ export class HeatmapCore<TX, TY, TDatum> {
 
         this.state.events.resize.subscribe(size => {
             if (!size) return;
-            const box = Box.create(0, 0, size.width, size.height);
-            this.state.boxes.canvas = box;
+            const canvasScale = this.state.canvasScale;
+            this.state.boxes.svg = Box.create(0, 0, size.width, size.height);
+            this.state.boxes.canvasContext = Box.create(0, 0, canvasScale * size.width, canvasScale * size.height);
             this.state.scales = Scales(this.state.boxes);
         });
+        this.state.events.hover.subscribe(e => this.state.dom?.svg.attr('pointing-data', (e.cell?.datum !== undefined) ? '' : null));
+    }
+
+    /** Update `canvasScale` based on screen resolution and browser zoom level. */
+    private updateCanvasScale() {
+        const devicePixelRatio = window?.devicePixelRatio ?? 1;
+        if (devicePixelRatio === this.state.canvasScale) return;
+        this.state.canvasScale = devicePixelRatio;
+        this.state.events.resize.next(this.state.events.resize.value);
     }
 
     /** Register an extension with this heatmap, i.e. create a behavior bound to the state of this heatmap. */
@@ -93,13 +103,14 @@ export class HeatmapCore<TX, TY, TDatum> {
             cell: this.state.getPointedCell(e),
             sourceEvent: e,
         }));
-        this.state.events.hover.subscribe(e => this.state.dom?.svg.attr('pointing-data', (e.cell?.datum !== undefined) ? '' : null));
 
         this.state.events.render.next(undefined);
         this.sizeObserver = new ResizeObserver(() => this.state.emitResize());
         for (const node of canvas.nodes()) {
             this.sizeObserver.observe(node);
         }
+        this.updateCanvasScale();
+        d3.select(window).on('resize.updateCanvasScale', () => this.updateCanvasScale());
 
         return this;
     }

@@ -114,10 +114,14 @@ export interface Boxes {
     wholeWorld: Box,
     /** Part of the world which maps to the viewport */
     visWorld: Box,
-    /** Viewport in the canvas coordinates (starts at [0,0]), measured in pixels.
-     * These coordinates can be used both for interactivity via DOM events and for drawing via canvas context,
-     * because the logical size of the canvas is synchronized with its DOM size. */
-    canvas: Box,
+    /** Viewport in the SVG/canvas coordinates (starts at [0,0]), measured in CSS pixels.
+     * These coordinates are used interactivity via DOM events. */
+    svg: Box,
+    /** Viewport in the canvas context coordinates (starts at [0,0]), measured in "logical pixels".
+     * These coordinates are for drawing via canvas context.
+     * This may be different from `svg` because the size of canvas context is adjusted for browser zoom and physical screen resolution!
+     * 1 pixel in this space should correspond to 1 physical screen pixel. */
+    canvasContext: Box,
 }
 
 /** Pair of scales for X and Y coordinates */
@@ -130,10 +134,14 @@ interface XYScale {
 
 /** Scales needed to implement zoom transformation and related stuff */
 export interface Scales {
-    /** Scale from world coordinates to canvas coordinates */
-    worldToCanvas: XYScale,
-    /** Scale from canvas coordinates to world coordinates */
-    canvasToWorld: XYScale,
+    /** Scale from world coordinates to SVG coordinates */
+    worldToSvg: XYScale,
+    /** Scale from SVG coordinates to world coordinates */
+    svgToWorld: XYScale,
+    /** Scale from world coordinates to canvas context coordinates */
+    worldToCanvasContext: XYScale,
+    /** Scale from canvas context coordinates to world coordinates */
+    canvasContextToWorld: XYScale,
 }
 
 function getXScale(source: Box, dest: Box): d3.ScaleLinear<number, number> {
@@ -145,13 +153,21 @@ function getYScale(source: Box, dest: Box): d3.ScaleLinear<number, number> {
 
 export function Scales(boxes: Boxes): Scales {
     return {
-        worldToCanvas: {
-            x: getXScale(boxes.visWorld, boxes.canvas),
-            y: getYScale(boxes.visWorld, boxes.canvas),
+        worldToSvg: {
+            x: getXScale(boxes.visWorld, boxes.svg),
+            y: getYScale(boxes.visWorld, boxes.svg),
         },
-        canvasToWorld: {
-            x: getXScale(boxes.canvas, boxes.visWorld),
-            y: getYScale(boxes.canvas, boxes.visWorld),
+        svgToWorld: {
+            x: getXScale(boxes.svg, boxes.visWorld),
+            y: getYScale(boxes.svg, boxes.visWorld),
+        },
+        worldToCanvasContext: {
+            x: getXScale(boxes.visWorld, boxes.canvasContext),
+            y: getYScale(boxes.visWorld, boxes.canvasContext),
+        },
+        canvasContextToWorld: {
+            x: getXScale(boxes.canvasContext, boxes.visWorld),
+            y: getYScale(boxes.canvasContext, boxes.visWorld),
         },
     };
 }

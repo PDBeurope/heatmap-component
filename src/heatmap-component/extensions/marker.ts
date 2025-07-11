@@ -46,18 +46,18 @@ export class MarkerBehavior extends BehaviorBase<MarkerExtensionParams> {
         const yIndex = (pointed?.yIndex !== undefined) ? pointed.yIndex : this.state.yDomain.index.get(pointed?.y);
         this.currentlyMarked.xIndex = xIndex;
         this.currentlyMarked.yIndex = yIndex;
-        const xCoord = (xIndex !== undefined) ? this.state.scales.worldToCanvas.x(xIndex) : undefined;
-        const yCoord = (yIndex !== undefined) ? this.state.scales.worldToCanvas.y(yIndex) : undefined;
-        const width = scaleDistance(this.state.scales.worldToCanvas.x, 1);
-        const height = scaleDistance(this.state.scales.worldToCanvas.y, 1);
+        const xCoord = (xIndex !== undefined) ? this.state.scales.worldToSvg.x(xIndex) : undefined;
+        const yCoord = (yIndex !== undefined) ? this.state.scales.worldToSvg.y(yIndex) : undefined;
+        const width = scaleDistance(this.state.scales.worldToSvg.x, 1);
+        const height = scaleDistance(this.state.scales.worldToSvg.y, 1);
         const staticAttrs = { rx: this.params.markerCornerRadius, ry: this.params.markerCornerRadius };
         // Column marker
         if (xCoord !== undefined) {
             this.addOrUpdateMarker(Class.MarkerX, staticAttrs, {
                 x: xCoord,
-                y: this.state.boxes.canvas.ymin,
+                y: this.state.boxes.svg.ymin,
                 width,
-                height: Box.height(this.state.boxes.canvas),
+                height: Box.height(this.state.boxes.svg),
             });
         } else {
             this.removeMarker(Class.MarkerX);
@@ -65,9 +65,9 @@ export class MarkerBehavior extends BehaviorBase<MarkerExtensionParams> {
         // Row marker
         if (yCoord !== undefined) {
             this.addOrUpdateMarker(Class.MarkerY, staticAttrs, {
-                x: this.state.boxes.canvas.xmin,
+                x: this.state.boxes.svg.xmin,
                 y: yCoord,
-                width: Box.width(this.state.boxes.canvas),
+                width: Box.width(this.state.boxes.svg),
                 height,
             });
         } else {
