@@ -93,6 +93,7 @@ export class HeatmapCore<TX, TY, TDatum> {
             cell: this.state.getPointedCell(e),
             sourceEvent: e,
         }));
+        this.state.events.hover.subscribe(e => this.state.dom?.svg.attr('pointing-data', (e.cell?.datum !== undefined) ? '' : null));
 
         this.state.events.render.next(undefined);
         this.sizeObserver = new ResizeObserver(() => this.state.emitResize());

@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file, following t
 ## [Unreleased]
 
 - Fixed canvas resize handling
+- Show "pointer" cursor when hovering over a cell with data
 
 ## [1.1.0] - 2024-12-19
 

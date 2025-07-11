@@ -133,7 +133,7 @@ heatmap.setTooltip('default'); // reset default tooltip content
 
 All elements of the heatmap component are styled via [this CSS](../src/heatmap-component.css). You can override the styles for classes defined there to customize the appearance of the component.
 
-This includes e.g. background color, marker, and tooltip style. However, the elements that are visualized in canvas (i.e. the colored rectangles) cannot be styled in this way.
+This includes e.g. background color, cursor shape, marker, and tooltip style. However, the elements that are visualized in canvas (i.e. the colored rectangles) cannot be styled in this way.
 
 ---
 
