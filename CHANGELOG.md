@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+- Fixed canvas resize handling
+
 ## [1.1.0] - 2024-12-19
 
 -   BrushExtension

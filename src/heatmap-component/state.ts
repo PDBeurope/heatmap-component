@@ -160,15 +160,15 @@ export class State<TX, TY, TDatum> {
     /** DOM elements managed by this component */
     dom?: {
         /** Root div in which the whole heatmap component is rendered (passed to the `render` method) */
-        rootDiv: d3.Selection<HTMLDivElement, any, any, any>;
+        readonly rootDiv: d3.Selection<HTMLDivElement, any, any, any>;
         /** Position-relative div covering the whole area of the heatmap component */
-        mainDiv: d3.Selection<HTMLDivElement, any, any, any>;
+        readonly mainDiv: d3.Selection<HTMLDivElement, any, any, any>;
         /** Div covering the canvas area */
-        canvasDiv: d3.Selection<HTMLDivElement, any, any, any>;
+        readonly canvasDiv: d3.Selection<HTMLDivElement, any, any, any>;
         /** Canvas element for rendering the data */
-        canvas: d3.Selection<HTMLCanvasElement, any, any, any>;
+        readonly canvas: d3.Selection<HTMLCanvasElement, any, any, any>;
         /** SVG element for handling HTML events and rendering simple things (e.g. markers) */
-        svg: d3.Selection<SVGSVGElement, any, any, any>;
+        readonly svg: d3.Selection<SVGSVGElement, any, any, any>;
     };
 
     /** Custom events fired by the heatmap component, all are RxJS `BehaviorSubject` */

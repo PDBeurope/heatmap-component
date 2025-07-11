@@ -16,6 +16,8 @@ export class HeatmapCore<TX, TY, TDatum> {
      * Shared between the heatmap instance and all registered behaviors. */
     protected readonly state: State<TX, TY, TDatum>;
 
+    private sizeObserver?: ResizeObserver;
+
     constructor(dataDescription: DataDescription<TX, TY, TDatum>) {
         this.state = new State(dataDescription);
 
@@ -93,14 +95,19 @@ export class HeatmapCore<TX, TY, TDatum> {
         }));
 
         this.state.events.render.next(undefined);
-        this.state.emitResize();
-        d3.select(window).on('resize.resizeheatmapcanvas', () => this.state.emitResize());
+        this.sizeObserver = new ResizeObserver(() => this.state.emitResize());
+        for (const node of canvas.nodes()) {
+            this.sizeObserver.observe(node);
+        }
 
         return this;
     }
 
     /** Clear all the contents of the root div. */
     remove(): void {
+        this.sizeObserver?.disconnect();
+        this.sizeObserver = undefined;
+
         if (!this.state.dom) return;
         this.state.dom.rootDiv.select('*').remove();
     }
