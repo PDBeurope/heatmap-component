@@ -16,6 +16,8 @@ import { removeElement, shallowMerge } from './utils';
 export interface Behavior<TParams extends {}> {
     /** Activate the behavior */
     register: () => void,
+    /** Return current behavior settings (`params`) */
+    getParams: () => TParams,
     /** Change behavior settings (`params`), do not touch parameters whose value is not provided (undefined) */
     update: (params: Partial<TParams>) => void,
     /** Deactivate the behavior */
@@ -43,6 +45,9 @@ export class BehaviorBase<TParams extends {}, TX = any, TY = any, TDatum = any> 
     constructor(protected state: State<TX, TY, TDatum>, protected params: TParams) { }
 
     register(): void { };
+    getParams(): TParams {
+        return { ...this.params };
+    }
     update(params: Partial<TParams>): void {
         this.params = shallowMerge(this.params, params);
     };
@@ -81,7 +86,7 @@ export const Extension = {
         return {
             name: p.name,
             defaultParams: p.defaultParams,
-            create: (state, params) => new p.behavior(state, shallowMerge<TParams>(p.defaultParams, params)),
+            create: (state, params) => new p.behavior(state, shallowMerge<TParams>(p.defaultParams, params)) as any,
         };
     },
 };

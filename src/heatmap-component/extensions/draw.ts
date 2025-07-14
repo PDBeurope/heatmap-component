@@ -215,7 +215,7 @@ export class DrawBehavior<TX, TY, TDatum> extends BehaviorBase<DrawExtensionPara
 
 
 /** Adds behavior that draws heatmap data in the canvas element (uses downsampling when the heatmap is zoomed out, to achieve efficient rendering). */
-export const DrawExtension: Extension<DrawExtensionParams<never, never, never>, typeof DefaultDrawExtensionParams> = Extension.fromBehaviorClass({
+export const DrawExtension: Extension<DrawExtensionParams<any, any, any>, typeof DefaultDrawExtensionParams> = Extension.fromBehaviorClass({
     name: 'builtin.draw',
     defaultParams: DefaultDrawExtensionParams,
     behavior: DrawBehavior,

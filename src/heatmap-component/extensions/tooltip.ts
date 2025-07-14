@@ -140,7 +140,7 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
 
 
 /** Adds behavior that shows a box with tooltip when hovering and/or clicking on a grid cell with data */
-export const TooltipExtension: Extension<TooltipExtensionParams<never, never, never>, typeof DefaultTooltipExtensionParams> = Extension.fromBehaviorClass({
+export const TooltipExtension: Extension<TooltipExtensionParams<any, any, any>, typeof DefaultTooltipExtensionParams> = Extension.fromBehaviorClass({
     name: 'builtin.tooltip',
     defaultParams: DefaultTooltipExtensionParams,
     behavior: TooltipBehavior,
