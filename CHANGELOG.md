@@ -4,9 +4,12 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-07-14
+
 - Fixed canvas resize handling
 - Show "pointer" cursor when hovering over a cell with data
 - Adjust canvas context size for browser zoom and physical screen resolution
+- Add `getParams()` to extensions
 
 ## [1.1.0] - 2024-12-19
 
