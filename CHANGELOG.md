@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+- No changes (only CICD udpate)
+
 ## [1.2.0] - 2025-07-14
 
 - Fixed canvas resize handling

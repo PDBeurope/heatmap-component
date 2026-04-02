@@ -7,7 +7,7 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages, and for NPM publish
 permissions:
   contents: read
   pages: write
@@ -25,11 +25,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
       - name: Install
         run: npm ci
       - name: Lint
@@ -39,12 +39,12 @@ jobs:
       - name: Build
         run: npm run build
       - name: Upload lib artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lib
           path: lib
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: build
           path: build
@@ -64,9 +64,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: build
           path: build
@@ -106,22 +106,20 @@ jobs:
     needs: [valid-tag]
     runs-on: ubuntu-latest
     steps:
-        - uses: actions/checkout@v4
-        - uses: actions/setup-node@v4
+        - uses: actions/checkout@v6
+        - uses: actions/setup-node@v6
           with:
-            node-version: 20
+            node-version: 24
             registry-url: https://registry.npmjs.org/
         - name: Download lib artifact
-          uses: actions/download-artifact@v4
+          uses: actions/download-artifact@v8
           with:
             name: lib
             path: lib
         - name: Download build artifact
-          uses: actions/download-artifact@v4
+          uses: actions/download-artifact@v8
           with:
             name: build
             path: build
         - name: NPM Publish
           run: npm publish
-          env:
-            NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
