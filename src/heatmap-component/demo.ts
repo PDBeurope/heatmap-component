@@ -137,8 +137,18 @@ export async function demo4(divElementOrId: HTMLDivElement | string): Promise<vo
     (window as any).heatmap = heatmap;
 }
 
+async function getPAEMatrixUrl(uniprotId: string) {
+    const predictionUrl = `https://alphafold.ebi.ac.uk/api/prediction/${uniprotId}`;
+    const response = await fetch(predictionUrl);
+    if (!response.ok) return undefined;
+    const js = await response.json();
+    if (!js.length) throw new Error(`${predictionUrl} returned zero models`);
+    return js[0].paeDocUrl;
+}
+
 async function fetchPAEMatrix(uniprotId: string, cut?: number) {
-    const url = `https://alphafold.ebi.ac.uk/files/AF-${uniprotId}-F1-predicted_aligned_error_v4.json`;
+    const url = await getPAEMatrixUrl(uniprotId);
+    if (!url) return undefined;
     const response = await fetch(url);
     if (!response.ok) return undefined;
     const js = await response.json();
