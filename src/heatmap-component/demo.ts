@@ -158,7 +158,7 @@ async function fetchPAEMatrix(uniprotId: string, cut?: number) {
     }
     return {
         n: values.length,
-        data: values.flatMap(x => x),
+        data: flatten(values),
     };
 }
 
@@ -169,4 +169,15 @@ function setTextContent(elementSelector: string, content: unknown, numberPrecisi
     const elements = document.querySelectorAll(elementSelector);
     if (typeof content === 'number' && numberPrecision >= 0) content = content.toFixed(numberPrecision);
     elements.forEach(element => element.textContent = `${content}`);
+}
+
+/** Flatten a nested array. Dumb implementation, but doesn't matter, this is just a demo. Would use `flatMap` but it's not available in es2015. */
+function flatten<T>(arrays: T[][]): T[] {
+    const out: T[] = [];
+    for (const arr of arrays) {
+        for (const item of arr) {
+            out.push(item);
+        }
+    }
+    return out;
 }
