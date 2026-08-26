@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
         "declaration": true,
-        "target": "es5",
+        "target": "es2015",
         "alwaysStrict": true,
         "noImplicitAny": true,
         "noImplicitThis": true,
@@ -12,9 +12,9 @@
         "noImplicitOverride": true,
         "noImplicitReturns": true,
         "strictFunctionTypes": true,
-        "module": "CommonJS",
+        "module": "esnext",
         "esModuleInterop": true,
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "importHelpers": true,
         "noEmitHelpers": true,
         "allowSyntheticDefaultImports": true,
@@ -24,7 +24,6 @@
         "outDir": "lib",
         // "composite": true,
         // "tsBuildInfoFile": "tsconfig.tsbuildinfo",
-        "baseUrl": "./"
     },
     "include": ["src"]
 }
