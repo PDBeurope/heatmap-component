@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>HeatmapComponent demo 5</title>
+  <link rel="shortcut icon" type="image/x-icon" href="../favicon.ico">
+  <link rel="stylesheet" type="text/css" href="../build/heatmap-component.css" />
+  <script src="../build/heatmap-component.js"></script>
+</head>
+
+<body>
+  <h1>Demo 5</h1>
+  <p>This demo shows a protein-protein interface contact map</p>
+  <span id="error"></span>
+  <h3>
+    &ensp;
+    <button id="btn-previous">&lt;</button>
+    <button id="btn-next">&gt;</button>
+    &ensp;
+    <span id="interface-number"></span>
+    &ensp;
+    <span id="interface-title">Interface</span>
+  </h3>
+
+    <input type="checkbox" id="toggle-only-contact-residues" style="margin-left: 16px;">
+    <label for="toggle-only-contact-residues">Show only contact residues</label>
+
+  <div style="padding: 15px; background-color: white;">
+    <!-- Your visualization will be placed here -->
+    <!-- <div id="app" style="width: 500px; aspect-ratio: 1; border: solid 1px black;"></div> -->
+    <div id="app" style="max-width: 800px; max-height: 600px; aspect-ratio: 1; border: solid 1px black;"></div>
+  </div>
+
+  <p><strong>Rows:</strong> <span id="row-names"></span></p>
+  <p><strong>Columns:</strong> <span id="column-names"></span></p>
+  <p><strong>Maximum contact frequency:</strong> <span id="max-frequency"></span></p>
+
+  <script>
+    HeatmapComponent.demos.demo5('app');
+  </script>
+
+  <p><a href="../src/heatmap-component/demo.ts">Source code</a></p>
+</body>
+
+</html>

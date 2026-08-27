@@ -163,12 +163,139 @@ async function fetchPAEMatrix(uniprotId: string, cut?: number) {
 }
 
 
+/** Demo showing an AlphaFold PAE matrix from real data */
+export async function demo5(divElementOrId: HTMLDivElement | string): Promise<void> {
+    const heatmap = Heatmap.create<string, string, InterfaceContact>();
+    heatmap.setVisualParams({ xGapRelative: 0, yGapRelative: 0 }); // Remove gaps between cells
+    heatmap.setTooltip((d) => `<strong>${d.residue_1} / ${d.residue_2}</strong><hr style="margin-block:0.2em;"><strong>Bond type:</strong> ${d.bond_type}<br><strong>Frequency:</strong> ${d.frequency}`);
+    // heatmap.extensions.marker?.update({ freeze: true });
+    // heatmap.setBrushing({ enabled: true });
+    heatmap.render(divElementOrId);
+    (window as any).heatmap = heatmap;
+
+
+    const allData = await fetchInterfaceData();
+    if (!allData) {
+        const msg = `Failed to fetch interface data.`;
+        setTextContent('#error', `Error: ${msg}`);
+        throw new Error(msg);
+    }
+
+    let interfaceIndex = 0;
+    let onlyContactResidues = false;
+
+    loadInterface(heatmap, allData, interfaceIndex, onlyContactResidues);
+    addClickListener('#btn-previous', 'click', () => {
+        interfaceIndex--;
+        if (interfaceIndex < 0) interfaceIndex = allData.length - 1;
+        loadInterface(heatmap, allData, interfaceIndex, onlyContactResidues);
+    });
+    addClickListener('#btn-next', 'click', () => {
+        interfaceIndex++;
+        if (interfaceIndex >= allData.length) interfaceIndex = 0;
+        loadInterface(heatmap, allData, interfaceIndex, onlyContactResidues);
+    });
+    addClickListener('#toggle-only-contact-residues', 'change', (e) => {
+        onlyContactResidues = !onlyContactResidues;
+        loadInterface(heatmap, allData, interfaceIndex, onlyContactResidues);
+    });
+}
+// TODO: show whole sequence (togglable)
+
+function loadInterface(heatmap: Heatmap<string, string, InterfaceContact>, allData: InterfaceData[], interfaceIndex: number, onlyContactResidues: boolean) {
+    const data = allData[interfaceIndex];
+    const maxValue = data.data.map(d => d.frequency).reduce((a, b) => b > a ? b : a, 0);
+    const sequence1 = onlyContactResidues ? data.residues1 : halucinateFullSequence(data.residues1);
+    const sequence2 = onlyContactResidues ? data.residues2 : halucinateFullSequence(data.residues2);
+    // TODO: get real full sequences from somewhere
+    const aspectRatio = sequence2.length / sequence1.length;
+
+    setTextContent('#interface-number', `(${interfaceIndex + 1}/${allData.length})`);
+    setTextContent('#interface-title', `Interface ${data.agg_interface_id}: ${data.component_label_1} / ${data.component_label_2}`);
+    setTextContent('#row-names', `${sequence1.join(', ')}`);
+    setTextContent('#column-names', `${sequence2.join(', ')}`);
+    setTextContent('#max-frequency', `${maxValue}`);
+    document.querySelectorAll('#app').forEach(appDiv => (appDiv as HTMLElement).style.aspectRatio = String(aspectRatio));
+
+    heatmap.setData({
+        yDomain: sequence1,
+        xDomain: sequence2,
+        data: data.data,
+        y: d => d.residue_1,
+        x: d => d.residue_2,
+    });
+    const colorScale = ColorScale.continuous('Greens', [0, maxValue], [0.1, 1]); // [0.1, 1] is to skip the first 10% of the color palette to avoid almost-white colors
+    heatmap.setColor(d => colorScale(d.frequency));
+}
+
+interface InterfaceContact {
+    residue_1: string,
+    residue_2: string,
+    bond_type: string,
+    frequency: number,
+}
+interface InterfaceData {
+    agg_interface_id: string,
+    component_label_1: string,
+    component_label_2: string,
+    residues1: string[],
+    residues2: string[],
+    data: InterfaceContact[],
+}
+async function fetchInterfaceData(): Promise<InterfaceData[]> {
+    const url = './demo5-data/interface-data.json'
+    if (!url) return [];
+    const response = await fetch(url);
+    if (!response.ok) return [];
+    const js = await response.json();
+    return js.map((interfac: any, i: number) => {
+        const contacts = interfac.contact_summary;
+        const residues1 = sortedUniqueResidues(contacts.map((c: any) => c.residue_1));
+        const residues2 = sortedUniqueResidues(contacts.map((c: any) => c.residue_2));
+        return {
+            agg_interface_id: interfac.agg_interface_id,
+            component_label_1: interfac.component_label_1,
+            component_label_2: interfac.component_label_2,
+            residues1,
+            residues2,
+            data: contacts,
+        } satisfies InterfaceData;
+    });
+}
+
+const RE_RESIDUE_NAME = /[A-Z]*(\d+)/;
+function getResidueNumber(resName: string) {
+    const resNum = resName.match(RE_RESIDUE_NAME)?.[1];
+    return Number(resNum ?? '-1');
+}
+function sortedUniqueResidues(resNames: string[]): string[] {
+    return Array.from(new Set(resNames)).sort((a, b) => getResidueNumber(a) - getResidueNumber(b));
+}
+function halucinateFullSequence(resNames: string[]) {
+    const resNums = resNames.map(getResidueNumber);
+    const resNumSet = new Set(resNums);
+    const min = Math.min(1, ...resNums);
+    const max = Math.max(1, ...resNums);
+    const out = resNames.slice();
+    for (let i = min; i <= max; i++) {
+        if (!resNumSet.has(i)) {
+            out.push(`${i}`);
+        }
+    }
+    return sortedUniqueResidues(out);
+}
+
 /** Set text content to all HTML elements selected by `elementSelector`.
  * Example: `setTextContent('#element-to-change', 'changed text here');` */
 function setTextContent(elementSelector: string, content: unknown, numberPrecision: number = 4): void {
     const elements = document.querySelectorAll(elementSelector);
     if (typeof content === 'number' && numberPrecision >= 0) content = content.toFixed(numberPrecision);
     elements.forEach(element => element.textContent = `${content}`);
+}
+
+function addClickListener(elementSelector: string, type: string, listener: EventListener): void {
+    const elements = document.querySelectorAll(elementSelector);
+    elements.forEach(element => element.addEventListener(type, listener));
 }
 
 /** Flatten a nested array. Dumb implementation, but doesn't matter, this is just a demo. Would use `flatMap` but it's not available in es2015. */
