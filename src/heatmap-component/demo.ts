@@ -166,7 +166,8 @@ async function fetchPAEMatrix(uniprotId: string, cut?: number) {
 /** Demo showing an AlphaFold PAE matrix from real data */
 export async function demo5(divElementOrId: HTMLDivElement | string): Promise<void> {
     const heatmap = Heatmap.create<string, string, InterfaceContact>();
-    heatmap.setVisualParams({ xGapRelative: 0, yGapRelative: 0 }); // Remove gaps between cells
+    // heatmap.setVisualParams({ xGapRelative: 0, yGapRelative: 0 }); // Remove gaps between cells
+    heatmap.setVisualParams({ xGapRelative: 0.05, yGapRelative: 0.05 }); // Decrease gaps between cells
     heatmap.setTooltip((d) => `<strong>${d.residue_1} / ${d.residue_2}</strong><hr style="margin-block:0.2em;"><strong>Bond type:</strong> ${d.bond_type}<br><strong>Frequency:</strong> ${d.frequency}`);
     // heatmap.extensions.marker?.update({ freeze: true });
     // heatmap.setBrushing({ enabled: true });
@@ -182,31 +183,36 @@ export async function demo5(divElementOrId: HTMLDivElement | string): Promise<vo
     }
 
     let interfaceIndex = 0;
-    let onlyContactResidues = false;
+    let filterKind = getFilterKind();
 
-    loadInterface(heatmap, allData, interfaceIndex, onlyContactResidues);
+    loadInterface(heatmap, allData, interfaceIndex, filterKind);
     addClickListener('#btn-previous', 'click', () => {
         interfaceIndex--;
         if (interfaceIndex < 0) interfaceIndex = allData.length - 1;
-        loadInterface(heatmap, allData, interfaceIndex, onlyContactResidues);
+        loadInterface(heatmap, allData, interfaceIndex, filterKind);
     });
     addClickListener('#btn-next', 'click', () => {
         interfaceIndex++;
         if (interfaceIndex >= allData.length) interfaceIndex = 0;
-        loadInterface(heatmap, allData, interfaceIndex, onlyContactResidues);
+        loadInterface(heatmap, allData, interfaceIndex, filterKind);
     });
-    addClickListener('#toggle-only-contact-residues', 'change', (e) => {
-        onlyContactResidues = !onlyContactResidues;
-        loadInterface(heatmap, allData, interfaceIndex, onlyContactResidues);
+    addClickListener('input[name=filter]', 'change', (e) => {
+        filterKind = getFilterKind();
+        loadInterface(heatmap, allData, interfaceIndex, filterKind);
     });
 }
-// TODO: show whole sequence (togglable)
 
-function loadInterface(heatmap: Heatmap<string, string, InterfaceContact>, allData: InterfaceData[], interfaceIndex: number, onlyContactResidues: boolean) {
+function loadInterface(heatmap: Heatmap<string, string, InterfaceContact>, allData: InterfaceData[], interfaceIndex: number, filter: FilterKind) {
     const data = allData[interfaceIndex];
     const maxValue = data.data.map(d => d.frequency).reduce((a, b) => b > a ? b : a, 0);
-    const sequence1 = onlyContactResidues ? data.residues1 : halucinateFullSequence(data.residues1);
-    const sequence2 = onlyContactResidues ? data.residues2 : halucinateFullSequence(data.residues2);
+    function prepareSequence(residues: string[]) {
+        if (filter === 'filter-full') return halucinateFullSequence(residues);
+        if (filter === 'filter-nogaps') return removeGaps(halucinateFullSequence(residues), residues, 10);
+        if (filter === 'filter-contacts') return residues;
+        throw new Error(`Unknown filter kind: ${filter}`);
+    }
+    const sequence1 = prepareSequence(data.residues1);
+    const sequence2 = prepareSequence(data.residues2);
     // TODO: get real full sequences from somewhere
     const aspectRatio = sequence2.length / sequence1.length;
 
@@ -243,7 +249,7 @@ interface InterfaceData {
     data: InterfaceContact[],
 }
 async function fetchInterfaceData(): Promise<InterfaceData[]> {
-    const url = './demo5-data/interface-data.json'
+    const url = './demo5-data/interface-data.json';
     if (!url) return [];
     const response = await fetch(url);
     if (!response.ok) return [];
@@ -285,6 +291,22 @@ function halucinateFullSequence(resNames: string[]) {
     return sortedUniqueResidues(out);
 }
 
+function removeGaps(fullSequence: string[], present: string[], maxGap: number) {
+    const n = fullSequence.length;
+    const presentSet = new Set(present);
+    const presentMask = fullSequence.map(item => presentSet.has(item));
+    const dilatedMask = presentMask.map(() => false);
+    const radius = Math.ceil(maxGap / 2);
+    for (let i = 0; i < n; i++) {
+        if (presentMask[i]) {
+            const jFrom = Math.max(0, i - radius);
+            const jTo = Math.min(n - 1, i + radius);
+            for (let j = jFrom; j <= jTo; j++) dilatedMask[j] = true;
+        }
+    }
+    return fullSequence.filter((item, i) => dilatedMask[i]);
+}
+
 /** Set text content to all HTML elements selected by `elementSelector`.
  * Example: `setTextContent('#element-to-change', 'changed text here');` */
 function setTextContent(elementSelector: string, content: unknown, numberPrecision: number = 4): void {
@@ -296,6 +318,13 @@ function setTextContent(elementSelector: string, content: unknown, numberPrecisi
 function addClickListener(elementSelector: string, type: string, listener: EventListener): void {
     const elements = document.querySelectorAll(elementSelector);
     elements.forEach(element => element.addEventListener(type, listener));
+}
+type FilterKind = 'filter-full' | 'filter-nogaps' | 'filter-contacts';
+function getFilterKind(): FilterKind {
+    for (const elem of document.querySelectorAll('input[name=filter]:checked')) {
+        return elem.getAttribute('id') as FilterKind;
+    }
+    throw new Error('Could not find filter kind');
 }
 
 /** Flatten a nested array. Dumb implementation, but doesn't matter, this is just a demo. Would use `flatMap` but it's not available in es2015. */

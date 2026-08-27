@@ -23,8 +23,11 @@
     <span id="interface-title">Interface</span>
   </h3>
 
-    <input type="checkbox" id="toggle-only-contact-residues" style="margin-left: 16px;">
-    <label for="toggle-only-contact-residues">Show only contact residues</label>
+  <form>
+    <input type="radio" name="filter" id="filter-full" checked><label for="filter-full">Full sequence</label>
+    <input type="radio" name="filter" id="filter-nogaps"><label for="filter-nogaps">Hide gaps</label>
+    <input type="radio" name="filter" id="filter-contacts"><label for="filter-contacts">Only contact residues</label>
+  </form>
 
   <div style="padding: 15px; background-color: white;">
     <!-- Your visualization will be placed here -->
