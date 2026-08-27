@@ -221,7 +221,7 @@ function loadInterface(heatmap: Heatmap<string, string, InterfaceContact>, allDa
     setTextContent('#row-names', `${sequence1.join(', ')}`);
     setTextContent('#column-names', `${sequence2.join(', ')}`);
     setTextContent('#max-frequency', `${maxValue}`);
-    document.querySelectorAll('#app').forEach(appDiv => (appDiv as HTMLElement).style.aspectRatio = String(aspectRatio));
+    document.querySelectorAll<HTMLElement>('#app').forEach(appDiv => appDiv.style.aspectRatio = String(aspectRatio));
 
     heatmap.setData({
         yDomain: sequence1,
