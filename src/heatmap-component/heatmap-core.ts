@@ -74,7 +74,7 @@ export class HeatmapCore<TX, TY, TDatum> {
 
         const canvasDiv = attrd(mainDiv.append('div'), {
             class: Class.CanvasDiv,
-            style: { position: 'absolute', width: '100%', height: '100%' },
+            // style: { position: 'absolute', width: '100%', height: '100%' },
         });
 
         const canvas = attrd(canvasDiv.append('canvas'), {

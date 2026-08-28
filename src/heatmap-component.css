@@ -3,15 +3,34 @@
     --tooltip-offset-x: 5px;
     /** Position of bottom-left corner of tooltip box relative to the mouse position */
     --tooltip-offset-y: 8px;
+
+    /** Left margin of the heatmap canvas within the main div */
+    --heatmap-margin-left: 1.5em;
+    /** Right margin of the heatmap canvas within the main div */
+    --heatmap-margin-right: 0.5em;
+    /** Top margin of the heatmap canvas within the main div */
+    --heatmap-margin-top: 0.5em;
+    /** Bottom margin of the heatmap canvas within the main div */
+    --heatmap-margin-bottom: 1.5em;
 }
 
 .heatmap-main-div {
     font-family: sans-serif;
+    /* DEBUG */
+    background-color: #ffe8d0;
 }
 
 .heatmap-canvas-div {
-    /* Set background-color here to change the background of the heatmap */
+    /** Set background-color here to change the background of the heatmap */
     background-color: none;
+    /* DEBUG */
+    background-color: #80808040;
+
+    position: absolute;
+    left: var(--heatmap-margin-left);
+    right: var(--heatmap-margin-right);
+    top: var(--heatmap-margin-top);
+    bottom: var(--heatmap-margin-bottom);
 }
 
 .heatmap-svg[pointing-data] {

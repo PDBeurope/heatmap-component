@@ -1,6 +1,7 @@
 import { Color } from './data/color';
 import { DataDescription, Provider } from './data/data-description';
 import { Behavior } from './extension';
+import { AxesExtension, AxesExtensionParams } from './extensions/axes';
 import { BrushExtension, BrushExtensionParams } from './extensions/brush';
 import { DrawExtension, DrawExtensionParams } from './extensions/draw';
 import { MarkerBehavior, MarkerExtension, MarkerExtensionParams } from './extensions/marker';
@@ -23,6 +24,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         draw?: Behavior<DrawExtensionParams<TX, TY, TDatum>>,
         zoom?: Behavior<ZoomExtensionParams>,
         brush?: Behavior<BrushExtensionParams>,
+        axes?: Behavior<AxesExtensionParams>,
     } = {};
 
     /** Create a new `Heatmap` and optionaly set `data`.
@@ -35,6 +37,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         heatmap.extensions.draw = heatmap.registerExtension(DrawExtension);
         heatmap.extensions.zoom = heatmap.registerExtension(ZoomExtension);
         heatmap.extensions.brush = heatmap.registerExtension(BrushExtension);
+        heatmap.extensions.axes = heatmap.registerExtension(AxesExtension);
 
         return heatmap;
     }
