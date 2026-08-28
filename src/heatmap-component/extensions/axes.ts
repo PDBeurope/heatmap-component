@@ -10,12 +10,18 @@ export interface AxesExtensionParams {
     showBottom: boolean;
     /** Whether to show the left Y axis. */
     showLeft: boolean;
+    /** Whether to show the top X axis. */
+    showTop: boolean;
+    /** Whether to show the right Y axis. */
+    showRight: boolean;
 }
 
 /** Default parameter values for `AxesExtension` */
 export const DefaultAxesExtensionParams: AxesExtensionParams = {
     showBottom: true,
     showLeft: true,
+    showTop: false,
+    showRight: false,
 };
 
 /** Behavior class for `AxesExtension` (highlights hovered grid cell and column and row) */
@@ -61,22 +67,40 @@ export class AxesBehavior extends BehaviorBase<AxesExtensionParams> {
         const yTicks = this.getTicks(this.state.yDomain.values.length, this.state.yAlignment);
 
         console.log('AxesBehavior.drawAxes calling');
-        const xAxis = axesSvg.selectAll<SVGGElement, unknown>('.heatmap-axis-x')
+        const xBottomAxis = axesSvg.selectAll<SVGGElement, unknown>('.heatmap-axis-x-bottom')
             .data(this.params.showBottom ? [undefined] : []);
-        const xGroup = xAxis.enter().append('g').attr('class', 'heatmap-axis-x').merge(xAxis)
+        const xBottomGroup = xBottomAxis.enter().append('g').attr('class', 'heatmap-axis-x-bottom').merge(xBottomAxis)
             .attr('transform', `translate(${canvasLeft},${canvasTop + canvasRect.height})`);
-        xAxis.exit().remove();
+        xBottomAxis.exit().remove();
         if (this.params.showBottom) {
-            xGroup.call(d3.axisBottom(xScale).tickValues(xTicks).tickFormat(index => String(this.state.xDomain.values[this.tickIndex(Number(index), this.state.xAlignment)])) as any);
+            xBottomGroup.call(d3.axisBottom(xScale).tickValues(xTicks).tickFormat(index => String(this.state.xDomain.values[this.tickIndex(Number(index), this.state.xAlignment)])) as any);
         }
 
-        const yAxis = axesSvg.selectAll<SVGGElement, unknown>('.heatmap-axis-y')
-            .data(this.params.showLeft ? [undefined] : []);
-        const yGroup = yAxis.enter().append('g').attr('class', 'heatmap-axis-y').merge(yAxis)
+        const xTopAxis = axesSvg.selectAll<SVGGElement, unknown>('.heatmap-axis-x-top')
+            .data(this.params.showTop ? [undefined] : []);
+        const xTopGroup = xTopAxis.enter().append('g').attr('class', 'heatmap-axis-x-top').merge(xTopAxis)
             .attr('transform', `translate(${canvasLeft},${canvasTop})`);
-        yAxis.exit().remove();
+        xTopAxis.exit().remove();
+        if (this.params.showTop) {
+            xTopGroup.call(d3.axisTop(xScale).tickValues(xTicks).tickFormat(index => String(this.state.xDomain.values[this.tickIndex(Number(index), this.state.xAlignment)])) as any);
+        }
+
+        const yLeftAxis = axesSvg.selectAll<SVGGElement, unknown>('.heatmap-axis-y-left')
+            .data(this.params.showLeft ? [undefined] : []);
+        const yLeftGroup = yLeftAxis.enter().append('g').attr('class', 'heatmap-axis-y-left').merge(yLeftAxis)
+            .attr('transform', `translate(${canvasLeft},${canvasTop})`);
+        yLeftAxis.exit().remove();
         if (this.params.showLeft) {
-            yGroup.call(d3.axisLeft(yScale).tickValues(yTicks).tickFormat(index => String(this.state.yDomain.values[this.tickIndex(Number(index), this.state.yAlignment)])) as any);
+            yLeftGroup.call(d3.axisLeft(yScale).tickValues(yTicks).tickFormat(index => String(this.state.yDomain.values[this.tickIndex(Number(index), this.state.yAlignment)])) as any);
+        }
+
+        const yRightAxis = axesSvg.selectAll<SVGGElement, unknown>('.heatmap-axis-y-right')
+            .data(this.params.showRight ? [undefined] : []);
+        const yRightGroup = yRightAxis.enter().append('g').attr('class', 'heatmap-axis-y-right').merge(yRightAxis)
+            .attr('transform', `translate(${canvasLeft + canvasRect.width},${canvasTop})`);
+        yRightAxis.exit().remove();
+        if (this.params.showRight) {
+            yRightGroup.call(d3.axisRight(yScale).tickValues(yTicks).tickFormat(index => String(this.state.yDomain.values[this.tickIndex(Number(index), this.state.yAlignment)])) as any);
         }
         console.log('AxesBehavior.drawAxes called');
     }
