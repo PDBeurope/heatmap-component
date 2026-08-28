@@ -41,6 +41,12 @@ export class AxesBehavior extends BehaviorBase<AxesExtensionParams> {
         this.drawAxes('update');
     }
 
+    override unregister(): void {
+        console.log('AxesBehavior.unregister');
+        this.state.dom?.mainDiv.selectAll(`.${Class.Axes}`).remove();
+        super.unregister();
+    }
+
     private drawAxes(message: string): void {
         if (!this.state.dom) return;
         console.log('AxesBehavior.drawAxes', message);
@@ -51,38 +57,34 @@ export class AxesBehavior extends BehaviorBase<AxesExtensionParams> {
         const canvasLeft = canvasRect.left - mainRect.left;
         const canvasTop = canvasRect.top - mainRect.top;
 
-        // Select/create axes SVG
+        // Create/update axes SVG
         const axes = this.state.dom.mainDiv.selectAll<SVGSVGElement, unknown>(`.${Class.Axes}`).data([undefined]);
         const axesSvg = axes.enter().append('svg').attr('class', Class.Axes).merge(axes);
 
-        attrd(axesSvg, {
-            width: mainRect.width,
-            height: mainRect.height,
-            style: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none' },
-        });
-
+        // Compute scales and ticks
         const xScale = this.state.scales.worldToSvg.x.copy().range([0, canvasRect.width]);
         const yScale = this.state.scales.worldToSvg.y.copy().range([0, canvasRect.height]);
         const xTicks = this.getTicks(this.state.xDomain.values.length, this.state.xAlignment);
         const yTicks = this.getTicks(this.state.yDomain.values.length, this.state.yAlignment);
 
+        // Create/update/remove individual axes
         console.log('AxesBehavior.drawAxes calling');
-        const xBottomAxis = axesSvg.selectAll<SVGGElement, unknown>('.heatmap-axis-x-bottom')
-            .data(this.params.showBottom ? [undefined] : []);
-        const xBottomGroup = xBottomAxis.enter().append('g').attr('class', 'heatmap-axis-x-bottom').merge(xBottomAxis)
-            .attr('transform', `translate(${canvasLeft},${canvasTop + canvasRect.height})`);
-        xBottomAxis.exit().remove();
-        if (this.params.showBottom) {
-            xBottomGroup.call(d3.axisBottom(xScale).tickValues(xTicks).tickFormat(index => String(this.state.xDomain.values[this.tickIndex(Number(index), this.state.xAlignment)])) as any);
-        }
-
         const xTopAxis = axesSvg.selectAll<SVGGElement, unknown>('.heatmap-axis-x-top')
             .data(this.params.showTop ? [undefined] : []);
         const xTopGroup = xTopAxis.enter().append('g').attr('class', 'heatmap-axis-x-top').merge(xTopAxis)
             .attr('transform', `translate(${canvasLeft},${canvasTop})`);
         xTopAxis.exit().remove();
         if (this.params.showTop) {
-            xTopGroup.call(d3.axisTop(xScale).tickValues(xTicks).tickFormat(index => String(this.state.xDomain.values[this.tickIndex(Number(index), this.state.xAlignment)])) as any);
+            xTopGroup.call(d3.axisTop(xScale).tickValues(xTicks).tickFormat(index => String(this.state.xDomain.values[this.tickIndex(Number(index), this.state.xAlignment)])));
+        }
+
+        const xBottomAxis = axesSvg.selectAll<SVGGElement, unknown>('.heatmap-axis-x-bottom')
+            .data(this.params.showBottom ? [undefined] : []);
+        const xBottomGroup = xBottomAxis.enter().append('g').attr('class', 'heatmap-axis-x-bottom').merge(xBottomAxis)
+            .attr('transform', `translate(${canvasLeft},${canvasTop + canvasRect.height})`);
+        xBottomAxis.exit().remove();
+        if (this.params.showBottom) {
+            xBottomGroup.call(d3.axisBottom(xScale).tickValues(xTicks).tickFormat(index => String(this.state.xDomain.values[this.tickIndex(Number(index), this.state.xAlignment)])));
         }
 
         const yLeftAxis = axesSvg.selectAll<SVGGElement, unknown>('.heatmap-axis-y-left')
@@ -91,7 +93,7 @@ export class AxesBehavior extends BehaviorBase<AxesExtensionParams> {
             .attr('transform', `translate(${canvasLeft},${canvasTop})`);
         yLeftAxis.exit().remove();
         if (this.params.showLeft) {
-            yLeftGroup.call(d3.axisLeft(yScale).tickValues(yTicks).tickFormat(index => String(this.state.yDomain.values[this.tickIndex(Number(index), this.state.yAlignment)])) as any);
+            yLeftGroup.call(d3.axisLeft(yScale).tickValues(yTicks).tickFormat(index => String(this.state.yDomain.values[this.tickIndex(Number(index), this.state.yAlignment)])));
         }
 
         const yRightAxis = axesSvg.selectAll<SVGGElement, unknown>('.heatmap-axis-y-right')
@@ -100,7 +102,7 @@ export class AxesBehavior extends BehaviorBase<AxesExtensionParams> {
             .attr('transform', `translate(${canvasLeft + canvasRect.width},${canvasTop})`);
         yRightAxis.exit().remove();
         if (this.params.showRight) {
-            yRightGroup.call(d3.axisRight(yScale).tickValues(yTicks).tickFormat(index => String(this.state.yDomain.values[this.tickIndex(Number(index), this.state.yAlignment)])) as any);
+            yRightGroup.call(d3.axisRight(yScale).tickValues(yTicks).tickFormat(index => String(this.state.yDomain.values[this.tickIndex(Number(index), this.state.yAlignment)])));
         }
         console.log('AxesBehavior.drawAxes called');
     }

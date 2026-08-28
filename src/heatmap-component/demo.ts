@@ -58,10 +58,12 @@ export function demo1(divElementOrId: HTMLDivElement | string): void {
     heatmap.render(divElementOrId);
     (window as any).heatmap = heatmap;
 
-    setTimeout(() => heatmap.extensions.axes?.update({ showBottom: false }), 3000);
-    setTimeout(() => heatmap.extensions.axes?.update({ showLeft: false }), 4000);
-    setTimeout(() => heatmap.extensions.axes?.update({ showBottom: true }), 5000);
-    setTimeout(() => heatmap.extensions.axes?.update({ showLeft: true }), 6000);
+    setTimeout(() => heatmap.extensions.axes?.update({ showBottom: false }), 1000);
+    setTimeout(() => heatmap.extensions.axes?.update({ showLeft: false }), 2000);
+    setTimeout(() => heatmap.extensions.axes?.update({ showBottom: true }), 3000);
+    setTimeout(() => heatmap.extensions.axes?.update({ showLeft: true }), 4000);
+    setTimeout(() => heatmap.extensions.axes?.unregister(), 5000);
+    setTimeout(() => heatmap.extensions.axes?.register(), 6000);
 }
 
 
