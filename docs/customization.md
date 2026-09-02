@@ -147,11 +147,11 @@ This method is used to enable and customize manual zooming.
 
 Currently, only horizontal zooming mode is implemented (`axis: 'x'`), providing this functionality:
 
--   mouse scroll —> zoom in/out
--   horizontal scroll (on trackpad) —> pan (move to the sides)
--   shift + mouse scroll —> pan
--   mouse click and drag —> pan
--   double click —> zoom in
+- mouse scroll —> zoom in/out
+- horizontal scroll (on trackpad) —> pan (move to the sides)
+- shift + mouse scroll —> pan
+- mouse click and drag —> pan
+- double click —> zoom in
 
 ```ts
 setZooming(params: Partial<ZoomExtensionParams>): this
@@ -286,6 +286,37 @@ heatmap.events.brush.subscribe(e => {
         console.log('Selection in progress:', e);
     }
 });
+```
+
+---
+
+## Axes
+
+Display of X and Y axes is implemented via `AxesExtension` and can be controlled by the `setAxes` method.
+
+### `setAxes`
+
+This method is used to turn on/off and customize individual axes (top, bottom, left, right).
+
+```ts
+setAxes(params: Partial<AxesExtensionParams<TX, TY>>): this
+
+// Example usage:
+heatmap.setAxes({ bottom: true, left: true });  // Turn on bottom x-axis and left y-axis
+heatmap.setAxes({ top: { offset: 5, tickArguments: () => [undefined, '.2f'] } });  // Turn on and customize top x-axis
+```
+
+When displaying axes, positioning of the `div.heatmap-canvas-div` element must be adjusted to create space for the axes.
+
+Example:
+
+```css
+.heatmap-canvas-div {
+    top: 0.5em;
+    bottom: 1.5em;
+    left: 1.5em;
+    right: 0.5em;
+}
 ```
 
 ---
