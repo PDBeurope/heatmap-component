@@ -131,6 +131,24 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         return this;
     }
 
+    /** Set axes parameters.
+     *
+     * Example:
+     * ```
+     * heatmap.setAxes({ left: true });  // Turn on left y-axis
+     * heatmap.setAxes({ bottom: { offset: 5, tickArguments: () => [undefined, '.2f'] } });  // Turn on and customize bottom x-axis
+     * ```
+     * 
+     * When displaying axes, positioning of the `div.heatmap-canvas-div` element must be adjusted to create space for the axes. Example:
+     * ```css
+     * .heatmap-canvas-div { top: 0.5em; bottom: 1.5em; left: 1.5em; right: 0.5em; }
+     * ```
+     */
+    setAxes(params: Partial<AxesExtensionParams<TX, TY>>): this {
+        this.extensions.axes?.update(params);
+        return this;
+    }
+
     /** Controls how column/row indices and names are aligned to X and Y axes, when using `.zoom` and `.events.zoom` */
     setAlignment(x: XAlignmentMode | undefined, y: YAlignmentMode | undefined): this {
         this.state.setAlignment(x, y);
