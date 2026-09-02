@@ -5,13 +5,38 @@ import { BehaviorBase, Extension } from '../extension';
 import { shallowMerge } from '../utils';
 
 
-export interface AxisOptions<TDomain> {
-    // TODO: docs
-    offset: number,
-    tickArguments: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>) => [count?: number, specifier?: string],
-    tickValues: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>, tickArguments: [count?: number, specifier?: string]) => Iterable<d3.NumberValue> | null,
-    tickFormat: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>, tickArguments: [count?: number, specifier?: string]) => ((domainValue: d3.NumberValue, index: number) => string) | null;
+/** Parameters for `AxesExtension` */
+export interface AxesExtensionParams<TX, TY> {
+    /** Options for the top X axis (`false` to hide the axis, `true` to show with default options). */
+    top: boolean | Partial<AxisOptions<TX>>;
+    /** Options for the bottom X axis (`false` to hide the axis, `true` to show with default options). */
+    bottom: boolean | Partial<AxisOptions<TX>>;
+    /** Options for the left Y axis (`false` to hide the axis, `true` to show with default options). */
+    left: boolean | Partial<AxisOptions<TY>>;
+    /** Options for the right Y axis (`false` to hide the axis, `true` to show with default options). */
+    right: boolean | Partial<AxisOptions<TY>>;
 }
+
+/** Default parameter values for `AxesExtension` */
+export const DefaultAxesExtensionParams: AxesExtensionParams<unknown, unknown> = {
+    top: false,
+    bottom: false,
+    left: false,
+    right: false,
+};
+
+
+export interface AxisOptions<TDomain> {
+    /** Pixel offset between the axis and the heatmap canvas. */
+    offset: number,
+    /** Function that returns the arguments used to generate axis ticks. These arguments will be passed to the D3 `Axis.tickArguments` method and to the `tickValues` and `tickFormat` functions. */
+    tickArguments: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>) => [count?: number, specifier?: string],
+    /** Function that returns the list of tick values, or `null` to use the D3 default ticks. */
+    tickValues: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>, tickArguments: [count?: number, specifier?: string]) => Iterable<d3.NumberValue> | null,
+    /** Function that returns the tick formatter, or `null` to use the D3 default formatter. */
+    tickFormat: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>, tickArguments: [count?: number, specifier?: string]) => ((index: d3.NumberValue, i: number) => string) | null,
+}
+
 export const DefaultAxisOptions: AxisOptions<unknown> = {
     offset: 0,
     tickArguments: () => [],
@@ -49,74 +74,50 @@ export const DefaultAxisOptions: AxisOptions<unknown> = {
     },
 };
 
-
-/** Parameters for `AxesExtension` */
-export interface AxesExtensionParams<TX, TY> {
-    /** Whether to show the top X axis. */
-    showTop: boolean | Partial<AxisOptions<TX>>;
-    /** Whether to show the bottom X axis. */
-    showBottom: boolean | Partial<AxisOptions<TX>>;
-    /** Whether to show the left Y axis. */
-    showLeft: boolean | Partial<AxisOptions<TY>>;
-    /** Whether to show the right Y axis. */
-    showRight: boolean | Partial<AxisOptions<TY>>;
-}
-
-/** Default parameter values for `AxesExtension` */
-export const DefaultAxesExtensionParams: AxesExtensionParams<unknown, unknown> = {
-    showBottom: true,
-    showLeft: true,
-    showTop: false,
-    showRight: false,
-};
-
-function getAxisOptions<TDomain>(param: boolean | Partial<AxisOptions<TDomain>>): AxisOptions<TDomain> | undefined {
+function normalizeAxisOptions<TDomain>(param: boolean | Partial<AxisOptions<TDomain>>): AxisOptions<TDomain> | undefined {
     if (!param) return undefined;
     if (param === true) return DefaultAxisOptions;
     return shallowMerge(DefaultAxisOptions, param);
 }
 
-/** Behavior class for `AxesExtension` (highlights hovered grid cell and column and row) */
+
+/** Behavior class for `AxesExtension` (displays axes around the heatmap canvas) */
 export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, TY>, TX, TY> {
     override register(): void {
         super.register();
-        console.log('AxesBehavior.register');
-        this.subscribe(this.state.events.render, () => this.drawAxes('render'));
-        this.subscribe(this.state.events.resize, () => this.drawAxes('resize'));
-        this.subscribe(this.state.events.zoom, () => this.drawAxes('zoom'));
-        this.subscribe(this.state.events.data, () => this.drawAxes('data'));
+        this.subscribe(this.state.events.render, () => this.updateAxes());
+        this.subscribe(this.state.events.resize, () => this.updateAxes());
+        this.subscribe(this.state.events.zoom, () => this.updateAxes());
+        this.subscribe(this.state.events.data, () => this.updateAxes());
     }
 
     override update(params: Partial<AxesExtensionParams<TX, TY>>): void {
         super.update(params);
-        console.log('AxesBehavior.update');
-        this.drawAxes('update');
+        this.updateAxes();
     }
 
     override unregister(): void {
-        console.log('AxesBehavior.unregister');
         this.state.dom?.mainDiv.selectAll(`.${Class.Axes}`).remove();
         super.unregister();
     }
 
-    private drawAxes(message: string): void {
+    private updateAxes(): void {
         if (!this.state.dom) return;
-        console.log('AxesBehavior.drawAxes', message);
 
         // Get measurements
-        const mainRect = this.state.dom.mainDiv.node()?.getBoundingClientRect();
-        const canvasRect = this.state.dom.canvasDiv.node()?.getBoundingClientRect();
+        const mainRect = getInnerRect(this.state.dom.mainDiv.node());
+        const canvasRect = getInnerRect(this.state.dom.canvasDiv.node());
         if (!mainRect || !canvasRect) return;
         const canvasLeft = canvasRect.left - mainRect.left;
         const canvasTop = canvasRect.top - mainRect.top;
 
         // Create/update axes SVG
-        const axes = this.state.dom.mainDiv.selectAll<SVGSVGElement, unknown>(`.${Class.Axes}`).data([undefined]);
-        const axesSvg = axes.enter().append('svg').attr('class', Class.Axes).merge(axes);
+        const currentAxesSvg = this.state.dom.mainDiv.selectAll<SVGSVGElement, unknown>(`.${Class.Axes}`).data([undefined]);
+        const axesSvg = currentAxesSvg.enter().append('svg').attr('class', Class.Axes).merge(currentAxesSvg);
 
         // Create/update/remove individual axes
         const updateAxis = <TDomain>(position: 'top' | 'bottom' | 'left' | 'right', axisParam: boolean | Partial<AxisOptions<TDomain>>, domain: Domain<TDomain>) => {
-            const options = getAxisOptions(axisParam);
+            const options = normalizeAxisOptions(axisParam);
             const className = `heatmap-axis-${position}`;
             const currentAxisGroup = axesSvg.selectAll<SVGGElement, unknown>(`.${className}`).data(options ? [undefined] : []);
             currentAxisGroup.exit().remove();
@@ -148,15 +149,29 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
                 setAxisTicks(axis, options, scale, domain);
                 axisGroup.call(axis);
             }
-        }
+        };
 
-        updateAxis('top', this.params.showTop, this.state.xDomain);
-        updateAxis('bottom', this.params.showBottom, this.state.xDomain);
-        updateAxis('left', this.params.showLeft, this.state.yDomain);
-        updateAxis('right', this.params.showRight, this.state.yDomain);
+        updateAxis('top', this.params.top, this.state.xDomain);
+        updateAxis('bottom', this.params.bottom, this.state.xDomain);
+        updateAxis('left', this.params.left, this.state.yDomain);
+        updateAxis('right', this.params.right, this.state.yDomain);
     }
 
 }
+
+
+/** Get client rectangle of the HTML element, excluding the border */
+function getInnerRect(element: HTMLElement | null) {
+    if (!element) return undefined;
+    const boundingRect = element.getBoundingClientRect();
+    return {
+        top: boundingRect.top + element.clientTop,
+        height: element.clientHeight,
+        left: boundingRect.left + element.clientLeft,
+        width: element.clientWidth,
+    };
+}
+
 function alignScale(scale: d3.ScaleLinear<number, number>, alignment: 'left' | 'center' | 'right' | 'top' | 'bottom'): d3.ScaleLinear<number, number> {
     if (alignment === 'left' || alignment === 'top') return scale;
     const origDomain = scale.domain();
@@ -164,28 +179,18 @@ function alignScale(scale: d3.ScaleLinear<number, number>, alignment: 'left' | '
     return scale.copy().domain([origDomain[0] - offset, origDomain[1] - offset]);
 }
 
-function getTicks(length: number, alignment: 'left' | 'center' | 'right' | 'top' | 'bottom'): number[] {
-    const offset = alignment === 'center' ? 0.5 : (alignment === 'right' || alignment === 'bottom') ? 1 : 0;
-    return Array.from({ length }, (_, index) => index + offset);
-}
-
-function tickIndex(position: number, alignment: 'left' | 'center' | 'right' | 'top' | 'bottom'): number {
-    const offset = alignment === 'center' ? 0.5 : (alignment === 'right' || alignment === 'bottom') ? 1 : 0;
-    return Math.round(position - offset);
-}
-
-function setAxisTicks<TDomain>(axis: d3.Axis<d3.NumberValue>, axisParams: AxisOptions<TDomain>, scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>): d3.Axis<d3.NumberValue> {
-    const tickArguments = axisParams.tickArguments(scale, domain);
+function setAxisTicks<TDomain>(axis: d3.Axis<d3.NumberValue>, axisOptions: AxisOptions<TDomain>, scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>): d3.Axis<d3.NumberValue> {
+    const tickArguments = axisOptions.tickArguments(scale, domain);
     axis.tickArguments(tickArguments);
-    const tickValues = axisParams.tickValues(scale, domain, tickArguments);
+    const tickValues = axisOptions.tickValues(scale, domain, tickArguments);
     if (tickValues) axis.tickValues(tickValues); else axis.tickValues(null);
-    const tickFormat = axisParams.tickFormat(scale, domain, tickArguments);
+    const tickFormat = axisOptions.tickFormat(scale, domain, tickArguments);
     if (tickFormat) axis.tickFormat(tickFormat); else axis.tickFormat(null);
     return axis;
 }
 
 
-/** Adds behavior that shows axes around the heatmap. When using this extension, .heatmap-canvas-div must be accordingly positioned via CSS to create space for the axes. */
+/** Adds behavior that displays axes around the heatmap. When using this extension, .heatmap-canvas-div must be accordingly positioned via CSS to create space for the axes. */
 export const AxesExtension: Extension<AxesExtensionParams<any, any>, typeof DefaultAxesExtensionParams> = Extension.fromBehaviorClass({
     name: 'builtin.axes',
     defaultParams: DefaultAxesExtensionParams,
