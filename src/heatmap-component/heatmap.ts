@@ -138,7 +138,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
      * heatmap.setAxes({ bottom: true, left: true });  // Turn on bottom x-axis and left y-axis
      * heatmap.setAxes({ top: { offset: 5, tickArguments: () => [undefined, '.2f'] } });  // Turn on and customize top x-axis
      * ```
-     * 
+     *
      * When displaying axes, positioning of the `div.heatmap-canvas-div` element must be adjusted to create space for the axes. Example:
      * ```css
      * .heatmap-canvas-div { top: 0.5em; bottom: 1.5em; left: 1.5em; right: 0.5em; }
