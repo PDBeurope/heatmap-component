@@ -24,7 +24,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         draw?: Behavior<DrawExtensionParams<TX, TY, TDatum>>,
         zoom?: Behavior<ZoomExtensionParams>,
         brush?: Behavior<BrushExtensionParams>,
-        axes?: Behavior<AxesExtensionParams>,
+        axes?: Behavior<AxesExtensionParams<TX, TY>>,
     } = {};
 
     /** Create a new `Heatmap` and optionaly set `data`.

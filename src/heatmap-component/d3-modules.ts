@@ -4,6 +4,7 @@
 export * from 'd3-axis';
 export * from 'd3-brush';
 export * from 'd3-color';
+export * from 'd3-format';
 export * from 'd3-scale';
 export * from 'd3-scale-chromatic';
 export * from 'd3-selection';
