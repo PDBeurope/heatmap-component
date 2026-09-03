@@ -1,6 +1,7 @@
 import { Color } from './data/color';
 import { DataDescription, Provider } from './data/data-description';
 import { Behavior } from './extension';
+import { AxesExtension, AxesExtensionParams } from './extensions/axes';
 import { BrushExtension, BrushExtensionParams } from './extensions/brush';
 import { DrawExtension, DrawExtensionParams } from './extensions/draw';
 import { MarkerBehavior, MarkerExtension, MarkerExtensionParams } from './extensions/marker';
@@ -23,6 +24,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         draw?: Behavior<DrawExtensionParams<TX, TY, TDatum>>,
         zoom?: Behavior<ZoomExtensionParams>,
         brush?: Behavior<BrushExtensionParams>,
+        axes?: Behavior<AxesExtensionParams<TX, TY>>,
     } = {};
 
     /** Create a new `Heatmap` and optionaly set `data`.
@@ -35,6 +37,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         heatmap.extensions.draw = heatmap.registerExtension(DrawExtension);
         heatmap.extensions.zoom = heatmap.registerExtension(ZoomExtension);
         heatmap.extensions.brush = heatmap.registerExtension(BrushExtension);
+        heatmap.extensions.axes = heatmap.registerExtension(AxesExtension);
 
         return heatmap;
     }
@@ -125,6 +128,24 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
      */
     setZooming(params: Partial<ZoomExtensionParams>): this {
         this.extensions.zoom?.update(params);
+        return this;
+    }
+
+    /** Set axes parameters.
+     *
+     * Example:
+     * ```
+     * heatmap.setAxes({ bottom: true, left: true });  // Turn on bottom x-axis and left y-axis
+     * heatmap.setAxes({ top: { offset: 5, tickArguments: () => [undefined, '.2f'] } });  // Turn on and customize top x-axis
+     * ```
+     *
+     * When displaying axes, positioning of the `div.heatmap-canvas-div` element must be adjusted to create space for the axes. Example:
+     * ```css
+     * .heatmap-canvas-div { top: 0.5em; bottom: 1.5em; left: 1.5em; right: 0.5em; }
+     * ```
+     */
+    setAxes(params: Partial<AxesExtensionParams<TX, TY>>): this {
+        this.extensions.axes?.update(params);
         return this;
     }
 
