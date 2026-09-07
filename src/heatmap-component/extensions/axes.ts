@@ -35,6 +35,8 @@ export interface AxisOptions<TDomain> {
     tickValues: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>, tickArguments: [count?: number, specifier?: string]) => Iterable<d3.NumberValue> | null,
     /** Function that returns the tick formatter, or `null` to use the D3 default formatter. */
     tickFormat: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>, tickArguments: [count?: number, specifier?: string]) => ((index: d3.NumberValue, i: number) => string) | null,
+    /** Function that returns the list of subaxis ranges (in domain index space) to be rendered. By default, exactly one subaxis is rendered, with range equal to the visible range of domain indices (i.e. `scale.domain()`). */
+    subaxisRanges: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>) => [start: number, end: number][],
 }
 
 export const DefaultAxisOptions: AxisOptions<unknown> = {
@@ -72,6 +74,7 @@ export const DefaultAxisOptions: AxisOptions<unknown> = {
             };
         }
     },
+    subaxisRanges: (scale, domain) => [getLimits(scale.domain())],
 };
 
 function normalizeAxisOptions<TDomain>(param: boolean | Partial<AxisOptions<TDomain>>): AxisOptions<TDomain> | undefined {
@@ -119,36 +122,48 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
         const updateAxis = <TDomain>(position: 'top' | 'bottom' | 'left' | 'right', axisParam: boolean | Partial<AxisOptions<TDomain>>, domain: Domain<TDomain>) => {
             const options = normalizeAxisOptions(axisParam);
             const className = `heatmap-axis-${position}`;
-            const currentAxisGroup = axesSvg.selectAll<SVGGElement, unknown>(`.${className}`).data(options ? [undefined] : []);
-            currentAxisGroup.exit().remove();
-            if (options) {
-                const scale = (position === 'top' || position === 'bottom') ?
-                    alignScale(this.state.scales.worldToSvg.x, this.state.xAlignment)
-                    : alignScale(this.state.scales.worldToSvg.y, this.state.yAlignment);
-                let axis: d3.Axis<d3.NumberValue>;
-                let translate: [number, number];
-                switch (position) {
-                    case 'top':
-                        axis = d3.axisTop(scale);
-                        translate = [canvasLeft, canvasTop - options.offset];
-                        break;
-                    case 'bottom':
-                        axis = d3.axisBottom(scale);
-                        translate = [canvasLeft, canvasTop + canvasRect.height + options.offset];
-                        break;
-                    case 'left':
-                        axis = d3.axisLeft(scale);
-                        translate = [canvasLeft - options.offset, canvasTop];
-                        break;
-                    case 'right':
-                        axis = d3.axisRight(scale);
-                        translate = [canvasLeft + canvasRect.width + options.offset, canvasTop];
-                        break;
-                }
-                const axisGroup = currentAxisGroup.enter().append('g').attr('class', className).merge(currentAxisGroup).attr('transform', `translate(${translate})`);
-                setAxisTicks(axis, options, scale, domain);
-                axisGroup.call(axis);
+            if (!options) {
+                axesSvg.selectAll<SVGGElement, unknown>(`.${className}`).remove();
+                return;
             }
+            let axisFn: typeof d3.axisTop;
+            let translate: [number, number];
+            switch (position) {
+                case 'top':
+                    axisFn = d3.axisTop;
+                    translate = [canvasLeft, canvasTop - options.offset];
+                    break;
+                case 'bottom':
+                    axisFn = d3.axisBottom;
+                    translate = [canvasLeft, canvasTop + canvasRect.height + options.offset];
+                    break;
+                case 'left':
+                    axisFn = d3.axisLeft;
+                    translate = [canvasLeft - options.offset, canvasTop];
+                    break;
+                case 'right':
+                    axisFn = d3.axisRight;
+                    translate = [canvasLeft + canvasRect.width + options.offset, canvasTop];
+                    break;
+            }
+            const globalScale = (position === 'top' || position === 'bottom') ?
+                alignScale(this.state.scales.worldToSvg.x, this.state.xAlignment)
+                : alignScale(this.state.scales.worldToSvg.y, this.state.yAlignment);
+            const globalRange = getLimits(globalScale.domain());
+            const subaxisRanges: [number, number][] = options.subaxisRanges(globalScale, domain)
+                .filter(range => range[0] <= globalRange[1] && range[1] >= globalRange[0]) // Remove subaxis ranges not overlapping with the global range
+                .map(range => [Math.max(range[0], globalRange[0]), Math.min(range[1], globalRange[1])]); // Clamp subaxis ranges to the global range
+
+            const currentAxisGroups = axesSvg.selectAll<SVGGElement, unknown>(`.${className}`).data(subaxisRanges);
+            currentAxisGroups.exit().remove();
+            const axisGroups = currentAxisGroups.enter().append('g').attr('class', className).merge(currentAxisGroups);
+            axisGroups.attr('transform', `translate(${translate})`);
+            axisGroups.each((subaxisRange, i, groupElements) => {
+                const subaxisScale = d3.scaleLinear(subaxisRange, subaxisRange.map(globalScale));
+                const subaxis = axisFn(subaxisScale);
+                setAxisTicks(subaxis, options, subaxisScale, domain);
+                d3.select(groupElements[i]).call(subaxis);
+            });
         };
 
         updateAxis('top', this.params.top, this.state.xDomain);
@@ -156,9 +171,13 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
         updateAxis('left', this.params.left, this.state.yDomain);
         updateAxis('right', this.params.right, this.state.yDomain);
     }
-
 }
 
+
+/** Get the first and last item of `domain`. */
+function getLimits<T>(domain: T[]): [T, T] {
+    return [domain[0], domain[domain.length - 1]];
+}
 
 /** Get client rectangle of the HTML element, excluding the border */
 function getInnerRect(element: HTMLElement | null) {
