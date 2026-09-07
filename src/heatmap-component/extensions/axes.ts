@@ -30,19 +30,19 @@ export interface AxisOptions<TDomain> {
     /** Pixel offset between the axis and the heatmap canvas. */
     offset: number,
     /** Function that returns the arguments used to generate axis ticks. These arguments will be passed to the D3 `Axis.tickArguments` method and to the `tickValues` and `tickFormat` functions. */
-    tickArguments: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>) => [count?: number, specifier?: string],
+    tickArguments: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>) => [count?: number, specifier?: string],
     /** Function that returns the list of tick values, or `null` to use the D3 default ticks. */
-    tickValues: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>, tickArguments: [count?: number, specifier?: string]) => Iterable<d3.NumberValue> | null,
+    tickValues: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>, tickArguments: [count?: number, specifier?: string]) => Iterable<d3.NumberValue> | null,
     /** Function that returns the tick formatter, or `null` to use the D3 default formatter. */
-    tickFormat: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>, tickArguments: [count?: number, specifier?: string]) => ((index: d3.NumberValue, i: number) => string) | null,
+    tickFormat: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>, tickArguments: [count?: number, specifier?: string]) => ((index: d3.NumberValue, i: number) => string) | null,
     /** Function that returns the list of subaxis ranges (in domain index space) to be rendered. By default, exactly one subaxis is rendered, with range equal to the visible range of domain indices (i.e. `scale.domain()`). */
-    subaxisRanges: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>) => [start: number, end: number][],
+    subaxisRanges: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>) => [start: number, end: number][],
 }
 
 export const DefaultAxisOptions: AxisOptions<unknown> = {
     offset: 0,
     tickArguments: () => [],
-    tickValues: (scale, domain, args) => {
+    tickValues: (domain, scale, args) => {
         const indexPresent = (idx: number) => Math.floor(idx) === idx && idx >= 0 && idx < domain.values.length;
         if (domain.isNumeric && domain.sortDirection !== 'none') {
             // Sorted numeric column/row labels
@@ -57,7 +57,7 @@ export const DefaultAxisOptions: AxisOptions<unknown> = {
             return scale.ticks(args[0]).filter(indexPresent);
         }
     },
-    tickFormat: (scale, domain, args) => {
+    tickFormat: (domain, scale, args) => {
         const numFormat = d3.format(args[1] ?? '');
         if (domain.isNumeric && domain.sortDirection !== 'none') {
             // Sorted numeric column/row labels
@@ -74,7 +74,7 @@ export const DefaultAxisOptions: AxisOptions<unknown> = {
             };
         }
     },
-    subaxisRanges: (scale, domain) => [getLimits(scale.domain())],
+    subaxisRanges: (domain, scale) => [getLimits(scale.domain())],
 };
 
 function normalizeAxisOptions<TDomain>(param: boolean | Partial<AxisOptions<TDomain>>): AxisOptions<TDomain> | undefined {
@@ -150,7 +150,7 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
                 alignScale(this.state.scales.worldToSvg.x, this.state.xAlignment)
                 : alignScale(this.state.scales.worldToSvg.y, this.state.yAlignment);
             const globalRange = getLimits(globalScale.domain());
-            const subaxisRanges: [number, number][] = options.subaxisRanges(globalScale, domain)
+            const subaxisRanges: [number, number][] = options.subaxisRanges(domain, globalScale)
                 .filter(range => range[0] <= globalRange[1] && range[1] >= globalRange[0]) // Remove subaxis ranges not overlapping with the global range
                 .map(range => [Math.max(range[0], globalRange[0]), Math.min(range[1], globalRange[1])]); // Clamp subaxis ranges to the global range
 
@@ -199,11 +199,11 @@ function alignScale(scale: d3.ScaleLinear<number, number>, alignment: 'left' | '
 }
 
 function setAxisTicks<TDomain>(axis: d3.Axis<d3.NumberValue>, axisOptions: AxisOptions<TDomain>, scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>): d3.Axis<d3.NumberValue> {
-    const tickArguments = axisOptions.tickArguments(scale, domain);
+    const tickArguments = axisOptions.tickArguments(domain, scale);
     axis.tickArguments(tickArguments);
-    const tickValues = axisOptions.tickValues(scale, domain, tickArguments);
+    const tickValues = axisOptions.tickValues(domain, scale, tickArguments);
     if (tickValues) axis.tickValues(tickValues); else axis.tickValues(null);
-    const tickFormat = axisOptions.tickFormat(scale, domain, tickArguments);
+    const tickFormat = axisOptions.tickFormat(domain, scale, tickArguments);
     if (tickFormat) axis.tickFormat(tickFormat); else axis.tickFormat(null);
     return axis;
 }
