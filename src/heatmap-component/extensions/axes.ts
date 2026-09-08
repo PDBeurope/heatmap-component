@@ -30,17 +30,17 @@ export interface AxisOptions<TDomain> {
     /** Pixel offset between the axis and the heatmap canvas. */
     offset: number,
     /** Function that returns the arguments used to generate axis ticks. These arguments will be passed to the D3 `Axis.tickArguments` method and to the `tickValues` and `tickFormat` functions. */
-    tickArguments: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>) => [count?: number, specifier?: string],
+    tickArguments: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>) => [count?: number, specifier?: string],
     /** Function that returns the list of tick values, or `null` to use the D3 default ticks. */
-    tickValues: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>, tickArguments: [count?: number, specifier?: string]) => Iterable<d3.NumberValue> | null,
+    tickValues: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>, tickArguments: [count?: number, specifier?: string]) => Iterable<d3.NumberValue> | null,
     /** Function that returns the tick formatter, or `null` to use the D3 default formatter. */
-    tickFormat: (scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>, tickArguments: [count?: number, specifier?: string]) => ((index: d3.NumberValue, i: number) => string) | null,
+    tickFormat: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>, tickArguments: [count?: number, specifier?: string]) => ((index: d3.NumberValue, i: number) => string) | null,
 }
 
 export const DefaultAxisOptions: AxisOptions<unknown> = {
     offset: 0,
     tickArguments: () => [],
-    tickValues: (scale, domain, args) => {
+    tickValues: (domain, scale, args) => {
         const indexPresent = (idx: number) => Math.floor(idx) === idx && idx >= 0 && idx < domain.values.length;
         if (domain.isNumeric && domain.sortDirection !== 'none') {
             // Sorted numeric column/row labels
@@ -55,7 +55,7 @@ export const DefaultAxisOptions: AxisOptions<unknown> = {
             return scale.ticks(args[0]).filter(indexPresent);
         }
     },
-    tickFormat: (scale, domain, args) => {
+    tickFormat: (domain, scale, args) => {
         const numFormat = d3.format(args[1] ?? '');
         if (domain.isNumeric && domain.sortDirection !== 'none') {
             // Sorted numeric column/row labels
@@ -146,7 +146,7 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
                         break;
                 }
                 const axisGroup = currentAxisGroup.enter().append('g').attr('class', className).merge(currentAxisGroup).attr('transform', `translate(${translate})`);
-                setAxisTicks(axis, options, scale, domain);
+                setAxisTicks(axis, options, domain, scale);
                 axisGroup.call(axis);
             }
         };
@@ -156,7 +156,6 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
         updateAxis('left', this.params.left, this.state.yDomain);
         updateAxis('right', this.params.right, this.state.yDomain);
     }
-
 }
 
 
@@ -179,12 +178,12 @@ function alignScale(scale: d3.ScaleLinear<number, number>, alignment: 'left' | '
     return scale.copy().domain([origDomain[0] - offset, origDomain[1] - offset]);
 }
 
-function setAxisTicks<TDomain>(axis: d3.Axis<d3.NumberValue>, axisOptions: AxisOptions<TDomain>, scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>): d3.Axis<d3.NumberValue> {
-    const tickArguments = axisOptions.tickArguments(scale, domain);
+function setAxisTicks<TDomain>(axis: d3.Axis<d3.NumberValue>, axisOptions: AxisOptions<TDomain>, domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>): d3.Axis<d3.NumberValue> {
+    const tickArguments = axisOptions.tickArguments(domain, scale);
     axis.tickArguments(tickArguments);
-    const tickValues = axisOptions.tickValues(scale, domain, tickArguments);
+    const tickValues = axisOptions.tickValues(domain, scale, tickArguments);
     if (tickValues) axis.tickValues(tickValues); else axis.tickValues(null);
-    const tickFormat = axisOptions.tickFormat(scale, domain, tickArguments);
+    const tickFormat = axisOptions.tickFormat(domain, scale, tickArguments);
     if (tickFormat) axis.tickFormat(tickFormat); else axis.tickFormat(null);
     return axis;
 }
