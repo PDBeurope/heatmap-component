@@ -7,6 +7,22 @@
   <link rel="shortcut icon" type="image/x-icon" href="../favicon.ico">
   <link rel="stylesheet" type="text/css" href="../build/heatmap-component.css" />
   <script src="../build/heatmap-component.js"></script>
+  <style>
+    #app .heatmap-canvas-div {
+      inset: 0.5em 0.5em 1.5em 2.5em;
+      border: solid 1px black;
+    }
+
+    #app .heatmap-axes {
+      .domain {
+        stroke-width: 3;
+      }
+
+      .tick line {
+        stroke-width: 0.5;
+      }
+    }
+  </style>
 </head>
 
 <body>
@@ -32,7 +48,7 @@
   <div style="padding: 15px; background-color: white;">
     <!-- Your visualization will be placed here -->
     <!-- <div id="app" style="width: 500px; aspect-ratio: 1; border: solid 1px black;"></div> -->
-    <div id="app" style="max-width: 800px; max-height: 600px; aspect-ratio: 1; border: solid 1px black;"></div>
+    <div id="app" style="max-width: 800px; max-height: 600px; aspect-ratio: 1; border: solid 1px gainsboro;"></div>
   </div>
 
   <p><strong>Rows:</strong> <span id="row-names"></span></p>

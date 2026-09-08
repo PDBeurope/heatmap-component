@@ -170,11 +170,9 @@ async function fetchPAEMatrix(uniprotId: string, cut?: number) {
 /** Demo showing an AlphaFold PAE matrix from real data */
 export async function demo5(divElementOrId: HTMLDivElement | string): Promise<void> {
     const heatmap = Heatmap.create<string, string, InterfaceContact>();
-    // heatmap.setVisualParams({ xGapRelative: 0, yGapRelative: 0 }); // Remove gaps between cells
     heatmap.setVisualParams({ xGapRelative: 0.05, yGapRelative: 0.05 }); // Decrease gaps between cells
     heatmap.setTooltip((d) => `<strong>${d.residue_1} / ${d.residue_2}</strong><hr style="margin-block:0.2em;"><strong>Bond type:</strong> ${d.bond_type}<br><strong>Frequency:</strong> ${d.frequency}`);
-    // heatmap.extensions.marker?.update({ freeze: true });
-    // heatmap.setBrushing({ enabled: true });
+    heatmap.setAlignment('center', 'center');
     heatmap.render(divElementOrId);
     (window as any).heatmap = heatmap;
 
@@ -209,33 +207,73 @@ export async function demo5(divElementOrId: HTMLDivElement | string): Promise<vo
 function loadInterface(heatmap: Heatmap<string, string, InterfaceContact>, allData: InterfaceData[], interfaceIndex: number, filter: FilterKind) {
     const data = allData[interfaceIndex];
     const maxValue = data.data.map(d => d.frequency).reduce((a, b) => b > a ? b : a, 0);
-    function prepareSequence(residues: string[]) {
-        if (filter === 'filter-full') return halucinateFullSequence(residues);
-        if (filter === 'filter-nogaps') return removeGaps(halucinateFullSequence(residues), residues, 10);
-        if (filter === 'filter-contacts') return residues;
-        throw new Error(`Unknown filter kind: ${filter}`);
-    }
-    const sequence1 = prepareSequence(data.residues1);
-    const sequence2 = prepareSequence(data.residues2);
-    // TODO: get real full sequences from somewhere
-    const aspectRatio = sequence2.length / sequence1.length;
+    const dom1 = prepareDomain(data.residues1, filter);
+    const dom2 = prepareDomain(data.residues2, filter);
+    const aspectRatio = dom2.domain.length / dom1.domain.length;
 
     setTextContent('#interface-number', `(${interfaceIndex + 1}/${allData.length})`);
     setTextContent('#interface-title', `Interface ${data.agg_interface_id}: ${data.component_label_1} / ${data.component_label_2}`);
-    setTextContent('#row-names', `${sequence1.join(', ')}`);
-    setTextContent('#column-names', `${sequence2.join(', ')}`);
+    setTextContent('#row-names', `${dom1.domain.join(', ')}`);
+    setTextContent('#column-names', `${dom2.domain.join(', ')}`);
     setTextContent('#max-frequency', `${maxValue}`);
-    document.querySelectorAll<HTMLElement>('#app').forEach(appDiv => appDiv.style.aspectRatio = String(aspectRatio));
+    document.querySelectorAll<HTMLElement>('#app').forEach(appDiv => appDiv.style.aspectRatio = String(aspectRatio)); // TODO: fix (this is not taking into account canvas margin (axis area))
 
     heatmap.setData({
-        yDomain: sequence1,
-        xDomain: sequence2,
+        yDomain: dom1.domain,
+        xDomain: dom2.domain,
         data: data.data,
         y: d => d.residue_1,
         x: d => d.residue_2,
     });
+
+    const AXIS_TICK_WIDTH = 30;
+    const AXIS_TICK_HEIGHT = 15;
+    heatmap.setAxes({
+        left: {
+            tickArguments: (domain, scale) => [tickNumber(scale.range(), AXIS_TICK_HEIGHT)],
+            tickFormat: (domain, scale) => (index => domain.values[index.valueOf()]?.match(/([+-]?\d+)/)?.[1] ?? '?'), // remove resName prefix
+            subaxisRanges: (domain, scale) => dom1.contigs.map(([start, stop]) => [start, stop - 1]),
+            offset: 5,
+        },
+        bottom: {
+            tickArguments: (domain, scale) => [tickNumber(scale.range(), AXIS_TICK_WIDTH)],
+            tickFormat: (domain, scale) => (index => domain.values[index.valueOf()]?.match(/([+-]?\d+)/)?.[1] ?? '?'), // remove resName prefix
+            subaxisRanges: (domain, scale) => dom2.contigs.map(([start, stop]) => [start, stop - 1]),
+            offset: 5,
+        },
+    });
     const colorScale = ColorScale.continuous('Greens', [0, maxValue], [0.1, 1]); // [0.1, 1] is to skip the first 10% of the color palette to avoid almost-white colors
     heatmap.setColor(d => colorScale(d.frequency));
+}
+
+// TODO: think about adding region separator lines in 'filter-nogaps' view
+// TODO: think about adding region highlights in 'filter-full' view
+
+// TODO: convert domains to ResidueNumber to get nicer ticks
+// type ResidueNumber = number & { '@type': ResidueNumber };
+// function ResidueNumber(num: number): ResidueNumber { return num as ResidueNumber; }
+
+function prepareDomain(residues: string[], filter: FilterKind) {
+    const fullSequence = halucinateFullSequence(residues);
+    // TODO: get real full sequences from somewhere
+    const domain =
+        filter === 'filter-full' ? fullSequence
+            : filter === 'filter-nogaps' ? removeGaps(fullSequence, residues, CONTIG_MAX_GAP)
+                : residues;
+    const contigsInFullSequence: Ranges =
+        filter === 'filter-full' ? [[0, fullSequence.length]]
+            : getContiguousRegions2(fullSequence, residues, filter === 'filter-nogaps' ? CONTIG_MAX_GAP : 0);
+    const resNameToDomainIndex: { [resName: string]: number } = {};
+    domain.forEach((resName, i) => resNameToDomainIndex[resName] = i);
+    const contigs: Ranges = contigsInFullSequence.map(
+        ([start, stop]) => [resNameToDomainIndex[fullSequence[start]], resNameToDomainIndex[fullSequence[stop - 1]] + 1]
+    );
+    return { domain, contigs };
+}
+
+function tickNumber(scaleRange: number[], oneTickSpace: number) {
+    const space = Math.abs(scaleRange[scaleRange.length - 1] - scaleRange[0]);
+    return 1 + space / oneTickSpace;
 }
 
 interface InterfaceContact {
@@ -273,9 +311,12 @@ async function fetchInterfaceData(): Promise<InterfaceData[]> {
     });
 }
 
-const RE_RESIDUE_NAME = /[A-Z]*(\d+)/;
-function getResidueNumber(resName: string) {
-    const resNum = resName.match(RE_RESIDUE_NAME)?.[1];
+const CONTIG_EXTENSION = 2; // residues
+const CONTIG_MAX_GAP = 2 * CONTIG_EXTENSION; // residues
+
+const RE_RESIDUE_NAME = /[A-Z]*([+-]?\d+)/;
+function getResidueNumber(resName: string | null | undefined) {
+    const resNum = resName?.match(RE_RESIDUE_NAME)?.[1];
     return Number(resNum ?? '-1');
 }
 function sortedUniqueResidues(resNames: string[]): string[] {
@@ -295,7 +336,7 @@ function halucinateFullSequence(resNames: string[]) {
     return sortedUniqueResidues(out);
 }
 
-function removeGaps(fullSequence: string[], present: string[], maxGap: number) {
+function removeGaps(fullSequence: string[], present: string[], maxGap: number): string[] {
     const n = fullSequence.length;
     const presentSet = new Set(present);
     const presentMask = fullSequence.map(item => presentSet.has(item));
@@ -311,6 +352,28 @@ function removeGaps(fullSequence: string[], present: string[], maxGap: number) {
     return fullSequence.filter((item, i) => dilatedMask[i]);
 }
 
+/** Get contiguous regions from a list of items based on a key function and maximum gap. */
+function getContiguousRegions2<T>(fullSequence: T[], present: T[], maxGap: number): Ranges {
+    const n = fullSequence.length;
+    const presentSet = new Set(present);
+    const presentMask = fullSequence.map(item => presentSet.has(item));
+
+    const out: Ranges = []; // (endIndex is exclusive)
+    for (let i = 0; i < n; i++) {
+        if (presentMask[i]) {
+            if (out.length > 0 && i - out[out.length - 1][1] <= maxGap) {
+                out[out.length - 1][1] = i + 1;
+            } else {
+                out.push([i, i + 1]);
+            }
+        }
+    }
+    return out;
+}
+
+type Ranges = [start: number, stop: number][];
+
+
 /** Set text content to all HTML elements selected by `elementSelector`.
  * Example: `setTextContent('#element-to-change', 'changed text here');` */
 function setTextContent(elementSelector: string, content: unknown, numberPrecision: number = 4): void {
@@ -325,10 +388,9 @@ function addClickListener(elementSelector: string, type: string, listener: Event
 }
 type FilterKind = 'filter-full' | 'filter-nogaps' | 'filter-contacts';
 function getFilterKind(): FilterKind {
-    for (const elem of document.querySelectorAll('input[name=filter]:checked')) {
-        return elem.getAttribute('id') as FilterKind;
-    }
-    throw new Error('Could not find filter kind');
+    const selectedFilterButton = document.querySelector('input[name=filter]:checked');
+    if (!selectedFilterButton) throw new Error('Could not find filter kind');
+    return selectedFilterButton.getAttribute('id') as FilterKind;
 }
 
 /** Flatten a nested array. Dumb implementation, but doesn't matter, this is just a demo. Would use `flatMap` but it's not available in es2015. */
