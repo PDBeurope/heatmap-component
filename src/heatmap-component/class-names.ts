@@ -4,6 +4,7 @@ export const Class = {
     CanvasDiv: 'heatmap-canvas-div',
     Canvas: 'heatmap-canvas',
     Svg: 'heatmap-svg',
+    Axes: 'heatmap-axes',
     Marker: 'heatmap-marker',
     MarkerX: 'heatmap-marker-x',
     MarkerY: 'heatmap-marker-y',
