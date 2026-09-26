@@ -161,7 +161,7 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
             axisGroups.each((subaxisRange, i, groupElements) => {
                 const subaxisScale = d3.scaleLinear(subaxisRange, subaxisRange.map(globalScale));
                 const subaxis = axisFn(subaxisScale);
-                setAxisTicks(subaxis, options, subaxisScale, domain);
+                setAxisTicks(subaxis, options, domain, subaxisScale);
                 d3.select(groupElements[i]).call(subaxis);
             });
         };
@@ -198,7 +198,7 @@ function alignScale(scale: d3.ScaleLinear<number, number>, alignment: 'left' | '
     return scale.copy().domain([origDomain[0] - offset, origDomain[1] - offset]);
 }
 
-function setAxisTicks<TDomain>(axis: d3.Axis<d3.NumberValue>, axisOptions: AxisOptions<TDomain>, scale: d3.ScaleLinear<number, number>, domain: Domain<TDomain>): d3.Axis<d3.NumberValue> {
+function setAxisTicks<TDomain>(axis: d3.Axis<d3.NumberValue>, axisOptions: AxisOptions<TDomain>, domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>): d3.Axis<d3.NumberValue> {
     const tickArguments = axisOptions.tickArguments(domain, scale);
     axis.tickArguments(tickArguments);
     const tickValues = axisOptions.tickValues(domain, scale, tickArguments);
