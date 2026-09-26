@@ -228,17 +228,18 @@ function loadInterface(heatmap: Heatmap<string, string, InterfaceContact>, allDa
 
     const AXIS_TICK_WIDTH = 30;
     const AXIS_TICK_HEIGHT = 15;
+    const AXIS_LIMIT_EXTENSION = 0.45;
     heatmap.setAxes({
         left: {
             tickArguments: (domain, scale) => [tickNumber(scale.range(), AXIS_TICK_HEIGHT)],
             tickFormat: (domain, scale) => (index => domain.values[index.valueOf()]?.match(/([+-]?\d+)/)?.[1] ?? '?'), // remove resName prefix
-            subaxisRanges: (domain, scale) => dom1.contigs.map(([start, stop]) => [start, stop - 1]),
+            subaxisRanges: (domain, scale) => dom1.contigs.map(([start, stop]) => [start - AXIS_LIMIT_EXTENSION, stop - 1 + AXIS_LIMIT_EXTENSION]),
             offset: 5,
         },
         bottom: {
             tickArguments: (domain, scale) => [tickNumber(scale.range(), AXIS_TICK_WIDTH)],
             tickFormat: (domain, scale) => (index => domain.values[index.valueOf()]?.match(/([+-]?\d+)/)?.[1] ?? '?'), // remove resName prefix
-            subaxisRanges: (domain, scale) => dom2.contigs.map(([start, stop]) => [start, stop - 1]),
+            subaxisRanges: (domain, scale) => dom2.contigs.map(([start, stop]) => [start - AXIS_LIMIT_EXTENSION, stop - 1 + AXIS_LIMIT_EXTENSION]),
             offset: 5,
         },
     });
