@@ -66,12 +66,18 @@ export function demo1(divElementOrId: HTMLDivElement | string): void {
 
 /** Demo showing a big data example (200_000 x 20) */
 export function demo2(divElementOrId: HTMLDivElement | string): void {
-    const data = DataDescription.createDummy(2e5, 20);
+    const data = DataDescription.createDummy(2e3, 20); // TODO: revert to 2e5
     const heatmap = Heatmap.create(data); // Heatmap<number, number, number>
     heatmap.setVisualParams({ xGapRelative: 0, yGapRelative: 0 });
     heatmap.setColor(ColorScale.continuous('Magma', [0, 1]));
+    heatmap.setColor(ColorScale.continuous('Magma', [0, 1], [0.8, 1])); // DEBUG TODO: revert
     heatmap.render(divElementOrId);
     heatmap.setZooming({ axis: 'x' });
+
+    heatmap.setRegions({
+        xRegions: [[0, 1000], [1500, 1600], [1600, 1800]],
+    });
+
     (window as any).heatmap = heatmap;
 }
 
