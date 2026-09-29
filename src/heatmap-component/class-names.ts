@@ -4,6 +4,7 @@ export const Class = {
     CanvasDiv: 'heatmap-canvas-div',
     Canvas: 'heatmap-canvas',
     Svg: 'heatmap-svg',
+    Axes: 'heatmap-axes',
     Marker: 'heatmap-marker',
     MarkerX: 'heatmap-marker-x',
     MarkerY: 'heatmap-marker-y',
@@ -17,4 +18,7 @@ export const Class = {
     OverlayShade: 'heatmap-overlay-shade',
     OverlayMessage: 'heatmap-overlay-message',
     BrushClose: 'heatmap-brush-close',
+    RegionX: 'heatmap-region-x',
+    RegionY: 'heatmap-region-y',
+    RegionXY: 'heatmap-region-xy',
 } as const;

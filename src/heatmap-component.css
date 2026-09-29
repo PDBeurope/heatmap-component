@@ -10,13 +10,35 @@
 }
 
 .heatmap-canvas-div {
-    /* Set background-color here to change the background of the heatmap */
+    /** Set background-color here to change the background of the heatmap */
     background-color: none;
+
+    position: absolute;
+    /** Set top margin of the heatmap canvas within the main div, to make space for axis */
+    top: 0;
+    /** Set bottom margin of the heatmap canvas within the main div, to make space for axis */
+    bottom: 0;
+    /** Set left margin of the heatmap canvas within the main div, to make space for axis */
+    left: 0;
+    /** Set right margin of the heatmap canvas within the main div, to make space for axis */
+    right: 0;
 }
 
 .heatmap-svg[pointing-data] {
     /** Show "pointer" cursor when hovering over a cell with data */
     cursor: pointer;
+}
+
+
+/* Axes extension */
+
+.heatmap-axes {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
 }
 
 
@@ -145,4 +167,20 @@
 .heatmap-brush-close .circle {
     fill: white;
     stroke: white;
+}
+
+
+/* Regions extension */
+
+.heatmap-region-x,
+.heatmap-region-y,
+.heatmap-region-xy {
+    fill: none;
+    stroke: black;
+    /** Visible stroke width will be half of `stroke-width` value, because of `clip-path: content-box;` */
+    stroke-width: 2px;
+    /** Override this to set border dash pattern */
+    stroke-dasharray: none;
+    /** Avoid region stroke overflowing to neighboring cells, avoid interference of strokes of neighboring regions */
+    clip-path: content-box;
 }

@@ -147,11 +147,11 @@ This method is used to enable and customize manual zooming.
 
 Currently, only horizontal zooming mode is implemented (`axis: 'x'`), providing this functionality:
 
--   mouse scroll —> zoom in/out
--   horizontal scroll (on trackpad) —> pan (move to the sides)
--   shift + mouse scroll —> pan
--   mouse click and drag —> pan
--   double click —> zoom in
+- mouse scroll —> zoom in/out
+- horizontal scroll (on trackpad) —> pan (move to the sides)
+- shift + mouse scroll —> pan
+- mouse click and drag —> pan
+- double click —> zoom in
 
 ```ts
 setZooming(params: Partial<ZoomExtensionParams>): this
@@ -290,9 +290,85 @@ heatmap.events.brush.subscribe(e => {
 
 ---
 
+## Axes
+
+Display of X and Y axes is implemented via `AxesExtension` and can be controlled by the `setAxes` method.
+
+### `setAxes`
+
+This method is used to turn on/off and customize individual axes (top, bottom, left, right).
+
+```ts
+setAxes(params: Partial<AxesExtensionParams<TX, TY>>): this
+
+// Example usage:
+heatmap.setAxes({ bottom: true, left: true });  // Turn on bottom x-axis and left y-axis
+heatmap.setAxes({ top: { offset: 5, tickArguments: () => [undefined, '.2f'] } });  // Turn on and customize top x-axis
+```
+
+When displaying axes, positioning of the `div.heatmap-canvas-div` element must be adjusted to create space for the axes.
+
+Example:
+
+```css
+.heatmap-canvas-div {
+    top: 0.5em;
+    bottom: 1.5em;
+    left: 1.5em;
+    right: 0.5em;
+}
+```
+
+---
+
+## Regions
+
+Custom static regions can be marked via builtin `RegionsExtension`. This includes 1-dimensional regions (bands) along X and Y axes and 2-dimensional rectangular regions.
+Regions to mark can be controlled by the `setRegions` method.
+
+**Note:** Regions are rendered via SVG (not canvas) and are intended to mark a few high-level regions within the heatmap. Using this to mark high numbers of regions can cause performance issues.
+
+### `setRegions`
+
+This method is used to visualy mark custom regions. The regions are defined by 0-based column/row indices (not column/row names!), where the stop index is exclusive; e.g. `[0, 100]` marks columns with index 0 up to 99.
+
+- 1-dimensional regions (`xRegions`, `yRegions`) are expressed as index tuples `[start, stop]`, where `stop` is exclusive.
+- 2-dimensional rectangular regions (`xyRegions`) are expressed as index 4-tuples `[xStart, xStop, yStart, yStop]`, where `xStop` and `yStop` are exclusive.
+
+```ts
+setRegions(params: Partial<RegionsExtensionParams>): this
+
+// Example usage:
+heatmap.setRegions({ xRegions: [[0, 100], [100, 200], [200, 250]] });   // Define regions along x-axis
+heatmap.setRegions({ xyRegions: [[0, 100, 0, 5], [200, 250, 5, 10]] }); // Define rectangular regions
+heatmap.setRegions({ xRegions: null, xyRegions: null });                // Remove regions
+```
+
+By default, regions are marked with black outline, without fill.
+Region style can be customized via CSS classes `.heatmap-region-x, .heatmap-region-y, .heatmap-region-xy`.
+
+Example:
+
+```css
+.heatmap-region-x,
+.heatmap-region-y {
+    stroke: darkblue;
+    /** Visible stroke width will be half of `stroke-width` value, because of `clip-path: content-box;` */
+    stroke-width: 4px;
+    /** Set dashed border */
+    stroke-dasharray: 5 3;
+}
+.heatmap-region-xy {
+    stroke: none;
+    fill: #ff00ff80;
+}
+```
+
+---
+
 ## Extension customization
 
-Each of the [builtin extensions](./architecture.md#extensions) (Draw, Marker, Tooltip, Zoom, Brush) has a set of parameters, initially set to their default values. The parameter values can be changed via `update` method.
+Each of the [builtin extensions](./architecture.md#extensions) (Draw, Marker, Tooltip, Zoom, Brush, Axes, Regions) has a set of parameters, initially set to their default values. The parameter values can be changed via `update` method.
 
 ```ts
 // Example usage:

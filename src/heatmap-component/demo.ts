@@ -55,6 +55,10 @@ export function demo1(divElementOrId: HTMLDivElement | string): void {
         }
     });
     heatmap.setZooming({ axis: 'x' });
+    heatmap.setAxes({
+        left: true,
+        bottom: { tickArguments: () => [undefined, '.2f'] },
+    });
     heatmap.render(divElementOrId);
     (window as any).heatmap = heatmap;
 }
