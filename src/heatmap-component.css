@@ -31,6 +31,7 @@
 
 
 /* Axes extension */
+
 .heatmap-axes {
     position: absolute;
     left: 0px;
@@ -168,15 +169,18 @@
     stroke: white;
 }
 
+
 /* Regions extension */
 
-.heatmap-region,
 .heatmap-region-x,
-.heatmap-region-y {
-    /* fill: none;  */
-    fill: #00ff0040;
-    stroke: #00000040;
-    stroke-width: 3px;
-    stroke-dasharray: 6 8;
-    stroke-linecap: square;
+.heatmap-region-y,
+.heatmap-region-xy {
+    fill: none;
+    stroke: black;
+    /** Visible stroke width will be half of `stroke-width` value, because of `clip-path: content-box;` */
+    stroke-width: 2px;
+    /** Set top margin of the heatmap canvas within the main div, to make space for axis */
+    stroke-dasharray: none;
+    /** Avoid region stroke overflowing to neighboring cells, avoid interference of strokes of neighboring regions */
+    clip-path: content-box;
 }

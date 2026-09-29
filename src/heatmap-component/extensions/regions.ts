@@ -6,17 +6,23 @@ import { Box } from '../scales';
 
 /** Parameters for `RegionsExtension` */
 export interface RegionsExtensionParams {
-    /** Options for the top X axis (`false` to hide the axis, `true` to show with default options). */
-    xRegions: [number, number][] | null,
+    /** Regions (bands) along the X axis, expressed as `[xStart, xStop)` tuples. The values are 0-based column indices, not column names. Final index (`xStop`) is exclusive. */
+    xRegions: [xStart: number, xStop: number][] | null,
+    /** Regions (bands) along the Y axis, expressed as `[yStart, yStop)` tuples. The values are 0-based row indices, not row names. Final index (`yStop`) is exclusive. */
+    yRegions: [yStart: number, yStop: number][] | null,
+    /** Regions (rectangles) along X and Y axis, expressed as `[xStart, xStop, yStart, yStop)` 4-tuples. The values are 0-based column/row indices, not column/row names. Final index (`xStop`, `yStop`) is exclusive. */
+    xyRegions: [xStart: number, xStop: number, yStart: number, yStop: number][] | null,
 }
 
 /** Default parameter values for `RegionsExtension` */
 export const DefaultRegionsExtensionParams: RegionsExtensionParams = {
     xRegions: null,
+    yRegions: null,
+    xyRegions: null,
 };
 
 
-/** Behavior class for `RegionsExtension` (marks custom regions ) */
+/** Behavior class for `RegionsExtension` (marks custom regions) */
 export class RegionsBehavior extends BehaviorBase<RegionsExtensionParams> {
     override register(): void {
         super.register();
@@ -31,27 +37,44 @@ export class RegionsBehavior extends BehaviorBase<RegionsExtensionParams> {
     }
 
     override unregister(): void {
-        this.state.dom?.svg.selectAll(`.${Class.RegionX}`).remove();
-        this.state.dom?.svg.selectAll(`.${Class.RegionY}`).remove();
-        this.state.dom?.svg.selectAll(`.${Class.Region}`).remove();
+        this.clearRegions();
         super.unregister();
     }
 
     private updateRegions(): void {
         if (!this.state.dom) return;
-        const svg = this.state.dom.svg;
-        // TODO: shortcut if no regions? (remove when emptying params)
 
+        const { xRegions, yRegions, xyRegions } = this.params;
+        if (!xRegions && !yRegions && !xyRegions) { // Shortcut just for performance
+            if (this.regionsVisible) {
+                this.clearRegions();
+            }
+            return;
+        }
+
+        this.regionsVisible = true;
         const xScale = this.state.scales.worldToSvg.x;
+        const yScale = this.state.scales.worldToSvg.y;
+        const svgBox = this.state.boxes.svg;
+        const svg = this.state.dom.svg;
 
-        const dataX = this.params.xRegions ?? [];
-
-        updateRegionGroups(svg, Class.RegionX, dataX.map(d => Box.create(xScale(d[0]), this.state.boxes.svg.ymin, xScale(d[1]), this.state.boxes.svg.ymax)), 'x');
+        updateRegionGroups(svg, Class.RegionX, xRegions?.map(d => Box.create(xScale(d[0]), svgBox.ymin, xScale(d[1]), svgBox.ymax)), 'x');
+        updateRegionGroups(svg, Class.RegionY, yRegions?.map(d => Box.create(svgBox.xmin, yScale(d[0]), svgBox.xmax, yScale(d[1]))), 'y');
+        updateRegionGroups(svg, Class.RegionXY, xyRegions?.map(d => Box.create(xScale(d[0]), yScale(d[2]), xScale(d[1]), yScale(d[3]))), 'xy');
     }
+
+    private clearRegions(): void {
+        this.regionsVisible = false;
+        this.state.dom?.svg.selectAll(`.${Class.RegionX}`).remove();
+        this.state.dom?.svg.selectAll(`.${Class.RegionY}`).remove();
+        this.state.dom?.svg.selectAll(`.${Class.RegionXY}`).remove();
+    }
+
+    private regionsVisible = false;
 }
 
-function getOrCreateRegionGroups<TData>(svg: Selection<SVGSVGElement, any, any, any>, className: string, data: TData[]) {
-    const groups = svg.selectAll<SVGGElement, unknown>(`g.${className}`).data(data);
+function getOrCreateRegionGroups<TData>(svg: Selection<SVGSVGElement, any, any, any>, className: string, data: TData[] | undefined) {
+    const groups = svg.selectAll<SVGGElement, unknown>(`g.${className}`).data(data ?? []);
     groups.exit().remove();
     const enterGroups = groups.enter().append('g').attr('class', className);
     enterGroups.append('rect').attr('stroke', 'none');
@@ -59,7 +82,7 @@ function getOrCreateRegionGroups<TData>(svg: Selection<SVGSVGElement, any, any, 
     return enterGroups.merge(groups);
 }
 
-function updateRegionGroups(svg: Selection<SVGSVGElement, any, any, any>, className: string, boxes: Box[], strokes: 'x' | 'y' | 'xy') {
+function updateRegionGroups(svg: Selection<SVGSVGElement, any, any, any>, className: string, boxes: Box[] | undefined, strokes: 'x' | 'y' | 'xy') {
     const gRegionsX = getOrCreateRegionGroups(svg, className, boxes);
     gRegionsX.select('rect')
         .attr('x', b => b.xmin)
@@ -69,9 +92,12 @@ function updateRegionGroups(svg: Selection<SVGSVGElement, any, any, any>, classN
     if (strokes === 'x') {
         // Draw vertical edges
         gRegionsX.select('path').attr('d', b => `M${b.xmin} ${b.ymin} L ${b.xmin} ${b.ymax} M${b.xmax} ${b.ymin} L ${b.xmax} ${b.ymax} `);
+    } else if (strokes === 'y') {
+        // Draw horizontal edges
+        gRegionsX.select('path').attr('d', b => `M${b.xmin} ${b.ymin} L ${b.xmax} ${b.ymin} M${b.xmin} ${b.ymax} L ${b.xmax} ${b.ymax} `);
     } else {
-        // TODO: implement
-        throw new Error('NotImplementedError');
+        // Draw vertical and horizontal edges
+        gRegionsX.select('path').attr('d', b => `M${b.xmin} ${b.ymin} L ${b.xmin} ${b.ymax} M${b.xmax} ${b.ymin} L ${b.xmax} ${b.ymax} M${b.xmin} ${b.ymin} L ${b.xmax} ${b.ymin} M${b.xmin} ${b.ymax} L ${b.xmax} ${b.ymax} `);
     }
 }
 
@@ -82,6 +108,3 @@ export const RegionsExtension: Extension<RegionsExtensionParams, typeof DefaultR
     defaultParams: DefaultRegionsExtensionParams,
     behavior: RegionsBehavior,
 });
-
-
-// TODO: doublecheck performance of AxesExtension and RegionExtension (issues might be caused only dev vs prod build)
