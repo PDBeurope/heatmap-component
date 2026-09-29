@@ -332,16 +332,16 @@ Regions to mark can be controlled by the `setRegions` method.
 
 This method is used to visualy mark custom regions. The regions are defined by 0-based column/row indices (not column/row names!), where the stop index is exclusive; e.g. `[0, 100]` marks columns with index 0 up to 99.
 
-- 1-dimensional regions (`xRegions`, `yRegions`) are expressed as 2-tuples `[start, stop]`, where `stop` is exclusive.
-- 2-dimensional rectangular regions (`xyRegions`) are defined by a 4-tuple `[xStart, xStop, yStart, yStop]`, where `xStop` and `yStop` are exclusive.
+- 1-dimensional regions (`xRegions`, `yRegions`) are expressed as index tuples `[start, stop]`, where `stop` is exclusive.
+- 2-dimensional rectangular regions (`xyRegions`) are expressed as index 4-tuples `[xStart, xStop, yStart, yStop]`, where `xStop` and `yStop` are exclusive.
 
 ```ts
 setRegions(params: Partial<RegionsExtensionParams>): this
 
 // Example usage:
-heatmap.setRegions({ xRegions: [[0, 100], [100, 200], [200, 250]] }); // Define regions along x-axis
+heatmap.setRegions({ xRegions: [[0, 100], [100, 200], [200, 250]] });   // Define regions along x-axis
 heatmap.setRegions({ xyRegions: [[0, 100, 0, 5], [200, 250, 5, 10]] }); // Define rectangular regions
-heatmap.setRegions({ xRegions: null, xyRegions: null }); // Remove rectangular regions
+heatmap.setRegions({ xRegions: null, xyRegions: null });                // Remove regions
 ```
 
 By default, regions are marked with black outline, without fill.
