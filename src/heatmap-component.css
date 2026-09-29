@@ -179,7 +179,7 @@
     stroke: black;
     /** Visible stroke width will be half of `stroke-width` value, because of `clip-path: content-box;` */
     stroke-width: 2px;
-    /** Set top margin of the heatmap canvas within the main div, to make space for axis */
+    /** Override this to set border dash pattern */
     stroke-dasharray: none;
     /** Avoid region stroke overflowing to neighboring cells, avoid interference of strokes of neighboring regions */
     clip-path: content-box;

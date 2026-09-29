@@ -152,7 +152,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         return this;
     }
 
-    /** Set custom highlighted regions.
+    /** Set custom regions to be visualy marked. The regions are defined by 0-based column/row indices (not column/row names!), where the stop index is exclusive; e.g. `[0, 100]` marks columns with index 0 up to 99.
      *
      * Example:
      * ```
@@ -160,7 +160,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
      * heatmap.setRegions({ xRegions: null }); // Remove regions along x-axis
      * ```
      *
-     * Regions can be styled via CSS `.heatmap-region, .heatmap-region-x, .heatmap-region-y` classes.
+     * Regions can be styled via CSS `.heatmap-region-x, .heatmap-region-y, .heatmap-region-xy, ` classes.
      */
     setRegions(params: Partial<RegionsExtensionParams>): this {
         this.extensions.regions?.update(params);

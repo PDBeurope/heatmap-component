@@ -321,9 +321,54 @@ Example:
 
 ---
 
+## Regions
+
+Custom static regions can be marked via builtin `RegionsExtension`. This includes 1-dimensional regions (bands) along X and Y axes and 2-dimensional rectangular regions.
+Regions to mark can be controlled by the `setRegions` method.
+
+**Note:** Regions are rendered via SVG (not canvas) and are intended to mark a few high-level regions within the heatmap. Using this to mark high numbers of regions can cause performance issues.
+
+### `setRegions`
+
+This method is used to visualy mark custom regions. The regions are defined by 0-based column/row indices (not column/row names!), where the stop index is exclusive; e.g. `[0, 100]` marks columns with index 0 up to 99.
+
+- 1-dimensional regions (`xRegions`, `yRegions`) are expressed as 2-tuples `[start, stop]`, where `stop` is exclusive.
+- 2-dimensional rectangular regions (`xyRegions`) are defined by a 4-tuple `[xStart, xStop, yStart, yStop]`, where `xStop` and `yStop` are exclusive.
+
+```ts
+setRegions(params: Partial<RegionsExtensionParams>): this
+
+// Example usage:
+heatmap.setRegions({ xRegions: [[0, 100], [100, 200], [200, 250]] }); // Define regions along x-axis
+heatmap.setRegions({ xyRegions: [[0, 100, 0, 5], [200, 250, 5, 10]] }); // Define rectangular regions
+heatmap.setRegions({ xRegions: null, xyRegions: null }); // Remove rectangular regions
+```
+
+By default, regions are marked with black outline, without fill.
+Region style can be customized via CSS classes `.heatmap-region-x, .heatmap-region-y, .heatmap-region-xy`.
+
+Example:
+
+```css
+.heatmap-region-x,
+.heatmap-region-y {
+    stroke: darkblue;
+    /** Visible stroke width will be half of `stroke-width` value, because of `clip-path: content-box;` */
+    stroke-width: 4px;
+    /** Set dashed border */
+    stroke-dasharray: 5 3;
+}
+.heatmap-region-xy {
+    stroke: none;
+    fill: #ff00ff80;
+}
+```
+
+---
+
 ## Extension customization
 
-Each of the [builtin extensions](./architecture.md#extensions) (Draw, Marker, Tooltip, Zoom, Brush) has a set of parameters, initially set to their default values. The parameter values can be changed via `update` method.
+Each of the [builtin extensions](./architecture.md#extensions) (Draw, Marker, Tooltip, Zoom, Brush, Axes, Regions) has a set of parameters, initially set to their default values. The parameter values can be changed via `update` method.
 
 ```ts
 // Example usage:
