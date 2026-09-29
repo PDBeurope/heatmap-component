@@ -31,6 +31,7 @@
 
 
 /* Axes extension */
+
 .heatmap-axes {
     position: absolute;
     left: 0px;
@@ -166,4 +167,20 @@
 .heatmap-brush-close .circle {
     fill: white;
     stroke: white;
+}
+
+
+/* Regions extension */
+
+.heatmap-region-x,
+.heatmap-region-y,
+.heatmap-region-xy {
+    fill: none;
+    stroke: black;
+    /** Visible stroke width will be half of `stroke-width` value, because of `clip-path: content-box;` */
+    stroke-width: 2px;
+    /** Override this to set border dash pattern */
+    stroke-dasharray: none;
+    /** Avoid region stroke overflowing to neighboring cells, avoid interference of strokes of neighboring regions */
+    clip-path: content-box;
 }

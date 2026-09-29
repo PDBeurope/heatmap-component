@@ -5,6 +5,7 @@ import { AxesExtension, AxesExtensionParams } from './extensions/axes';
 import { BrushExtension, BrushExtensionParams } from './extensions/brush';
 import { DrawExtension, DrawExtensionParams } from './extensions/draw';
 import { MarkerBehavior, MarkerExtension, MarkerExtensionParams } from './extensions/marker';
+import { RegionsExtension, RegionsExtensionParams } from './extensions/regions';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 import { ZoomExtension, ZoomExtensionParams } from './extensions/zoom';
 import { HeatmapCore } from './heatmap-core';
@@ -25,6 +26,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         zoom?: Behavior<ZoomExtensionParams>,
         brush?: Behavior<BrushExtensionParams>,
         axes?: Behavior<AxesExtensionParams<TX, TY>>,
+        regions?: Behavior<RegionsExtensionParams>,
     } = {};
 
     /** Create a new `Heatmap` and optionaly set `data`.
@@ -38,6 +40,7 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         heatmap.extensions.zoom = heatmap.registerExtension(ZoomExtension);
         heatmap.extensions.brush = heatmap.registerExtension(BrushExtension);
         heatmap.extensions.axes = heatmap.registerExtension(AxesExtension);
+        heatmap.extensions.regions = heatmap.registerExtension(RegionsExtension);
 
         return heatmap;
     }
@@ -146,6 +149,21 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
      */
     setAxes(params: Partial<AxesExtensionParams<TX, TY>>): this {
         this.extensions.axes?.update(params);
+        return this;
+    }
+
+    /** Set custom regions to be visualy marked. The regions are defined by 0-based column/row indices (not column/row names!), where the stop index is exclusive; e.g. `[0, 100]` marks columns with index 0 up to 99.
+     *
+     * Example:
+     * ```
+     * heatmap.setRegions({ xRegions: [[0, 100], [100, 200], [200, 250]] }); // Define regions along x-axis
+     * heatmap.setRegions({ xRegions: null }); // Remove regions along x-axis
+     * ```
+     *
+     * Regions can be styled via CSS `.heatmap-region-x, .heatmap-region-y, .heatmap-region-xy, ` classes.
+     */
+    setRegions(params: Partial<RegionsExtensionParams>): this {
+        this.extensions.regions?.update(params);
         return this;
     }
 
