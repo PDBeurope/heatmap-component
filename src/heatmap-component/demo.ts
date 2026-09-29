@@ -225,6 +225,10 @@ function loadInterface(heatmap: Heatmap<string, string, InterfaceContact>, allDa
         y: d => d.residue_1,
         x: d => d.residue_2,
     });
+    heatmap.setRegions({
+        yRegions: dom1.regions,
+        xRegions: dom2.regions,
+    });
 
     const AXIS_TICK_WIDTH = 30;
     const AXIS_TICK_HEIGHT = 15;
@@ -247,7 +251,6 @@ function loadInterface(heatmap: Heatmap<string, string, InterfaceContact>, allDa
     heatmap.setColor(d => colorScale(d.frequency));
 }
 
-// TODO: think about adding region separator lines in 'filter-nogaps' view
 // TODO: think about adding region highlights in 'filter-full' view
 
 // TODO: convert domains to ResidueNumber to get nicer ticks
@@ -266,10 +269,12 @@ function prepareDomain(residues: string[], filter: FilterKind) {
             : getContiguousRegions2(fullSequence, residues, filter === 'filter-nogaps' ? CONTIG_MAX_GAP : 0);
     const resNameToDomainIndex: { [resName: string]: number } = {};
     domain.forEach((resName, i) => resNameToDomainIndex[resName] = i);
-    const contigs: Ranges = contigsInFullSequence.map(
-        ([start, stop]) => [resNameToDomainIndex[fullSequence[start]], resNameToDomainIndex[fullSequence[stop - 1]] + 1]
-    );
-    return { domain, contigs };
+    function rangesFromFullSequenceToDomain(ranges: Ranges): Ranges {
+        return ranges.map(([start, stop]) => [resNameToDomainIndex[fullSequence[start]], resNameToDomainIndex[fullSequence[stop - 1]] + 1]);
+    }
+    const contigs: Ranges = rangesFromFullSequenceToDomain(contigsInFullSequence);
+    const regions: Ranges | null = filter === 'filter-nogaps' ? rangesFromFullSequenceToDomain(getContiguousRegions2(fullSequence, domain, 0)) : null;
+    return { domain, contigs, regions };
 }
 
 function tickNumber(scaleRange: number[], oneTickSpace: number) {
