@@ -167,9 +167,9 @@ async function fetchPAEMatrix(uniprotId: string, cut?: number) {
 }
 
 
-/** Demo showing an AlphaFold PAE matrix from real data */
+/** Demo showing interface contact residues */
 export async function demo5(divElementOrId: HTMLDivElement | string): Promise<void> {
-    const heatmap = Heatmap.create<string, string, InterfaceContact>();
+    const heatmap = Heatmap.create<ResidueNumber, ResidueNumber, InterfaceContact>();
     heatmap.setVisualParams({ xGapRelative: 0.05, yGapRelative: 0.05 }); // Decrease gaps between cells
     heatmap.setTooltip((d) => `<strong>${d.residue_1} / ${d.residue_2}</strong><hr style="margin-block:0.2em;"><strong>Bond type:</strong> ${d.bond_type}<br><strong>Frequency:</strong> ${d.frequency}`);
     heatmap.setAlignment('center', 'center');
@@ -204,7 +204,7 @@ export async function demo5(divElementOrId: HTMLDivElement | string): Promise<vo
     });
 }
 
-function loadInterface(heatmap: Heatmap<string, string, InterfaceContact>, allData: InterfaceData[], interfaceIndex: number, filter: FilterKind) {
+function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceContact>, allData: InterfaceData[], interfaceIndex: number, filter: FilterKind) {
     const data = allData[interfaceIndex];
     const maxValue = data.data.map(d => d.frequency).reduce((a, b) => b > a ? b : a, 0);
     const dom1 = prepareDomain(data.residues1, filter);
@@ -218,12 +218,12 @@ function loadInterface(heatmap: Heatmap<string, string, InterfaceContact>, allDa
     setTextContent('#max-frequency', `${maxValue}`);
     document.querySelectorAll<HTMLElement>('#app').forEach(appDiv => appDiv.style.aspectRatio = String(aspectRatio)); // TODO: fix (this is not taking into account canvas margin (axis area))
 
-    heatmap.setData({
-        yDomain: dom1.domain,
-        xDomain: dom2.domain,
+    heatmap.setData<ResidueNumber, ResidueNumber, InterfaceContact>({
+        yDomain: dom1.domain.map(getResidueNumber),
+        xDomain: dom2.domain.map(getResidueNumber),
         data: data.data,
-        y: d => d.residue_1,
-        x: d => d.residue_2,
+        y: d => getResidueNumber(d.residue_1),
+        x: d => getResidueNumber(d.residue_2),
     });
     heatmap.setRegions({
         yRegions: dom1.regions,
@@ -231,18 +231,16 @@ function loadInterface(heatmap: Heatmap<string, string, InterfaceContact>, allDa
     });
 
     const AXIS_TICK_WIDTH = 30;
-    const AXIS_TICK_HEIGHT = 15;
+    const AXIS_TICK_HEIGHT = 20;
     const AXIS_LIMIT_EXTENSION = 0.45;
     heatmap.setAxes({
         left: {
             tickArguments: (domain, scale) => [tickNumber(scale.range(), AXIS_TICK_HEIGHT)],
-            tickFormat: (domain, scale) => (index => domain.values[index.valueOf()]?.match(/([+-]?\d+)/)?.[1] ?? '?'), // remove resName prefix
             subaxisRanges: (domain, scale) => dom1.contigs.map(([start, stop]) => [start - AXIS_LIMIT_EXTENSION, stop - 1 + AXIS_LIMIT_EXTENSION]),
             offset: 5,
         },
         bottom: {
             tickArguments: (domain, scale) => [tickNumber(scale.range(), AXIS_TICK_WIDTH)],
-            tickFormat: (domain, scale) => (index => domain.values[index.valueOf()]?.match(/([+-]?\d+)/)?.[1] ?? '?'), // remove resName prefix
             subaxisRanges: (domain, scale) => dom2.contigs.map(([start, stop]) => [start - AXIS_LIMIT_EXTENSION, stop - 1 + AXIS_LIMIT_EXTENSION]),
             offset: 5,
         },
@@ -251,11 +249,8 @@ function loadInterface(heatmap: Heatmap<string, string, InterfaceContact>, allDa
     heatmap.setColor(d => colorScale(d.frequency));
 }
 
-// TODO: think about adding region highlights in 'filter-full' view
-
-// TODO: convert domains to ResidueNumber to get nicer ticks
-// type ResidueNumber = number & { '@type': ResidueNumber };
-// function ResidueNumber(num: number): ResidueNumber { return num as ResidueNumber; }
+type ResidueNumber = number & { '@type': 'ResidueNumber' };
+function ResidueNumber(num: number): ResidueNumber { return num as ResidueNumber; }
 
 function prepareDomain(residues: string[], filter: FilterKind) {
     const fullSequence = halucinateFullSequence(residues);
@@ -279,7 +274,7 @@ function prepareDomain(residues: string[], filter: FilterKind) {
 
 function tickNumber(scaleRange: number[], oneTickSpace: number) {
     const space = Math.abs(scaleRange[scaleRange.length - 1] - scaleRange[0]);
-    return 1 + space / oneTickSpace;
+    return Math.max(1, space / oneTickSpace);
 }
 
 interface InterfaceContact {
@@ -288,6 +283,7 @@ interface InterfaceContact {
     bond_type: string,
     frequency: number,
 }
+
 interface InterfaceData {
     agg_interface_id: string,
     component_label_1: string,
@@ -296,13 +292,14 @@ interface InterfaceData {
     residues2: string[],
     data: InterfaceContact[],
 }
+
 async function fetchInterfaceData(): Promise<InterfaceData[]> {
     const url = './demo5-data/interface-data.json';
     if (!url) return [];
     const response = await fetch(url);
     if (!response.ok) return [];
     const js = await response.json();
-    return js.map((interfac: any, i: number) => {
+    return js.map((interfac: any) => {
         const contacts = interfac.contact_summary;
         const residues1 = sortedUniqueResidues(contacts.map((c: any) => c.residue_1));
         const residues2 = sortedUniqueResidues(contacts.map((c: any) => c.residue_2));
@@ -323,14 +320,16 @@ const CONTIG_MAX_GAP = 2 * CONTIG_EXTENSION; // residues
 const RE_RESIDUE_NAME = /[A-Z]*([+-]?\d+)/;
 function getResidueNumber(resName: string | null | undefined) {
     const resNum = resName?.match(RE_RESIDUE_NAME)?.[1];
-    return Number(resNum ?? '-1');
+    return ResidueNumber(Number(resNum ?? '-1'));
 }
+
 function sortedUniqueResidues(resNames: string[]): string[] {
     return Array.from(new Set(resNames)).sort((a, b) => getResidueNumber(a) - getResidueNumber(b));
 }
+
 function halucinateFullSequence(resNames: string[]) {
     const resNums = resNames.map(getResidueNumber);
-    const resNumSet = new Set(resNums);
+    const resNumSet = new Set<number>(resNums);
     const min = Math.min(1, ...resNums);
     const max = Math.max(1, ...resNums);
     const out = resNames.slice();
@@ -392,7 +391,9 @@ function addClickListener(elementSelector: string, type: string, listener: Event
     const elements = document.querySelectorAll(elementSelector);
     elements.forEach(element => element.addEventListener(type, listener));
 }
+
 type FilterKind = 'filter-full' | 'filter-nogaps' | 'filter-contacts';
+
 function getFilterKind(): FilterKind {
     const selectedFilterButton = document.querySelector('input[name=filter]:checked');
     if (!selectedFilterButton) throw new Error('Could not find filter kind');
