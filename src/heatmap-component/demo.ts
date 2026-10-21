@@ -207,9 +207,8 @@ export async function demo5(divElementOrId: HTMLDivElement | string): Promise<vo
 function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceContact>, allData: InterfaceData[], interfaceIndex: number, filter: FilterKind) {
     const data = allData[interfaceIndex];
     const maxValue = data.contact_summary.map(d => d.frequency).reduce((a, b) => b > a ? b : a, 0);
-    // TODO: numeric domains
-    const residues1 = sortedUniqueResidues(data.contact_summary.map(c => c.residue_1));
-    const residues2 = sortedUniqueResidues(data.contact_summary.map(c => c.residue_2));
+    const residues1 = uniqueResidueNumbers(data.contact_summary.map(c => c.residue_1));
+    const residues2 = uniqueResidueNumbers(data.contact_summary.map(c => c.residue_2));
     const dom1 = prepareDomain(residues1, filter);
     const dom2 = prepareDomain(residues2, filter);
     const aspectRatio = dom2.domain.length / dom1.domain.length;
@@ -222,15 +221,15 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
     document.querySelectorAll<HTMLElement>('#app').forEach(appDiv => appDiv.style.aspectRatio = String(aspectRatio)); // TODO: fix (this is not taking into account canvas margin (axis area))
 
     heatmap.setData<ResidueNumber, ResidueNumber, InterfaceContact>({
-        yDomain: dom1.domain.map(getResidueNumber),
-        xDomain: dom2.domain.map(getResidueNumber),
+        yDomain: dom1.domain,
+        xDomain: dom2.domain,
         data: data.contact_summary,
-        y: d => getResidueNumber(d.residue_1),
-        x: d => getResidueNumber(d.residue_2),
+        y: d => getResidueNumber(d.residue_1)!,
+        x: d => getResidueNumber(d.residue_2)!,
     });
     heatmap.setRegions({
-        yRegions: dom1.regions,
-        xRegions: dom2.regions,
+        yRegions: dom1.regionRanges,
+        xRegions: dom2.regionRanges,
     });
 
     const AXIS_TICK_WIDTH = 30;
@@ -239,25 +238,26 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
     heatmap.setAxes({
         left: {
             tickArguments: (domain, scale) => [tickNumber(scale.range(), AXIS_TICK_HEIGHT)],
-            subaxisRanges: (domain, scale) => dom1.contigs.map(([start, stop]) => [start - AXIS_LIMIT_EXTENSION, stop - 1 + AXIS_LIMIT_EXTENSION]),
+            subaxisRanges: (domain, scale) => dom1.subaxisRanges.map(([start, stop]) => [start - AXIS_LIMIT_EXTENSION, stop - 1 + AXIS_LIMIT_EXTENSION]),
             offset: 5,
         },
         bottom: {
             tickArguments: (domain, scale) => [tickNumber(scale.range(), AXIS_TICK_WIDTH)],
-            subaxisRanges: (domain, scale) => dom2.contigs.map(([start, stop]) => [start - AXIS_LIMIT_EXTENSION, stop - 1 + AXIS_LIMIT_EXTENSION]),
+            subaxisRanges: (domain, scale) => dom2.subaxisRanges.map(([start, stop]) => [start - AXIS_LIMIT_EXTENSION, stop - 1 + AXIS_LIMIT_EXTENSION]),
             offset: 5,
         },
     });
+    // TODO: solve axis ticks for OnlyContactResidues in interface 4/13 9/13
     const colorScale = ColorScale.continuous('Greens', [0, maxValue], [0.1, 1]); // [0.1, 1] is to skip the first 10% of the color palette to avoid almost-white colors
     heatmap.setColor(d => colorScale(d.frequency));
 }
 
-/** Residue number, type alias for `number` for better static checking */
+/** Residue number, type alias for `number` for better static checking (avoids mixing ResidueNumbers with regular numbers) */
 type ResidueNumber = number & { '@type': 'ResidueNumber' };
 function ResidueNumber(num: number): ResidueNumber { return num as ResidueNumber; }
 
-function prepareDomain(residues: string[], filter: FilterKind) {
-    const fullSequence = halucinateFullSequence(residues);
+function prepareDomain(residues: ResidueNumber[], filter: FilterKind) {
+    const fullSequence = guessFullSequence(residues);
     // TODO: get real full sequences from somewhere
     const domain =
         filter === 'filter-full' ? fullSequence
@@ -265,16 +265,23 @@ function prepareDomain(residues: string[], filter: FilterKind) {
                 : residues;
     const contigsInFullSequence: Ranges =
         filter === 'filter-full' ? [[0, fullSequence.length]]
-            : getContiguousRegions(fullSequence, residues, filter === 'filter-nogaps' ? CONTIG_MAX_GAP : 0);
+            : filter === 'filter-nogaps' ? getContiguousRegions(fullSequence, residues, CONTIG_MAX_GAP)
+                : getContiguousRegions(fullSequence, residues, 0);
     const resNameToDomainIndex: { [resName: string]: number } = {};
     domain.forEach((resName, i) => resNameToDomainIndex[resName] = i);
     function rangesFromFullSequenceToDomain(ranges: Ranges): Ranges {
         return ranges.map(([start, stop]) => [resNameToDomainIndex[fullSequence[start]], resNameToDomainIndex[fullSequence[stop - 1]] + 1]);
     }
     const contigs: Ranges = rangesFromFullSequenceToDomain(contigsInFullSequence);
-    const regions: Ranges | null = filter === 'filter-nogaps' ? rangesFromFullSequenceToDomain(getContiguousRegions(fullSequence, domain, 0)) : null;
-    // TODO: docstrings
-    return { domain, contigs, regions };
+    const contigsWithPadding: Ranges | null = filter === 'filter-nogaps' ? rangesFromFullSequenceToDomain(getContiguousRegions(fullSequence, domain, 0)) : null;
+    return {
+        /** List of residue numbers corresponding to rows/columns */
+        domain,
+        /** Ranges of indices in `domain`, corresponding to contiguous regions with data (excluding padding residues before and after) - for subaxis rendering */
+        subaxisRanges: contigs,
+        /** Ranges of indices in `domain`, corresponding to contiguous regions with data (including padding residues before and after) - for region rendering */
+        regionRanges: contigsWithPadding,
+    };
 }
 
 function tickNumber(scaleRange: number[], oneTickSpace: number) {
@@ -282,18 +289,19 @@ function tickNumber(scaleRange: number[], oneTickSpace: number) {
     return Math.max(1, space / oneTickSpace);
 }
 
-interface InterfaceContact {
-    residue_1: string,
-    residue_2: string,
-    bond_type: string,
-    frequency: number,
-}
-
+/** Shape of data in the example Interface API response */
 interface InterfaceData {
     agg_interface_id: string,
     component_label_1: string,
     component_label_2: string,
     contact_summary: InterfaceContact[],
+}
+
+interface InterfaceContact {
+    residue_1: string,
+    residue_2: string,
+    bond_type: string,
+    frequency: number,
 }
 
 async function fetchInterfaceData(): Promise<InterfaceData[]> {
@@ -310,28 +318,27 @@ const CONTIG_MAX_GAP = 2 * CONTIG_EXTENSION; // residues
 const RE_RESIDUE_NAME = /[A-Z]*([+-]?\d+)/;
 function getResidueNumber(resName: string | null | undefined) {
     const resNum = resName?.match(RE_RESIDUE_NAME)?.[1];
-    return ResidueNumber(Number(resNum ?? '-1'));
+    if (resNum === undefined) {
+        console.warn(`Invalid residue name: ${resName}. Ignoring this residue.`);
+        return undefined;
+    }
+    return ResidueNumber(Number(resNum));
 }
 
-function sortedUniqueResidues(resNames: string[]): string[] {
-    return Array.from(new Set(resNames)).sort((a, b) => getResidueNumber(a) - getResidueNumber(b));
+/** Return sorted, unique residue numbers extracted from residue names (e.g. ALA123) */
+function uniqueResidueNumbers(resNames: string[]): ResidueNumber[] {
+    const resNums = resNames.map(getResidueNumber).filter(num => num !== undefined);
+    return Array.from(new Set(resNums)).sort((a, b) => a - b);
 }
 
-function halucinateFullSequence(resNames: string[]) {
-    const resNums = resNames.map(getResidueNumber);
-    const resNumSet = new Set<number>(resNums);
+/** Try to infer the full sequence of residue numbers (assumes the sequence starts at 1 and ends at the maximum number found in `resNums`) */
+function guessFullSequence(resNums: ResidueNumber[]): ResidueNumber[] {
     const min = Math.min(1, ...resNums);
     const max = Math.max(1, ...resNums);
-    const out = resNames.slice();
-    for (let i = min; i <= max; i++) {
-        if (!resNumSet.has(i)) {
-            out.push(`${i}`);
-        }
-    }
-    return sortedUniqueResidues(out);
+    return range(min, max + 1) as ResidueNumber[];
 }
 
-function removeGaps(fullSequence: string[], present: string[], maxGap: number): string[] {
+function removeGaps<T>(fullSequence: T[], present: T[], maxGap: number): T[] {
     const n = fullSequence.length;
     const presentSet = new Set(present);
     const presentMask = fullSequence.map(item => presentSet.has(item));
@@ -383,6 +390,7 @@ function addClickListener(elementSelector: string, type: string, listener: Event
     elements.forEach(element => element.addEventListener(type, listener));
 }
 
+// TODO: rename filter-nogaps to "Only contact regions"
 type FilterKind = 'filter-full' | 'filter-nogaps' | 'filter-contacts';
 
 function getFilterKind(): FilterKind {
