@@ -206,9 +206,12 @@ export async function demo5(divElementOrId: HTMLDivElement | string): Promise<vo
 
 function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceContact>, allData: InterfaceData[], interfaceIndex: number, filter: FilterKind) {
     const data = allData[interfaceIndex];
-    const maxValue = data.data.map(d => d.frequency).reduce((a, b) => b > a ? b : a, 0);
-    const dom1 = prepareDomain(data.residues1, filter);
-    const dom2 = prepareDomain(data.residues2, filter);
+    const maxValue = data.contact_summary.map(d => d.frequency).reduce((a, b) => b > a ? b : a, 0);
+    // TODO: numeric domains
+    const residues1 = sortedUniqueResidues(data.contact_summary.map(c => c.residue_1));
+    const residues2 = sortedUniqueResidues(data.contact_summary.map(c => c.residue_2));
+    const dom1 = prepareDomain(residues1, filter);
+    const dom2 = prepareDomain(residues2, filter);
     const aspectRatio = dom2.domain.length / dom1.domain.length;
 
     setTextContent('#interface-number', `(${interfaceIndex + 1}/${allData.length})`);
@@ -221,7 +224,7 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
     heatmap.setData<ResidueNumber, ResidueNumber, InterfaceContact>({
         yDomain: dom1.domain.map(getResidueNumber),
         xDomain: dom2.domain.map(getResidueNumber),
-        data: data.data,
+        data: data.contact_summary,
         y: d => getResidueNumber(d.residue_1),
         x: d => getResidueNumber(d.residue_2),
     });
@@ -249,6 +252,7 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
     heatmap.setColor(d => colorScale(d.frequency));
 }
 
+/** Residue number, type alias for `number` for better static checking */
 type ResidueNumber = number & { '@type': 'ResidueNumber' };
 function ResidueNumber(num: number): ResidueNumber { return num as ResidueNumber; }
 
@@ -261,14 +265,15 @@ function prepareDomain(residues: string[], filter: FilterKind) {
                 : residues;
     const contigsInFullSequence: Ranges =
         filter === 'filter-full' ? [[0, fullSequence.length]]
-            : getContiguousRegions2(fullSequence, residues, filter === 'filter-nogaps' ? CONTIG_MAX_GAP : 0);
+            : getContiguousRegions(fullSequence, residues, filter === 'filter-nogaps' ? CONTIG_MAX_GAP : 0);
     const resNameToDomainIndex: { [resName: string]: number } = {};
     domain.forEach((resName, i) => resNameToDomainIndex[resName] = i);
     function rangesFromFullSequenceToDomain(ranges: Ranges): Ranges {
         return ranges.map(([start, stop]) => [resNameToDomainIndex[fullSequence[start]], resNameToDomainIndex[fullSequence[stop - 1]] + 1]);
     }
     const contigs: Ranges = rangesFromFullSequenceToDomain(contigsInFullSequence);
-    const regions: Ranges | null = filter === 'filter-nogaps' ? rangesFromFullSequenceToDomain(getContiguousRegions2(fullSequence, domain, 0)) : null;
+    const regions: Ranges | null = filter === 'filter-nogaps' ? rangesFromFullSequenceToDomain(getContiguousRegions(fullSequence, domain, 0)) : null;
+    // TODO: docstrings
     return { domain, contigs, regions };
 }
 
@@ -288,9 +293,7 @@ interface InterfaceData {
     agg_interface_id: string,
     component_label_1: string,
     component_label_2: string,
-    residues1: string[],
-    residues2: string[],
-    data: InterfaceContact[],
+    contact_summary: InterfaceContact[],
 }
 
 async function fetchInterfaceData(): Promise<InterfaceData[]> {
@@ -298,20 +301,7 @@ async function fetchInterfaceData(): Promise<InterfaceData[]> {
     if (!url) return [];
     const response = await fetch(url);
     if (!response.ok) return [];
-    const js = await response.json();
-    return js.map((interfac: any) => {
-        const contacts = interfac.contact_summary;
-        const residues1 = sortedUniqueResidues(contacts.map((c: any) => c.residue_1));
-        const residues2 = sortedUniqueResidues(contacts.map((c: any) => c.residue_2));
-        return {
-            agg_interface_id: interfac.agg_interface_id,
-            component_label_1: interfac.component_label_1,
-            component_label_2: interfac.component_label_2,
-            residues1,
-            residues2,
-            data: contacts,
-        } satisfies InterfaceData;
-    });
+    return await response.json();
 }
 
 const CONTIG_EXTENSION = 2; // residues
@@ -357,13 +347,13 @@ function removeGaps(fullSequence: string[], present: string[], maxGap: number): 
     return fullSequence.filter((item, i) => dilatedMask[i]);
 }
 
-/** Get contiguous regions from a list of items based on a key function and maximum gap. */
-function getContiguousRegions2<T>(fullSequence: T[], present: T[], maxGap: number): Ranges {
+/** Find contiguous regions of items in `fullSequence` which are also present in `present`, allowing gaps of at most `maxGap` missing items. */
+function getContiguousRegions<T>(fullSequence: T[], present: T[], maxGap: number): Ranges {
     const n = fullSequence.length;
     const presentSet = new Set(present);
     const presentMask = fullSequence.map(item => presentSet.has(item));
 
-    const out: Ranges = []; // (endIndex is exclusive)
+    const out: Ranges = [];
     for (let i = 0; i < n; i++) {
         if (presentMask[i]) {
             if (out.length > 0 && i - out[out.length - 1][1] <= maxGap) {
@@ -376,6 +366,7 @@ function getContiguousRegions2<T>(fullSequence: T[], present: T[], maxGap: numbe
     return out;
 }
 
+/** Collection of non-overlapping ranges of indices. `start` is inclusive, `stop` is exclusive. */
 type Ranges = [start: number, stop: number][];
 
 
@@ -410,3 +401,5 @@ function flatten<T>(arrays: T[][]): T[] {
     }
     return out;
 }
+
+// TODO: allow hiding axis domain path ends
