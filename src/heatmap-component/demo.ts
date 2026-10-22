@@ -211,14 +211,12 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
     const residues2 = uniqueResidueNumbers(data.contact_summary.map(c => c.residue_2));
     const dom1 = prepareDomain(residues1, filter);
     const dom2 = prepareDomain(residues2, filter);
-    const aspectRatio = dom2.domain.length / dom1.domain.length;
 
     setTextContent('#interface-number', `(${interfaceIndex + 1}/${allData.length})`);
     setTextContent('#interface-title', `Interface ${data.agg_interface_id}: ${data.component_label_1} / ${data.component_label_2}`);
     setTextContent('#row-names', `${dom1.domain.join(', ')}`);
     setTextContent('#column-names', `${dom2.domain.join(', ')}`);
     setTextContent('#max-frequency', `${maxValue}`);
-    document.querySelectorAll<HTMLElement>('#app').forEach(appDiv => appDiv.style.aspectRatio = String(aspectRatio)); // TODO: fix (this is not taking into account canvas margin (axis area))
 
     heatmap.setData<ResidueNumber, ResidueNumber, InterfaceContact>({
         yDomain: dom1.domain,
@@ -250,6 +248,8 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
     // TODO: solve axis ticks for OnlyContactResidues in interface 4/13 9/13
     const colorScale = ColorScale.continuous('Greens', [0, maxValue], [0.1, 1]); // [0.1, 1] is to skip the first 10% of the color palette to avoid almost-white colors
     heatmap.setColor(d => colorScale(d.frequency));
+    // Resize the root element of the component, so that cell aspect ratio is 1:1, and it fits within max-width, max-height CSS properties (at least one of these properties must be defined)
+    heatmap.ensureCellAspectRatio();
 }
 
 /** Residue number, type alias for `number` for better static checking (avoids mixing ResidueNumbers with regular numbers) */
