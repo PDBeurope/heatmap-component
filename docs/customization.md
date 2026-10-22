@@ -129,6 +129,18 @@ heatmap.setTooltip(null); // disable tooltips
 heatmap.setTooltip('default'); // reset default tooltip content
 ```
 
+### `ensureCellAspectRatio`
+
+Helper method which resizes the root element of the heatmap component to fit within the specified maximum dimensions while keeping heatmap cells at the requested aspect ratio. The maximum width and height can be provided in `options` or via the root element's CSS `max-width` and `max-height`; at least one maximum dimension must be defined. By default, the cell aspect ratio is 1:1 and the row and column counts are taken from the heatmap's current data.
+
+```ts
+ensureCellAspectRatio(options?: { cellAspectRatio?: number, nColumns?: number, nRows?: number, maxComponentWidth?: number, maxComponentHeight?: number }): this
+
+// Example usage:
+heatmap.ensureCellAspectRatio(); // cell aspect ratio 1, use max-width and max-height CSS properties
+heatmap.ensureCellAspectRatio({ cellAspectRatio: 1.5, maxComponentWidth: 800, maxComponentHeight: 600 });
+```
+
 ### Styling via CSS
 
 All elements of the heatmap component are styled via [this CSS](../src/heatmap-component.css). You can override the styles for classes defined there to customize the appearance of the component.

@@ -195,6 +195,48 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         this.extensions.brush?.update(params);
         return this;
     }
+
+    /** Resize the root element of the heatmap component to fit within the specified maximum dimensions while keeping heatmap cells at the requested aspect ratio.
+     * The maximum width and height can be provided in `options` or via the root element's CSS `max-width` and `max-height`; at least one maximum dimension must be defined.
+    * By default, the cell aspect ratio is 1:1 and the row and column counts are taken from the heatmap's current data.
+    *
+    * Example:
+    * ```
+    * heatmap.ensureCellAspectRatio({ cellAspectRatio: 1.5, maxComponentWidth: 800, maxComponentHeight: 600 });
+    * ```
+    */
+    ensureCellAspectRatio(options?: { cellAspectRatio?: number, nColumns?: number, nRows?: number, maxComponentWidth?: number, maxComponentHeight?: number }): this {
+        const appDiv = this.state.dom?.rootDiv.node();
+        const canvasDiv = this.state.dom?.canvasDiv.node();
+        if (!appDiv || !canvasDiv) return this;
+
+        const appDivStyle = window.getComputedStyle(appDiv);
+        const maxWidth = options?.maxComponentWidth ?? parseFloat(appDivStyle.maxWidth);
+        const maxHeight = options?.maxComponentHeight ?? parseFloat(appDivStyle.maxHeight);
+
+        const canvasDivstyle = window.getComputedStyle(canvasDiv);
+        const marginsInline = parseFloat(canvasDivstyle.left) + parseFloat(canvasDivstyle.right);
+        const marginsBlock = parseFloat(canvasDivstyle.top) + parseFloat(canvasDivstyle.bottom);
+
+        const nColumns = options?.nColumns ?? this.state.xDomain.values.length;
+        const nRows = options?.nRows ?? this.state.yDomain.values.length;
+        const cellAspectRatio = options?.cellAspectRatio ?? 1;
+
+        const maxCellWidth = isNaN(maxWidth) ? Infinity : (maxWidth - marginsInline) / nColumns;
+        const maxCellHeight = isNaN(maxHeight) ? Infinity : (maxHeight - marginsBlock) / nRows;
+        const cellHeight = Math.min(maxCellWidth / cellAspectRatio, maxCellHeight);
+        if (cellHeight === Infinity) {
+            console.warn(`Could not adjust aspect ratio: at least one of maxComponentWidth, maxComponentHeight must be defined (either via function arguments or via max-width, max-height CSS properties)`);
+            return this;
+        }
+        if (cellHeight <= 0) {
+            console.warn(`Could not adjust aspect ratio: computed cell size is negative or zero.`);
+            return this;
+        }
+        appDiv.style.width = `${cellHeight * nColumns * cellAspectRatio + marginsInline}px`;
+        appDiv.style.height = `${cellHeight * nRows + marginsBlock}px`;
+        return this;
+    }
 }
 
 
