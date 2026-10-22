@@ -185,32 +185,32 @@ export async function demo5(divElementOrId: HTMLDivElement | string): Promise<vo
     }
 
     let interfaceIndex = 0;
-    let filterKind = getFilterKind();
+    let axesKind = getAxesKind();
 
-    loadInterface(heatmap, allData, interfaceIndex, filterKind);
+    loadInterface(heatmap, allData, interfaceIndex, axesKind);
     addClickListener('#btn-previous', 'click', () => {
         interfaceIndex--;
         if (interfaceIndex < 0) interfaceIndex = allData.length - 1;
-        loadInterface(heatmap, allData, interfaceIndex, filterKind);
+        loadInterface(heatmap, allData, interfaceIndex, axesKind);
     });
     addClickListener('#btn-next', 'click', () => {
         interfaceIndex++;
         if (interfaceIndex >= allData.length) interfaceIndex = 0;
-        loadInterface(heatmap, allData, interfaceIndex, filterKind);
+        loadInterface(heatmap, allData, interfaceIndex, axesKind);
     });
-    addClickListener('input[name=filter]', 'change', (e) => {
-        filterKind = getFilterKind();
-        loadInterface(heatmap, allData, interfaceIndex, filterKind);
+    addClickListener('input[name=axes-kind]', 'change', (e) => {
+        axesKind = getAxesKind();
+        loadInterface(heatmap, allData, interfaceIndex, axesKind);
     });
 }
 
-function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceContact>, allData: InterfaceData[], interfaceIndex: number, filter: FilterKind) {
+function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceContact>, allData: InterfaceData[], interfaceIndex: number, axesKind: AxesKind) {
     const data = allData[interfaceIndex];
     const maxValue = data.contact_summary.map(d => d.frequency).reduce((a, b) => b > a ? b : a, 0);
     const residues1 = uniqueResidueNumbers(data.contact_summary.map(c => c.residue_1));
     const residues2 = uniqueResidueNumbers(data.contact_summary.map(c => c.residue_2));
-    const dom1 = prepareDomain(residues1, filter);
-    const dom2 = prepareDomain(residues2, filter);
+    const dom1 = prepareDomain(residues1, axesKind);
+    const dom2 = prepareDomain(residues2, axesKind);
 
     setTextContent('#interface-number', `(${interfaceIndex + 1}/${allData.length})`);
     setTextContent('#interface-title', `Interface ${data.agg_interface_id}: ${data.component_label_1} / ${data.component_label_2}`);
@@ -248,24 +248,23 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
     // TODO: solve axis ticks for OnlyContactResidues in interface 4/13 9/13
     const colorScale = ColorScale.continuous('Greens', [0, maxValue], [0.1, 1]); // [0.1, 1] is to skip the first 10% of the color palette to avoid almost-white colors
     heatmap.setColor(d => colorScale(d.frequency));
-    // Resize the root element of the component, so that cell aspect ratio is 1:1, and it fits within max-width, max-height CSS properties (at least one of these properties must be defined)
-    heatmap.ensureCellAspectRatio();
+    heatmap.ensureCellAspectRatio(); // Resize the component, so that cell aspect ratio is 1:1
 }
 
 /** Residue number, type alias for `number` for better static checking (avoids mixing ResidueNumbers with regular numbers) */
 type ResidueNumber = number & { '@type': 'ResidueNumber' };
 function ResidueNumber(num: number): ResidueNumber { return num as ResidueNumber; }
 
-function prepareDomain(residues: ResidueNumber[], filter: FilterKind) {
+function prepareDomain(residues: ResidueNumber[], axesKind: AxesKind) {
     const fullSequence = guessFullSequence(residues);
     // TODO: get real full sequences from somewhere
     const domain =
-        filter === 'filter-full' ? fullSequence
-            : filter === 'filter-nogaps' ? removeGaps(fullSequence, residues, CONTIG_MAX_GAP)
+        axesKind === 'axes-full-sequence' ? fullSequence
+            : axesKind === 'axes-contact-regions' ? removeGaps(fullSequence, residues, CONTIG_MAX_GAP)
                 : residues;
     const contigsInFullSequence: Ranges =
-        filter === 'filter-full' ? [[0, fullSequence.length]]
-            : filter === 'filter-nogaps' ? getContiguousRegions(fullSequence, residues, CONTIG_MAX_GAP)
+        axesKind === 'axes-full-sequence' ? [[0, fullSequence.length]]
+            : axesKind === 'axes-contact-regions' ? getContiguousRegions(fullSequence, residues, CONTIG_MAX_GAP)
                 : getContiguousRegions(fullSequence, residues, 0);
     const resNameToDomainIndex: { [resName: string]: number } = {};
     domain.forEach((resName, i) => resNameToDomainIndex[resName] = i);
@@ -273,7 +272,7 @@ function prepareDomain(residues: ResidueNumber[], filter: FilterKind) {
         return ranges.map(([start, stop]) => [resNameToDomainIndex[fullSequence[start]], resNameToDomainIndex[fullSequence[stop - 1]] + 1]);
     }
     const contigs: Ranges = rangesFromFullSequenceToDomain(contigsInFullSequence);
-    const contigsWithPadding: Ranges | null = filter === 'filter-nogaps' ? rangesFromFullSequenceToDomain(getContiguousRegions(fullSequence, domain, 0)) : null;
+    const contigsWithPadding: Ranges | null = axesKind === 'axes-contact-regions' ? rangesFromFullSequenceToDomain(getContiguousRegions(fullSequence, domain, 0)) : null;
     return {
         /** List of residue numbers corresponding to rows/columns */
         domain,
@@ -390,13 +389,12 @@ function addClickListener(elementSelector: string, type: string, listener: Event
     elements.forEach(element => element.addEventListener(type, listener));
 }
 
-// TODO: rename filter-nogaps to "Only contact regions"
-type FilterKind = 'filter-full' | 'filter-nogaps' | 'filter-contacts';
+type AxesKind = 'axes-full-sequence' | 'axes-contact-regions' | 'axes-contact-residues';
 
-function getFilterKind(): FilterKind {
-    const selectedFilterButton = document.querySelector('input[name=filter]:checked');
-    if (!selectedFilterButton) throw new Error('Could not find filter kind');
-    return selectedFilterButton.getAttribute('id') as FilterKind;
+function getAxesKind(): AxesKind {
+    const selectedButton = document.querySelector('input[name=axes-kind]:checked');
+    if (!selectedButton) throw new Error('Could not find axes kind');
+    return selectedButton.getAttribute('id') as AxesKind;
 }
 
 /** Flatten a nested array. Dumb implementation, but doesn't matter, this is just a demo. Would use `flatMap` but it's not available in es2015. */

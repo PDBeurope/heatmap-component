@@ -47,9 +47,16 @@
   </h3>
 
   <form>
-    <input type="radio" name="filter" id="filter-full" checked><label for="filter-full">Full sequence</label>
-    <input type="radio" name="filter" id="filter-nogaps"><label for="filter-nogaps">Hide gaps</label>
-    <input type="radio" name="filter" id="filter-contacts"><label for="filter-contacts">Only contact residues</label>
+    <strong>Axes:</strong>
+
+    <input type="radio" name="axes-kind" id="axes-full-sequence">
+    <label for="axes-full-sequence" title="Show full polymer sequence on X and Y axis">Full sequence</label>
+
+    <input type="radio" name="axes-kind" id="axes-contact-regions" checked>
+    <label for="axes-contact-regions" title="Show only residues with at least one contact, plus a few surrounding residues">Only contact regions</label>
+
+    <input type="radio" name="axes-kind" id="axes-contact-residues">
+    <label for="axes-contact-residues" title="Show only residues with at least one contact">Only contact residues</label>
   </form>
 
   <div style="padding: 15px; background-color: white;">
