@@ -414,6 +414,5 @@ function flatten<T>(arrays: T[][]): T[] {
     return out;
 }
 
-// TODO: solve z-index of tooltip vs axes
 // TODO: split demo file
 // TODO: relook at tick spacing

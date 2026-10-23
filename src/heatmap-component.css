@@ -64,7 +64,7 @@
 
 .heatmap-tooltip-box,
 .heatmap-pinned-tooltip-box {
-    z-index: 0;
+    z-index: 1;
     /* Avoid tooltip flickering */
     pointer-events: none;
 }
