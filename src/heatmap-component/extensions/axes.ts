@@ -38,14 +38,46 @@ export interface AxisOptions<TDomain> {
     tickSizeOuter: number,
     /** Distance between tick and its label. Default: 3. */
     tickPadding: number,
-    /** Function that returns the arguments used to generate axis ticks. These arguments will be passed to the D3 `Axis.tickArguments` method and to the `tickValues` and `tickFormat` functions. */
-    tickArguments: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>) => [count?: number, specifier?: string],
-    /** Function that returns the list of tick values, or `null` to use the D3 default ticks. */
-    tickValues: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>, tickArguments: [count?: number, specifier?: string]) => Iterable<d3.NumberValue> | null,
+    /** Function that returns the arguments used to generate axis ticks.
+     * These arguments will be passed to the D3 `Axis.tickArguments` method and to the `tickValues` and `tickFormat` functions. */
+    tickArguments: (params: {
+        /** Full domain corresponding the axis (column/row labels) */
+        domain: Domain<TDomain>,
+        /** D3 scale bound to the current subaxis (only different from `globalAxis`, if `subaxisRanges` is used) */
+        scale: d3.ScaleLinear<number, number>,
+        /** D3 scale corresponding to the whole visible range of the columns/rows */
+        globalScale: d3.ScaleLinear<number, number>,
+    }) => [count?: number, specifier?: string],
+    /** Function that returns the list of tick values (in domain index space), or `null` to use the D3 default ticks. */
+    tickValues: (params: {
+        /** Full domain corresponding the axis (column/row labels) */
+        domain: Domain<TDomain>,
+        /** D3 scale bound to the current subaxis (only different from `globalAxis`, if `subaxisRanges` is used) */
+        scale: d3.ScaleLinear<number, number>,
+        /** D3 scale corresponding to the whole visible range of the columns/rows */
+        globalScale: d3.ScaleLinear<number, number>,
+        /** Arguments returned by `tickArguments` function */
+        tickArguments: [count?: number, specifier?: string],
+    }) => Iterable<d3.NumberValue> | null,
     /** Function that returns the tick formatter, or `null` to use the D3 default formatter. */
-    tickFormat: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>, tickArguments: [count?: number, specifier?: string]) => ((index: d3.NumberValue, i: number) => string) | null,
-    /** Function that returns the list of subaxis ranges (in domain index space) to be rendered. By default, exactly one subaxis is rendered, with range equal to the visible range of domain indices (i.e. `scale.domain()`). */
-    subaxisRanges: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>) => [start: number, end: number][],
+    tickFormat: (params: {
+        /** Full domain corresponding the axis (column/row labels) */
+        domain: Domain<TDomain>,
+        /** D3 scale bound to the current subaxis (only different from `globalAxis`, if `subaxisRanges` is used) */
+        scale: d3.ScaleLinear<number, number>,
+        /** D3 scale corresponding to the whole visible range of the columns/rows */
+        globalScale: d3.ScaleLinear<number, number>,
+        /** Arguments returned by `tickArguments` function */
+        tickArguments: [count?: number, specifier?: string],
+    }) => ((index: d3.NumberValue, i: number) => string) | null,
+    /** Function that returns the list of subaxis ranges (in domain index space) to be rendered.
+     * By default, exactly one subaxis is rendered, with range equal to the visible range of domain indices (i.e. `scale.domain()`). */
+    subaxisRanges: (params: {
+        /** Full domain corresponding the axis (column/row labels) */
+        domain: Domain<TDomain>,
+        /** D3 scale corresponding to the whole visible range of the columns/rows */
+        globalScale: d3.ScaleLinear<number, number>,
+    }) => [start: number, end: number][],
     /** Controls whether the range indicator for the axis (or for each subaxis) should extend outwards to the next cell boundary. */
     subaxisRangeIndicatorExtend: boolean,
 }
@@ -56,23 +88,25 @@ export const DefaultAxisOptions: AxisOptions<unknown> = {
     tickSizeOuter: 6,
     tickPadding: 3,
     tickArguments: () => [],
-    tickValues: (domain, scale, args) => {
+    tickValues: ({ domain, scale, tickArguments }) => {
+        const count = tickArguments[0];
         const indexPresent = (idx: number) => Math.floor(idx) === idx && idx >= 0 && idx < domain.values.length;
         if (domain.isNumeric && domain.sortDirection !== 'none') {
             // Sorted numeric column/row labels
             const indexDomain = scale.domain();
             const labelDomain = indexDomain.map(idx => Domain.interpolateValue(domain as Domain<number>, idx));
             const labelScale = scale.copy().domain(labelDomain);
-            const labelTicks = labelScale.ticks(args[0]);
+            const labelTicks = labelScale.ticks(count);
             const indexTicks = labelTicks.map(x => Domain.interpolateIndex(domain, x)) as number[];
             return indexTicks.some(indexPresent) ? indexTicks.filter(indexPresent) : indexTicks;
         } else {
             // Unsorted column/row labels (numbers or strings)
-            return scale.ticks(args[0]).filter(indexPresent);
+            return scale.ticks(count).filter(indexPresent);
         }
     },
-    tickFormat: (domain, scale, args) => {
-        const numFormat = d3.format(args[1] ?? '');
+    tickFormat: ({ domain, tickArguments }) => {
+        const specifier = tickArguments[1];
+        const numFormat = d3.format(specifier ?? '');
         if (domain.isNumeric && domain.sortDirection !== 'none') {
             // Sorted numeric column/row labels
             return index => {
@@ -88,7 +122,7 @@ export const DefaultAxisOptions: AxisOptions<unknown> = {
             };
         }
     },
-    subaxisRanges: (domain, scale) => [getLimits(scale.domain())],
+    subaxisRanges: ({ globalScale }) => [getLimits(globalScale.domain())],
     subaxisRangeIndicatorExtend: false,
 };
 
@@ -166,7 +200,7 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
                 alignScale(this.state.scales.worldToSvg.x, this.state.xAlignment)
                 : alignScale(this.state.scales.worldToSvg.y, this.state.yAlignment);
             const globalRange = getLimits(globalScale.domain());
-            const subaxisRanges: [number, number][] = options.subaxisRanges(domain, globalScale)
+            const subaxisRanges: [number, number][] = options.subaxisRanges({ domain, globalScale })
                 .filter(range => range[0] <= globalRange[1] && range[1] >= globalRange[0]) // Remove subaxis ranges not overlapping with the global range
                 .map(range => [Math.max(range[0], globalRange[0]), Math.min(range[1], globalRange[1])]); // Clamp subaxis ranges to the global range
 
@@ -177,7 +211,7 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
             axisGroups.each((subaxisRange, i, groupElements) => {
                 const subaxisScale = d3.scaleLinear(subaxisRange, subaxisRange.map(globalScale));
                 const subaxis = axisFn(subaxisScale);
-                setAxisTicks(subaxis, options, domain, subaxisScale);
+                setAxisTicks(subaxis, options, domain, subaxisScale, globalScale);
                 subaxis.tickSizeInner(options.tickSizeInner);
                 // tickSizeOuter adjusted later manually
                 subaxis.tickPadding(options.tickPadding);
@@ -235,12 +269,12 @@ function alignScale(scale: d3.ScaleLinear<number, number>, alignment: 'left' | '
     return scale.copy().domain([origDomain[0] - offset, origDomain[1] - offset]);
 }
 
-function setAxisTicks<TDomain>(axis: d3.Axis<d3.NumberValue>, axisOptions: AxisOptions<TDomain>, domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>): d3.Axis<d3.NumberValue> {
-    const tickArguments = axisOptions.tickArguments(domain, scale);
+function setAxisTicks<TDomain>(axis: d3.Axis<d3.NumberValue>, axisOptions: AxisOptions<TDomain>, domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>, globalScale: d3.ScaleLinear<number, number>): d3.Axis<d3.NumberValue> {
+    const tickArguments = axisOptions.tickArguments({ domain, scale, globalScale });
     axis.tickArguments(tickArguments);
-    const tickValues = axisOptions.tickValues(domain, scale, tickArguments);
+    const tickValues = axisOptions.tickValues({ domain, scale, globalScale, tickArguments });
     if (tickValues) axis.tickValues(tickValues); else axis.tickValues(null);
-    const tickFormat = axisOptions.tickFormat(domain, scale, tickArguments);
+    const tickFormat = axisOptions.tickFormat({ domain, scale, globalScale, tickArguments });
     if (tickFormat) axis.tickFormat(tickFormat); else axis.tickFormat(null);
     return axis;
 }

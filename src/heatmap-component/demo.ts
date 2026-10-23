@@ -243,13 +243,13 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
     heatmap.setAxes({
         left: {
             ...commonAxisOptions,
-            tickArguments: (domain, scale) => [tickNumber(scale.range(), AXIS_TICK_HEIGHT)],
-            subaxisRanges: (domain, scale) => dom1.subaxisRanges.map(([start, stop]) => [start, stop - 1]),
+            tickArguments: ({ scale }) => [tickNumber(scale.range(), AXIS_TICK_HEIGHT)],
+            subaxisRanges: () => dom1.subaxisRanges.map(([start, stop]) => [start, stop - 1]),
         },
         bottom: {
             ...commonAxisOptions,
-            tickArguments: (domain, scale) => [tickNumber(scale.range(), AXIS_TICK_WIDTH)],
-            subaxisRanges: (domain, scale) => dom2.subaxisRanges.map(([start, stop]) => [start, stop - 1]),
+            tickArguments: ({ scale }) => [tickNumber(scale.range(), AXIS_TICK_WIDTH)],
+            subaxisRanges: () => dom2.subaxisRanges.map(([start, stop]) => [start, stop - 1]),
         },
     });
     const colorScale = ColorScale.continuous('Greens', [0, maxValue], [0.1, 1]); // [0.1, 1] is to skip the first 10% of the color palette to avoid almost-white colors
