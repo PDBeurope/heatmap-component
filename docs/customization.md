@@ -331,6 +331,9 @@ Example:
 }
 ```
 
+An axis can be subdivided into multiple individually rendered subaxes, using the `subaxisRanges` parameter.
+The subaxis range indicators ("brackets") can be customized via `subaxisRangeIndicatorEndtick`, `subaxisRangeIndicatorExtend`.
+
 ---
 
 ## Regions
