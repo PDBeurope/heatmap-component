@@ -232,20 +232,24 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
 
     const AXIS_TICK_WIDTH = 30;
     const AXIS_TICK_HEIGHT = 20;
-    const AXIS_LIMIT_EXTENSION = 0.45;
+    const AXIS_OFFSET = 6;
+    const AXIS_ENDTICKS = -3;
     heatmap.setAxes({
         left: {
             tickArguments: (domain, scale) => [tickNumber(scale.range(), AXIS_TICK_HEIGHT)],
-            subaxisRanges: (domain, scale) => dom1.subaxisRanges.map(([start, stop]) => [start - AXIS_LIMIT_EXTENSION, stop - 1 + AXIS_LIMIT_EXTENSION]),
-            offset: 5,
+            subaxisRanges: (domain, scale) => dom1.subaxisRanges.map(([start, stop]) => [start, stop - 1]),
+            offset: AXIS_OFFSET,
+            subaxisRangeIndicatorEndtick: AXIS_ENDTICKS,
+            subaxisRangeIndicatorExtend: true,
         },
         bottom: {
             tickArguments: (domain, scale) => [tickNumber(scale.range(), AXIS_TICK_WIDTH)],
-            subaxisRanges: (domain, scale) => dom2.subaxisRanges.map(([start, stop]) => [start - AXIS_LIMIT_EXTENSION, stop - 1 + AXIS_LIMIT_EXTENSION]),
-            offset: 5,
+            subaxisRanges: (domain, scale) => dom2.subaxisRanges.map(([start, stop]) => [start, stop - 1]),
+            offset: AXIS_OFFSET,
+            subaxisRangeIndicatorEndtick: AXIS_ENDTICKS,
+            subaxisRangeIndicatorExtend: true,
         },
     });
-    // TODO: solve axis ticks for OnlyContactResidues in interface 4/13 9/13
     const colorScale = ColorScale.continuous('Greens', [0, maxValue], [0.1, 1]); // [0.1, 1] is to skip the first 10% of the color palette to avoid almost-white colors
     heatmap.setColor(d => colorScale(d.frequency));
     heatmap.ensureCellAspectRatio(); // Resize the component, so that cell aspect ratio is 1:1
@@ -408,4 +412,4 @@ function flatten<T>(arrays: T[][]): T[] {
     return out;
 }
 
-// TODO: allow hiding axis domain path ends
+// TODO: solve z-index of tooltip vs axes

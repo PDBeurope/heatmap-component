@@ -2,6 +2,7 @@ import { Class } from '../class-names';
 import * as d3 from '../d3-modules';
 import { Domain } from '../data/domain';
 import { BehaviorBase, Extension } from '../extension';
+import { XAlignmentMode, YAlignmentMode } from '../state';
 import { shallowMerge } from '../utils';
 
 
@@ -37,6 +38,12 @@ export interface AxisOptions<TDomain> {
     tickFormat: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>, tickArguments: [count?: number, specifier?: string]) => ((index: d3.NumberValue, i: number) => string) | null,
     /** Function that returns the list of subaxis ranges (in domain index space) to be rendered. By default, exactly one subaxis is rendered, with range equal to the visible range of domain indices (i.e. `scale.domain()`). */
     subaxisRanges: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>) => [start: number, end: number][],
+    /** Controls the size (in pixels) of the endticks of the range indicator for the axis (or for each subaxis). Default: 6.
+     * Use 0 to render as a plain line without endticks. Use negative values to draw the endticks inwards.
+     * Apply CSS to `.heatmap-axes .domain` to further style or hide the indicator. */
+    subaxisRangeIndicatorEndtick: number,
+    /** Controls whether the range indicator for the axis (or for each subaxis) should extend outwards to the next cell boundary. */
+    subaxisRangeIndicatorExtend: boolean,
 }
 
 export const DefaultAxisOptions: AxisOptions<unknown> = {
@@ -75,6 +82,8 @@ export const DefaultAxisOptions: AxisOptions<unknown> = {
         }
     },
     subaxisRanges: (domain, scale) => [getLimits(scale.domain())],
+    subaxisRangeIndicatorEndtick: 6,
+    subaxisRangeIndicatorExtend: false,
 };
 
 function normalizeAxisOptions<TDomain>(param: boolean | Partial<AxisOptions<TDomain>>): AxisOptions<TDomain> | undefined {
@@ -146,6 +155,7 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
                     translate = [canvasLeft + canvasRect.width + options.offset, canvasTop];
                     break;
             }
+            const alignmentMode = (position === 'top' || position === 'bottom') ? this.state.xAlignment : this.state.yAlignment;
             const globalScale = (position === 'top' || position === 'bottom') ?
                 alignScale(this.state.scales.worldToSvg.x, this.state.xAlignment)
                 : alignScale(this.state.scales.worldToSvg.y, this.state.yAlignment);
@@ -162,7 +172,25 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
                 const subaxisScale = d3.scaleLinear(subaxisRange, subaxisRange.map(globalScale));
                 const subaxis = axisFn(subaxisScale);
                 setAxisTicks(subaxis, options, domain, subaxisScale);
-                d3.select(groupElements[i]).call(subaxis);
+                const group = d3.select(groupElements[i]);
+                group.call(subaxis);
+
+                // Customize subaxis range indicator (.domain)
+                const rangeIndicator = group.select('.domain');
+                const worldRange = options.subaxisRangeIndicatorExtend ? extendRange(subaxisRange, alignmentMode) : subaxisRange;
+                const svgRange = worldRange.map(globalScale);
+                const strokeWidth = getStrokeWidth(rangeIndicator);
+                /** Gap in pixels to be inserted between range indicators of too adjacent subaxes if they are extended outwards (to avoid overlap) */
+                const SUBAXIS_GAP = 1;
+                const padding = options.subaxisRangeIndicatorExtend ?
+                    0.5 * SUBAXIS_GAP + (options.subaxisRangeIndicatorEndtick !== 0 ? 0.5 * strokeWidth : 0)
+                    : 0;
+                /** Magic D3 adjustment depending on devicePixelRatio */
+                const offset = subaxis.offset();
+                const start = Math.min(svgRange[0] + padding, /* avoid zero length */ svgRange[1] - 0.5 * strokeWidth) + offset;
+                const end = Math.max(svgRange[1] - padding, /* avoid zero length */ svgRange[0] + 0.5 * strokeWidth) + offset;
+                const path = rangeIndicatorPath(position, options.subaxisRangeIndicatorEndtick, start, end);
+                rangeIndicator.attr('d', path);
             });
         };
 
@@ -206,6 +234,45 @@ function setAxisTicks<TDomain>(axis: d3.Axis<d3.NumberValue>, axisOptions: AxisO
     const tickFormat = axisOptions.tickFormat(domain, scale, tickArguments);
     if (tickFormat) axis.tickFormat(tickFormat); else axis.tickFormat(null);
     return axis;
+}
+
+/** Extend `range` outwards to the next cell boundary */
+function extendRange(range: [number, number], alignment: XAlignmentMode | YAlignmentMode): [number, number] {
+    if (alignment === 'center') {
+        const start = Math.floor(range[0] + 0.5) - 0.5;
+        const stop = Math.ceil(range[1] + 0.5) - 0.5;
+        return [start, stop];
+    }
+    const start = Math.floor(range[0]);
+    const stop = Math.ceil(range[1]);
+    return [start, stop];
+}
+
+/** Return stroke-width style property of a selection */
+function getStrokeWidth(selection: d3.Selection<any, any, any, any>): number {
+    const strokeWidth = parseFloat(selection.style('stroke-width'));
+    if (isNaN(strokeWidth)) return 1;
+    else return strokeWidth;
+}
+
+/** Return customized path for .domain element in D3 axis */
+function rangeIndicatorPath(position: 'top' | 'bottom' | 'left' | 'right', endtickLength: number, start: number, end: number) {
+    const isVertical = position === 'left' || position === 'right';
+    const isFlipped = position === 'left' || position === 'top';
+    if (endtickLength !== 0) {
+        // Render as bracket (with endticks)
+        const tick = isFlipped ? -endtickLength : endtickLength;
+        if (isVertical)
+            return `M${tick},${start} H0 V${end} H${tick}`;
+        else
+            return `M${start},${tick} V0 H${end} V${tick}`;
+    } else {
+        // Render as line (without endticks)
+        if (isVertical)
+            return `M0,${start} V${end}`;
+        else
+            return `M${start},0 H${end}`;
+    }
 }
 
 
