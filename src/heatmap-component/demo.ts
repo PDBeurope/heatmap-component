@@ -1,6 +1,7 @@
 import { range } from 'lodash';
 import { ColorScale, Heatmap } from '../main';
 import { DataDescription } from './data/data-description';
+import { AxisOptions } from './extensions/axes';
 
 
 /** Demo showing small data with a lot of customizations */
@@ -232,22 +233,23 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
 
     const AXIS_TICK_WIDTH = 30;
     const AXIS_TICK_HEIGHT = 20;
-    const AXIS_OFFSET = 6;
-    const AXIS_ENDTICKS = -3;
+    const commonAxisOptions: Partial<AxisOptions<ResidueNumber>> = {
+        axisPadding: 6,
+        tickSizeInner: 6,
+        tickSizeOuter: -3,
+        tickPadding: 3,
+        subaxisRangeIndicatorExtend: true,
+    };
     heatmap.setAxes({
         left: {
+            ...commonAxisOptions,
             tickArguments: (domain, scale) => [tickNumber(scale.range(), AXIS_TICK_HEIGHT)],
             subaxisRanges: (domain, scale) => dom1.subaxisRanges.map(([start, stop]) => [start, stop - 1]),
-            offset: AXIS_OFFSET,
-            subaxisRangeIndicatorEndtick: AXIS_ENDTICKS,
-            subaxisRangeIndicatorExtend: true,
         },
         bottom: {
+            ...commonAxisOptions,
             tickArguments: (domain, scale) => [tickNumber(scale.range(), AXIS_TICK_WIDTH)],
             subaxisRanges: (domain, scale) => dom2.subaxisRanges.map(([start, stop]) => [start, stop - 1]),
-            offset: AXIS_OFFSET,
-            subaxisRangeIndicatorEndtick: AXIS_ENDTICKS,
-            subaxisRangeIndicatorExtend: true,
         },
     });
     const colorScale = ColorScale.continuous('Greens', [0, maxValue], [0.1, 1]); // [0.1, 1] is to skip the first 10% of the color palette to avoid almost-white colors
@@ -413,3 +415,5 @@ function flatten<T>(arrays: T[][]): T[] {
 }
 
 // TODO: solve z-index of tooltip vs axes
+// TODO: split demo file
+// TODO: relook at tick spacing

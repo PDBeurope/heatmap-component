@@ -28,8 +28,16 @@ export const DefaultAxesExtensionParams: AxesExtensionParams<unknown, unknown> =
 
 
 export interface AxisOptions<TDomain> {
-    /** Pixel offset between the axis and the heatmap canvas. */
-    offset: number,
+    /** Space between the axis and the heatmap canvas. Default: 0. */
+    axisPadding: number,
+    /** Size of inner ticks. Default: 6. */
+    tickSizeInner: number,
+    /** Size of outer ticks (at the ends of the range indicator for the axis (or for each subaxis)). Default: 6.
+     * Use 0 to render as a plain line without endticks. Use negative values to draw the ticks inwards.
+     * Apply CSS to `.heatmap-axes .domain` to further style or hide the range indicator. */
+    tickSizeOuter: number,
+    /** Distance between tick and its label. Default: 3. */
+    tickPadding: number,
     /** Function that returns the arguments used to generate axis ticks. These arguments will be passed to the D3 `Axis.tickArguments` method and to the `tickValues` and `tickFormat` functions. */
     tickArguments: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>) => [count?: number, specifier?: string],
     /** Function that returns the list of tick values, or `null` to use the D3 default ticks. */
@@ -38,16 +46,15 @@ export interface AxisOptions<TDomain> {
     tickFormat: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>, tickArguments: [count?: number, specifier?: string]) => ((index: d3.NumberValue, i: number) => string) | null,
     /** Function that returns the list of subaxis ranges (in domain index space) to be rendered. By default, exactly one subaxis is rendered, with range equal to the visible range of domain indices (i.e. `scale.domain()`). */
     subaxisRanges: (domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>) => [start: number, end: number][],
-    /** Controls the size (in pixels) of the endticks of the range indicator for the axis (or for each subaxis). Default: 6.
-     * Use 0 to render as a plain line without endticks. Use negative values to draw the endticks inwards.
-     * Apply CSS to `.heatmap-axes .domain` to further style or hide the indicator. */
-    subaxisRangeIndicatorEndtick: number,
     /** Controls whether the range indicator for the axis (or for each subaxis) should extend outwards to the next cell boundary. */
     subaxisRangeIndicatorExtend: boolean,
 }
 
 export const DefaultAxisOptions: AxisOptions<unknown> = {
-    offset: 0,
+    axisPadding: 0,
+    tickSizeInner: 6,
+    tickSizeOuter: 6,
+    tickPadding: 3,
     tickArguments: () => [],
     tickValues: (domain, scale, args) => {
         const indexPresent = (idx: number) => Math.floor(idx) === idx && idx >= 0 && idx < domain.values.length;
@@ -82,7 +89,6 @@ export const DefaultAxisOptions: AxisOptions<unknown> = {
         }
     },
     subaxisRanges: (domain, scale) => [getLimits(scale.domain())],
-    subaxisRangeIndicatorEndtick: 6,
     subaxisRangeIndicatorExtend: false,
 };
 
@@ -140,19 +146,19 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
             switch (position) {
                 case 'top':
                     axisFn = d3.axisTop;
-                    translate = [canvasLeft, canvasTop - options.offset];
+                    translate = [canvasLeft, canvasTop - options.axisPadding];
                     break;
                 case 'bottom':
                     axisFn = d3.axisBottom;
-                    translate = [canvasLeft, canvasTop + canvasRect.height + options.offset];
+                    translate = [canvasLeft, canvasTop + canvasRect.height + options.axisPadding];
                     break;
                 case 'left':
                     axisFn = d3.axisLeft;
-                    translate = [canvasLeft - options.offset, canvasTop];
+                    translate = [canvasLeft - options.axisPadding, canvasTop];
                     break;
                 case 'right':
                     axisFn = d3.axisRight;
-                    translate = [canvasLeft + canvasRect.width + options.offset, canvasTop];
+                    translate = [canvasLeft + canvasRect.width + options.axisPadding, canvasTop];
                     break;
             }
             const alignmentMode = (position === 'top' || position === 'bottom') ? this.state.xAlignment : this.state.yAlignment;
@@ -172,10 +178,13 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
                 const subaxisScale = d3.scaleLinear(subaxisRange, subaxisRange.map(globalScale));
                 const subaxis = axisFn(subaxisScale);
                 setAxisTicks(subaxis, options, domain, subaxisScale);
+                subaxis.tickSizeInner(options.tickSizeInner);
+                // tickSizeOuter adjusted later manually
+                subaxis.tickPadding(options.tickPadding);
                 const group = d3.select(groupElements[i]);
                 group.call(subaxis);
 
-                // Customize subaxis range indicator (.domain)
+                // Customize subaxis range indicator (.domain path is changed explicitly instead of calling .tickSizeOuter(), to allow adjusting the length when subaxisRangeIndicatorExtend is true)
                 const rangeIndicator = group.select('.domain');
                 const worldRange = options.subaxisRangeIndicatorExtend ? extendRange(subaxisRange, alignmentMode) : subaxisRange;
                 const svgRange = worldRange.map(globalScale);
@@ -183,13 +192,13 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
                 /** Gap in pixels to be inserted between range indicators of too adjacent subaxes if they are extended outwards (to avoid overlap) */
                 const SUBAXIS_GAP = 1;
                 const padding = options.subaxisRangeIndicatorExtend ?
-                    0.5 * SUBAXIS_GAP + (options.subaxisRangeIndicatorEndtick !== 0 ? 0.5 * strokeWidth : 0)
+                    0.5 * SUBAXIS_GAP + (options.tickSizeOuter !== 0 ? 0.5 * strokeWidth : 0)
                     : 0;
                 /** Magic D3 adjustment depending on devicePixelRatio */
                 const offset = subaxis.offset();
                 const start = Math.min(svgRange[0] + padding, /* avoid zero length */ svgRange[1] - 0.5 * strokeWidth) + offset;
                 const end = Math.max(svgRange[1] - padding, /* avoid zero length */ svgRange[0] + 0.5 * strokeWidth) + offset;
-                const path = rangeIndicatorPath(position, options.subaxisRangeIndicatorEndtick, start, end);
+                const path = rangeIndicatorPath(position, options.tickSizeOuter, start, end);
                 rangeIndicator.attr('d', path);
             });
         };
