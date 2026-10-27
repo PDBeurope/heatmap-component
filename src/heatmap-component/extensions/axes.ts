@@ -234,6 +234,13 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
                 const end = Math.max(svgRange[1] - padding, /* avoid zero length */ svgRange[0] + 0.5 * strokeWidth) + offset;
                 const path = rangeIndicatorPath(position, options.tickSizeOuter, start, end);
                 rangeIndicator.attr('d', path);
+                // Add tooltip
+                const tooltipStart = domain.values[Math.max(0, Math.ceil(subaxisRange[0]))];
+                const tooltipEnd = domain.values[Math.min(domain.values.length - 1, Math.floor(subaxisRange[1]))];
+                const tooltip = `${tooltipStart} - ${tooltipEnd}`;
+                rangeIndicator.selectAll('title').data([tooltip]).join(enter => enter.append('title')).text(d => d);
+                rangeIndicator.style('pointer-events', 'auto');
+                // TODO: make tooltip more obvious?
             });
         };
 

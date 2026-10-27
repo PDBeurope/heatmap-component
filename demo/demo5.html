@@ -16,11 +16,12 @@
     #app .heatmap-axes {
       .domain {
         stroke-width: 3;
+
+        &:hover {
+          stroke: red;
+        }
       }
 
-      .tick line {
-        stroke-width: 0.5;
-      }
     }
 
     .heatmap-region-x,
@@ -52,21 +53,23 @@
     <input type="radio" name="axes-kind" id="axes-full-sequence">
     <label for="axes-full-sequence" title="Show full polymer sequence on X and Y axis">Full sequence</label>
 
-    <input type="radio" name="axes-kind" id="axes-contact-regions" checked>
+    <input type="radio" name="axes-kind" id="axes-contact-regions">
     <label for="axes-contact-regions" title="Show only residues with at least one contact, plus a few surrounding residues">Only contact regions</label>
 
-    <input type="radio" name="axes-kind" id="axes-contact-residues">
+    <input type="radio" name="axes-kind" id="axes-contact-residues" checked>
     <label for="axes-contact-residues" title="Show only residues with at least one contact">Only contact residues</label>
   </form>
 
   <div style="padding: 15px; background-color: white;">
     <!-- Your visualization will be placed here -->
     <div id="app" style="max-width: 800px; max-height: 600px; width: 100px; height: 100px; border: solid 1px gainsboro;"></div>
+    <!-- <div id="app" style="max-width: 95vw; width: 100px; height: 100px; border: solid 1px gainsboro;"></div> -->
+    <!-- <div id="app" style="max-height: 75vh; width: 100px; height: 100px; border: solid 1px gainsboro;"></div> -->
     <!-- width, height style properties on #app element are just placeholders. Real size will be set by `ensureCellAspectRatio`, based on max-width, max-height. -->
   </div>
 
-  <p><strong>Rows:</strong> <span id="row-names"></span></p>
-  <p><strong>Columns:</strong> <span id="column-names"></span></p>
+  <!-- <p><strong>Rows:</strong> <span id="row-names"></span></p>
+  <p><strong>Columns:</strong> <span id="column-names"></span></p> -->
   <p><strong>Maximum contact frequency:</strong> <span id="max-frequency"></span></p>
 
   <script>

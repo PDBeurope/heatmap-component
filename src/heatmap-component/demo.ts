@@ -2,6 +2,7 @@ import { range } from 'lodash';
 import { ColorScale, Heatmap } from '../main';
 import { DataDescription } from './data/data-description';
 import { AxisOptions } from './extensions/axes';
+import { ScaleLinear } from 'd3';
 
 
 /** Demo showing small data with a lot of customizations */
@@ -231,8 +232,13 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
         xRegions: dom2.regionRanges,
     });
 
-    const AXIS_TICK_WIDTH = 30;
-    const AXIS_TICK_HEIGHT = 20;
+    /** End-inclusive */
+    const xSubaxisRanges: [number, number][] = dom2.subaxisRanges.map(([start, stop]) => [start, stop - 1]);
+    /** End-inclusive */
+    const ySubaxisRanges: [number, number][] = dom1.subaxisRanges.map(([start, stop]) => [start, stop - 1]);
+
+    const AXIS_TICK_WIDTH = 20;
+    const AXIS_TICK_HEIGHT = 12;
     const commonAxisOptions: Partial<AxisOptions<ResidueNumber>> = {
         axisPadding: 6,
         tickSizeInner: 6,
@@ -240,22 +246,115 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
         tickPadding: 3,
         subaxisRangeIndicatorExtend: true,
     };
+
+    const xTicksCache = SingleEntryCache<ScaleLinear<number, number>, Map<string, number[]>>(scaleToString, scale => computeTicks(dom2.domain, xSubaxisRanges, scale, AXIS_TICK_WIDTH));
+    const yTicksCache = SingleEntryCache<ScaleLinear<number, number>, Map<string, number[]>>(scaleToString, scale => computeTicks(dom1.domain, ySubaxisRanges, scale, AXIS_TICK_HEIGHT));
+
     heatmap.setAxes({
         left: {
             ...commonAxisOptions,
             tickArguments: ({ scale }) => [tickNumber(scale.range(), AXIS_TICK_HEIGHT)],
-            subaxisRanges: () => dom1.subaxisRanges.map(([start, stop]) => [start, stop - 1]),
+            subaxisRanges: () => ySubaxisRanges,
+            tickValues: axesKind === 'axes-full-sequence' ? undefined : ({ globalScale, scale }) => yTicksCache.get(globalScale).get(scale.domain().join(',')) ?? [],
         },
         bottom: {
             ...commonAxisOptions,
             tickArguments: ({ scale }) => [tickNumber(scale.range(), AXIS_TICK_WIDTH)],
-            subaxisRanges: () => dom2.subaxisRanges.map(([start, stop]) => [start, stop - 1]),
+            subaxisRanges: () => xSubaxisRanges,
+            tickValues: axesKind === 'axes-full-sequence' ? undefined : ({ globalScale, scale }) => xTicksCache.get(globalScale).get(scale.domain().join(',')) ?? [],
         },
     });
+    // TODO: consider changing per-subaxis ticks provider to global ticks provider
     const colorScale = ColorScale.continuous('Greens', [0, maxValue], [0.1, 1]); // [0.1, 1] is to skip the first 10% of the color palette to avoid almost-white colors
     heatmap.setColor(d => colorScale(d.frequency));
-    heatmap.ensureCellAspectRatio(); // Resize the component, so that cell aspect ratio is 1:1
+    heatmap.ensureCellAspectRatio({ cellAspectRatio: 1 }); // Resize the component, so that cell aspect ratio is 1:1
 }
+
+
+interface SingleEntryCache<I, O> {
+    get(input: I): O,
+}
+function SingleEntryCache<I, O>(key: (input: I) => string, compute: (input: I) => O): SingleEntryCache<I, O> {
+    let lastKey: string | undefined = undefined;
+    let lastValue: O | undefined = undefined;
+    return {
+        get: (input: I) => {
+            const k = key(input);
+            if (lastKey !== k) {
+                lastValue = compute(input);
+                lastKey = k;
+            }
+            return lastValue!;
+        },
+    };
+}
+
+function scaleToString(scale: ScaleLinear<number, number>): string {
+    return `${scale.domain().join(',')}:${scale.range().join(',')}`;
+};
+
+/** Ranges end-inclusive */
+function computeTicks(domain: ResidueNumber[], ranges: Ranges, scale: ScaleLinear<number, number>, minSpace: number): Map<string, number[]> {
+    const scaleRange = scale.range();
+    const unitSpace = (scaleRange[scaleRange.length - 1] - scaleRange[0]) / (domain.length - 1);
+    const minStep = minSpace / unitSpace;
+    const step = Math.max(1, niceTickStep(minStep));
+    const domainIndex = new Map(domain.map((x, i) => [x, i]));
+    function ticksForRange(range: [number, number]): number[] {
+        const firstValue = domain[range[0]];
+        const lastValue = domain[range[1]];
+        const ticks: number[] = [];
+        for (let i = Math.ceil(firstValue / step); i <= lastValue / step; i++) {
+            const value = i * step as ResidueNumber;
+            const idx = domainIndex.get(value);
+            if (idx !== undefined) ticks.push(idx);
+        }
+        return ticks;
+    }
+    const ticksForRanges = ranges.map(range => ticksForRange(range));
+
+    // Remove trailing ticks to avoid conflicts with next range
+    let nextTick = Infinity;
+    const nextTickPerRange = ranges.map(() => Infinity);
+    for (let i = ticksForRanges.length - 1; i >= 0; i--) {
+        nextTickPerRange[i] = nextTick;
+        const ticksHere = ticksForRanges[i];
+        while (ticksHere.length > 0 && ticksHere[ticksHere.length - 1] > nextTick - minStep) {
+            ticksHere.pop();
+        }
+        if (ticksHere.length > 0) {
+            nextTick = ticksHere[0];
+        }
+    }
+
+    // Add at least one tick per range if possible, even if it doesn't fall on a multiple of step
+    let prevTick = -Infinity;
+    for (let i = 0; i < ticksForRanges.length; i++) {
+        const ticksHere = ticksForRanges[i];
+        if (ticksHere.length === 0) {
+            const idx = ranges[i][0];
+            if (idx - prevTick >= minStep && nextTickPerRange[i] - idx >= minStep) {
+                ticksHere.push(idx);
+            }
+        }
+        if (ticksHere.length > 0) {
+            prevTick = ticksHere[ticksHere.length - 1];
+        }
+    }
+
+    return new Map(ticksForRanges.map((ticks, i) => [ranges[i].join(','), ticks]));
+};
+
+/** Return the closest "nice value" greater or equal to `minStep`, e.g. 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50... */
+function niceTickStep(minStep: number): number {
+    const exponent = Math.floor(Math.log10(minStep));
+    const significand = minStep / 10 ** exponent;
+    if (significand <= 1) return 1 * 10 ** exponent;
+    if (significand <= 2) return 2 * 10 ** exponent;
+    if (significand <= 5) return 5 * 10 ** exponent;
+    return 10 ** (exponent + 1);
+}
+
 
 /** Residue number, type alias for `number` for better static checking (avoids mixing ResidueNumbers with regular numbers) */
 type ResidueNumber = number & { '@type': 'ResidueNumber' };
@@ -291,7 +390,7 @@ function prepareDomain(residues: ResidueNumber[], axesKind: AxesKind) {
 
 function tickNumber(scaleRange: number[], oneTickSpace: number) {
     const space = Math.abs(scaleRange[scaleRange.length - 1] - scaleRange[0]);
-    return Math.max(1, space / oneTickSpace);
+    return Math.min(9, Math.max(1, space / oneTickSpace));
 }
 
 /** Shape of data in the example Interface API response */
