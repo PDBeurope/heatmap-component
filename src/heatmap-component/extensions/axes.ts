@@ -2,6 +2,7 @@ import { Class } from '../class-names';
 import * as d3 from '../d3-modules';
 import { Domain } from '../data/domain';
 import { BehaviorBase, Extension } from '../extension';
+import { Box } from '../scales';
 import { XAlignmentMode, YAlignmentMode } from '../state';
 import { shallowMerge } from '../utils';
 
@@ -158,108 +159,116 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
         if (!mainRect || !canvasRect) return;
         const canvasLeft = canvasRect.left - mainRect.left;
         const canvasTop = canvasRect.top - mainRect.top;
+        /** Position of canvas div within main div */
+        const canvasBox = Box.create(canvasLeft, canvasTop, canvasLeft + canvasRect.width, canvasTop + canvasRect.height);
 
         // Create/update axes SVG
         const currentAxesSvg = this.state.dom.mainDiv.selectAll<SVGSVGElement, unknown>(`.${Class.Axes}`).data([undefined]);
-        const axesSvg = currentAxesSvg.enter().append('svg').attr('class', Class.Axes).merge(currentAxesSvg);
+        const axesSvg = currentAxesSvg.enter().append('svg').attr('class', Class.Axes).merge(currentAxesSvg); // TODO: .join
 
         // Create/update/remove individual axes
-        const updateAxis = <TDomain>(position: 'top' | 'bottom' | 'left' | 'right', axisParam: boolean | Partial<AxisOptions<TDomain>>, domain: Domain<TDomain>) => {
-            const options = normalizeAxisOptions(axisParam);
-            const groupClass = `heatmap-axis-${position}`;
-            const axisClass = `heatmap-axis`;
-            const subdomainClass = `heatmap-domain`;
-            if (!options) {
-                axesSvg.selectAll<SVGGElement, unknown>(`.${groupClass}`).remove();
-                return;
-            }
-            let axisFn: typeof d3.axisTop;
-            let translate: [number, number];
-            switch (position) {
-                case 'top':
-                    axisFn = d3.axisTop;
-                    translate = [canvasLeft, canvasTop - options.axisPadding];
-                    break;
-                case 'bottom':
-                    axisFn = d3.axisBottom;
-                    translate = [canvasLeft, canvasTop + canvasRect.height + options.axisPadding];
-                    break;
-                case 'left':
-                    axisFn = d3.axisLeft;
-                    translate = [canvasLeft - options.axisPadding, canvasTop];
-                    break;
-                case 'right':
-                    axisFn = d3.axisRight;
-                    translate = [canvasLeft + canvasRect.width + options.axisPadding, canvasTop];
-                    break;
-            }
-            const alignmentMode = (position === 'top' || position === 'bottom') ? this.state.xAlignment : this.state.yAlignment;
-            const scale = (position === 'top' || position === 'bottom') ?
-                alignScale(this.state.scales.worldToSvg.x, this.state.xAlignment)
-                : alignScale(this.state.scales.worldToSvg.y, this.state.yAlignment);
-            const globalRange = getLimits(scale.domain());
-            const subdomainRanges: [number, number][] = options.subdomainRanges({ domain, scale: scale })
-                .filter(range => range[0] <= globalRange[1] && range[1] >= globalRange[0]) // Remove subdomain ranges not overlapping with the global range
-                .map(range => [Math.max(range[0], globalRange[0]), Math.min(range[1], globalRange[1])]); // Clamp subdomain ranges to the global range
-
-            /** Group to hold all axis element for a position */
-            const group = axesSvg.selectAll<SVGGElement, unknown>(`.${groupClass}`)
-                .data([undefined])
-                .join(enter => enter.append('g').attr('class', groupClass))
-                .attr('transform', `translate(${translate})`);
-
-            // Update D3 axis:
-
-            /** Group for D3 axis (except .domain) */
-            const axisGroup = group.selectAll<SVGGElement, unknown>(`.${axisClass}`)
-                .data([undefined])
-                .join(enter => enter.append('g').attr('class', axisClass));
-
-            const axis = axisFn(scale);
-            setAxisTicks(axis, options, domain, scale);
-            axis.tickSizeInner(options.tickSizeInner);
-            // tickSizeOuter adjusted elsewhere (subdomains rendered manually)
-            axis.tickPadding(options.tickPadding);
-            axisGroup.call(axis);
-
-            // Update (sub)domain indicators:
-
-            /** Groups for (sub)domain indicators */
-            const subdomainGroups = group.selectAll<SVGPathElement, unknown>(`.${subdomainClass}`)
-                .data(subdomainRanges)
-                .join(enter => enter.append('path').attr('class', subdomainClass));
-            const strokeWidth = getStrokeWidth(subdomainGroups);
-            subdomainGroups.attr('d', (subdomainRange) => {
-                const worldRange = options.subdomainIndicatorExtend ? extendRange(subdomainRange, alignmentMode) : subdomainRange;
-                const svgRange = worldRange.map(scale);
-                /** Gap in pixels to be inserted between range indicators of too adjacent subaxes if they are extended outwards (to avoid overlap) */
-                const SUBDOMAIN_GAP = 1;
-                const padding = options.subdomainIndicatorExtend ?
-                    0.5 * SUBDOMAIN_GAP + (options.tickSizeOuter !== 0 ? 0.5 * strokeWidth : 0)
-                    : 0;
-                /** Magic D3 adjustment depending on devicePixelRatio */
-                const offset = axis.offset();
-                const start = Math.min(svgRange[0] + padding, /* avoid zero length */ svgRange[1] - 0.5 * strokeWidth) + offset;
-                const end = Math.max(svgRange[1] - padding, /* avoid zero length */ svgRange[0] + 0.5 * strokeWidth) + offset;
-                return rangeIndicatorPath(position, options.tickSizeOuter, start, end);
-            });
-            // Add tooltip
-            subdomainGroups.style('pointer-events', 'auto');
-            subdomainGroups.selectAll('title')
-                .data(subdomainRange => [subdomainRange])
-                .join(enter => enter.append('title'))
-                .text(subdomainRange => {
-                    const tooltipStart = domain.values[Math.max(0, Math.ceil(subdomainRange[0]))];
-                    const tooltipEnd = domain.values[Math.min(domain.values.length - 1, Math.floor(subdomainRange[1]))];
-                    return `${tooltipStart} - ${tooltipEnd}`;
-                });
-        };
-
-        updateAxis('top', this.params.top, this.state.xDomain);
-        updateAxis('bottom', this.params.bottom, this.state.xDomain);
-        updateAxis('left', this.params.left, this.state.yDomain);
-        updateAxis('right', this.params.right, this.state.yDomain);
+        this.updateAxis(axesSvg, canvasBox, 'top', this.params.top, this.state.xDomain);
+        this.updateAxis(axesSvg, canvasBox, 'bottom', this.params.bottom, this.state.xDomain);
+        this.updateAxis(axesSvg, canvasBox, 'left', this.params.left, this.state.yDomain);
+        this.updateAxis(axesSvg, canvasBox, 'right', this.params.right, this.state.yDomain);
     }
+
+
+    /** Create/update/remove individual axes */
+    private updateAxis<TDomain>(axesSvg: d3.Selection<SVGSVGElement, any, any, any>, canvasBox: Box, position: 'top' | 'bottom' | 'left' | 'right', axisParam: boolean | Partial<AxisOptions<TDomain>>, domain: Domain<TDomain>) {
+        const options = normalizeAxisOptions(axisParam);
+        const groupClass = `heatmap-axis-${position}`;
+        const axisClass = `heatmap-axis`;
+        const subdomainClass = `heatmap-domain`;
+        if (!options) {
+            axesSvg.selectAll<SVGGElement, unknown>(`.${groupClass}`).remove();
+            return;
+        }
+        let axisFn: typeof d3.axisTop;
+        let translate: [number, number];
+        switch (position) {
+            case 'top':
+                axisFn = d3.axisTop;
+                translate = [canvasBox.xmin, canvasBox.ymin - options.axisPadding];
+                // translate = [canvasLeft, canvasTop - options.axisPadding];
+                break;
+            case 'bottom':
+                axisFn = d3.axisBottom;
+                translate = [canvasBox.xmin, canvasBox.ymax + options.axisPadding];
+                // translate = [canvasLeft, canvasTop + canvasRect.height + options.axisPadding];
+                break;
+            case 'left':
+                axisFn = d3.axisLeft;
+                translate = [canvasBox.xmin - options.axisPadding, canvasBox.ymin];
+                // translate = [canvasLeft - options.axisPadding, canvasTop];
+                break;
+            case 'right':
+                axisFn = d3.axisRight;
+                translate = [canvasBox.xmax + options.axisPadding, canvasBox.ymin];
+                // translate = [canvasLeft + canvasRect.width + options.axisPadding, canvasTop];
+                break;
+        }
+        const alignmentMode = (position === 'top' || position === 'bottom') ? this.state.xAlignment : this.state.yAlignment;
+        const scale = (position === 'top' || position === 'bottom') ?
+            alignScale(this.state.scales.worldToSvg.x, this.state.xAlignment)
+            : alignScale(this.state.scales.worldToSvg.y, this.state.yAlignment);
+        const globalRange = getLimits(scale.domain());
+        const subdomainRanges: [number, number][] = options.subdomainRanges({ domain, scale: scale })
+            .filter(range => range[0] <= globalRange[1] && range[1] >= globalRange[0]) // Remove subdomain ranges not overlapping with the global range
+            .map(range => [Math.max(range[0], globalRange[0]), Math.min(range[1], globalRange[1])]); // Clamp subdomain ranges to the global range
+
+        /** Group to hold all axis element for a position */
+        const group = axesSvg.selectAll<SVGGElement, unknown>(`.${groupClass}`)
+            .data([undefined])
+            .join(enter => enter.append('g').attr('class', groupClass))
+            .attr('transform', `translate(${translate})`);
+
+        // Update D3 axis:
+
+        /** Group for D3 axis (except .domain) */
+        const axisGroup = group.selectAll<SVGGElement, unknown>(`.${axisClass}`)
+            .data([undefined])
+            .join(enter => enter.append('g').attr('class', axisClass));
+
+        const axis = axisFn(scale);
+        setAxisTicks(axis, options, domain, scale);
+        axis.tickSizeInner(options.tickSizeInner);
+        // tickSizeOuter adjusted elsewhere (subdomains rendered manually)
+        axis.tickPadding(options.tickPadding);
+        axisGroup.call(axis);
+
+        // Update (sub)domain indicators:
+
+        /** Groups for (sub)domain indicators */
+        const subdomainGroups = group.selectAll<SVGPathElement, unknown>(`.${subdomainClass}`)
+            .data(subdomainRanges)
+            .join(enter => enter.append('path').attr('class', subdomainClass));
+        const strokeWidth = getStrokeWidth(subdomainGroups);
+        subdomainGroups.attr('d', (subdomainRange) => {
+            const worldRange = options.subdomainIndicatorExtend ? extendRange(subdomainRange, alignmentMode) : subdomainRange;
+            const svgRange = worldRange.map(scale);
+            /** Gap in pixels to be inserted between range indicators of too adjacent subaxes if they are extended outwards (to avoid overlap) */
+            const SUBDOMAIN_GAP = 1;
+            const padding = options.subdomainIndicatorExtend ?
+                0.5 * SUBDOMAIN_GAP + (options.tickSizeOuter !== 0 ? 0.5 * strokeWidth : 0)
+                : 0;
+            /** Magic D3 adjustment depending on devicePixelRatio */
+            const offset = axis.offset();
+            const start = Math.min(svgRange[0] + padding, /* avoid zero length */ svgRange[1] - 0.5 * strokeWidth) + offset;
+            const end = Math.max(svgRange[1] - padding, /* avoid zero length */ svgRange[0] + 0.5 * strokeWidth) + offset;
+            return rangeIndicatorPath(position, options.tickSizeOuter, start, end);
+        });
+        // Add tooltip
+        subdomainGroups.style('pointer-events', 'auto');
+        subdomainGroups.selectAll('title')
+            .data(subdomainRange => [subdomainRange])
+            .join(enter => enter.append('title'))
+            .text(subdomainRange => {
+                const tooltipStart = domain.values[Math.max(0, Math.ceil(subdomainRange[0]))];
+                const tooltipEnd = domain.values[Math.min(domain.values.length - 1, Math.floor(subdomainRange[1]))];
+                return `${tooltipStart} - ${tooltipEnd}`;
+            });
+    };
 }
 
 
