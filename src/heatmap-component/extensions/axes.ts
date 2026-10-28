@@ -32,9 +32,9 @@ export interface AxisOptions<TDomain> {
     axisPadding: number,
     /** Size of inner ticks. Default: 6. */
     tickSizeInner: number,
-    /** Size of outer ticks (at the ends of the range indicator for the axis (or for each subaxis)). Default: 6.
+    /** Size of outer ticks (at the ends of the domain indicator for the axis (or for each subdomain)). Default: 6.
      * Use 0 to render as a plain line without endticks. Use negative values to draw the ticks inwards.
-     * Apply CSS to `.heatmap-axes .domain` to further style or hide the range indicator. */
+     * Apply CSS to `.heatmap-domain` to further style or hide the domain indicator. */
     tickSizeOuter: number,
     /** Distance between tick and its label. Default: 3. */
     tickPadding: number,
@@ -43,19 +43,15 @@ export interface AxisOptions<TDomain> {
     tickArguments: (params: {
         /** Full domain corresponding the axis (column/row labels) */
         domain: Domain<TDomain>,
-        /** D3 scale bound to the current subaxis (only different from `globalAxis`, if `subaxisRanges` is used) */
+        /** D3 scale corresponding to the visible range of the columns/rows */
         scale: d3.ScaleLinear<number, number>,
-        /** D3 scale corresponding to the whole visible range of the columns/rows */
-        globalScale: d3.ScaleLinear<number, number>,
     }) => [count?: number, specifier?: string],
     /** Function that returns the list of tick values (in domain index space), or `null` to use the D3 default ticks. */
     tickValues: (params: {
         /** Full domain corresponding the axis (column/row labels) */
         domain: Domain<TDomain>,
-        /** D3 scale bound to the current subaxis (only different from `globalAxis`, if `subaxisRanges` is used) */
+        /** D3 scale corresponding to the visible range of the columns/rows */
         scale: d3.ScaleLinear<number, number>,
-        /** D3 scale corresponding to the whole visible range of the columns/rows */
-        globalScale: d3.ScaleLinear<number, number>,
         /** Arguments returned by `tickArguments` function */
         tickArguments: [count?: number, specifier?: string],
     }) => Iterable<d3.NumberValue> | null,
@@ -63,23 +59,23 @@ export interface AxisOptions<TDomain> {
     tickFormat: (params: {
         /** Full domain corresponding the axis (column/row labels) */
         domain: Domain<TDomain>,
-        /** D3 scale bound to the current subaxis (only different from `globalAxis`, if `subaxisRanges` is used) */
+        /** D3 scale corresponding to the visible range of the columns/rows */
         scale: d3.ScaleLinear<number, number>,
-        /** D3 scale corresponding to the whole visible range of the columns/rows */
-        globalScale: d3.ScaleLinear<number, number>,
         /** Arguments returned by `tickArguments` function */
         tickArguments: [count?: number, specifier?: string],
     }) => ((index: d3.NumberValue, i: number) => string) | null,
-    /** Function that returns the list of subaxis ranges (in domain index space) to be rendered.
-     * By default, exactly one subaxis is rendered, with range equal to the visible range of domain indices (i.e. `scale.domain()`). */
-    subaxisRanges: (params: {
+    /** Function that returns the list of subdomain ranges to be rendered as (sub)domain indicators ("brackets").
+     * Each range must be a tuple [start, end], where `start` is index of the first column/row, and `end` is index of the last (inclusive).
+     * Indices can be float.
+     * By default, exactly one subdomain is rendered, with range equal to the visible range of domain indices (i.e. `scale.domain()`). */
+    subdomainRanges: (params: {
         /** Full domain corresponding the axis (column/row labels) */
         domain: Domain<TDomain>,
-        /** D3 scale corresponding to the whole visible range of the columns/rows */
-        globalScale: d3.ScaleLinear<number, number>,
+        /** D3 scale corresponding to the visible range of the columns/rows */
+        scale: d3.ScaleLinear<number, number>,
     }) => [start: number, end: number][],
-    /** Controls whether the range indicator for the axis (or for each subaxis) should extend outwards to the next cell boundary. */
-    subaxisRangeIndicatorExtend: boolean,
+    /** Controls whether the subdomain indicators for the axis should extend outwards to the next cell boundary. */
+    subdomainIndicatorExtend: boolean,
 }
 
 export const DefaultAxisOptions: AxisOptions<unknown> = {
@@ -122,8 +118,8 @@ export const DefaultAxisOptions: AxisOptions<unknown> = {
             };
         }
     },
-    subaxisRanges: ({ globalScale }) => [getLimits(globalScale.domain())],
-    subaxisRangeIndicatorExtend: false,
+    subdomainRanges: ({ scale }) => [getLimits(scale.domain())],
+    subdomainIndicatorExtend: false,
 };
 
 function normalizeAxisOptions<TDomain>(param: boolean | Partial<AxisOptions<TDomain>>): AxisOptions<TDomain> | undefined {
@@ -170,9 +166,11 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
         // Create/update/remove individual axes
         const updateAxis = <TDomain>(position: 'top' | 'bottom' | 'left' | 'right', axisParam: boolean | Partial<AxisOptions<TDomain>>, domain: Domain<TDomain>) => {
             const options = normalizeAxisOptions(axisParam);
-            const className = `heatmap-axis-${position}`;
+            const groupClass = `heatmap-axis-${position}`;
+            const axisClass = `heatmap-axis`;
+            const subdomainClass = `heatmap-domain`;
             if (!options) {
-                axesSvg.selectAll<SVGGElement, unknown>(`.${className}`).remove();
+                axesSvg.selectAll<SVGGElement, unknown>(`.${groupClass}`).remove();
                 return;
             }
             let axisFn: typeof d3.axisTop;
@@ -196,52 +194,65 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
                     break;
             }
             const alignmentMode = (position === 'top' || position === 'bottom') ? this.state.xAlignment : this.state.yAlignment;
-            const globalScale = (position === 'top' || position === 'bottom') ?
+            const scale = (position === 'top' || position === 'bottom') ?
                 alignScale(this.state.scales.worldToSvg.x, this.state.xAlignment)
                 : alignScale(this.state.scales.worldToSvg.y, this.state.yAlignment);
-            const globalRange = getLimits(globalScale.domain());
-            const subaxisRanges: [number, number][] = options.subaxisRanges({ domain, globalScale })
-                .filter(range => range[0] <= globalRange[1] && range[1] >= globalRange[0]) // Remove subaxis ranges not overlapping with the global range
-                .map(range => [Math.max(range[0], globalRange[0]), Math.min(range[1], globalRange[1])]); // Clamp subaxis ranges to the global range
+            const globalRange = getLimits(scale.domain());
+            const subdomainRanges: [number, number][] = options.subdomainRanges({ domain, scale: scale })
+                .filter(range => range[0] <= globalRange[1] && range[1] >= globalRange[0]) // Remove subdomain ranges not overlapping with the global range
+                .map(range => [Math.max(range[0], globalRange[0]), Math.min(range[1], globalRange[1])]); // Clamp subdomain ranges to the global range
 
-            const currentAxisGroups = axesSvg.selectAll<SVGGElement, unknown>(`.${className}`).data(subaxisRanges);
-            currentAxisGroups.exit().remove();
-            const axisGroups = currentAxisGroups.enter().append('g').attr('class', className).merge(currentAxisGroups);
-            axisGroups.attr('transform', `translate(${translate})`);
-            axisGroups.each((subaxisRange, i, groupElements) => {
-                const subaxisScale = d3.scaleLinear(subaxisRange, subaxisRange.map(globalScale));
-                const subaxis = axisFn(subaxisScale);
-                setAxisTicks(subaxis, options, domain, subaxisScale, globalScale);
-                subaxis.tickSizeInner(options.tickSizeInner);
-                // tickSizeOuter adjusted later manually
-                subaxis.tickPadding(options.tickPadding);
-                const group = d3.select(groupElements[i]);
-                group.call(subaxis);
+            /** Group to hold all axis element for a position */
+            const group = axesSvg.selectAll<SVGGElement, unknown>(`.${groupClass}`)
+                .data([undefined])
+                .join(enter => enter.append('g').attr('class', groupClass))
+                .attr('transform', `translate(${translate})`);
 
-                // Customize subaxis range indicator (.domain path is changed explicitly instead of calling .tickSizeOuter(), to allow adjusting the length when subaxisRangeIndicatorExtend is true)
-                const rangeIndicator = group.select('.domain');
-                const worldRange = options.subaxisRangeIndicatorExtend ? extendRange(subaxisRange, alignmentMode) : subaxisRange;
-                const svgRange = worldRange.map(globalScale);
-                const strokeWidth = getStrokeWidth(rangeIndicator);
+            // Update D3 axis:
+
+            /** Group for D3 axis (except .domain) */
+            const axisGroup = group.selectAll<SVGGElement, unknown>(`.${axisClass}`)
+                .data([undefined])
+                .join(enter => enter.append('g').attr('class', axisClass));
+
+            const axis = axisFn(scale);
+            setAxisTicks(axis, options, domain, scale);
+            axis.tickSizeInner(options.tickSizeInner);
+            // tickSizeOuter adjusted elsewhere (subdomains rendered manually)
+            axis.tickPadding(options.tickPadding);
+            axisGroup.call(axis);
+
+            // Update (sub)domain indicators:
+
+            /** Groups for (sub)domain indicators */
+            const subdomainGroups = group.selectAll<SVGPathElement, unknown>(`.${subdomainClass}`)
+                .data(subdomainRanges)
+                .join(enter => enter.append('path').attr('class', subdomainClass));
+            const strokeWidth = getStrokeWidth(subdomainGroups);
+            subdomainGroups.attr('d', (subdomainRange) => {
+                const worldRange = options.subdomainIndicatorExtend ? extendRange(subdomainRange, alignmentMode) : subdomainRange;
+                const svgRange = worldRange.map(scale);
                 /** Gap in pixels to be inserted between range indicators of too adjacent subaxes if they are extended outwards (to avoid overlap) */
-                const SUBAXIS_GAP = 1;
-                const padding = options.subaxisRangeIndicatorExtend ?
-                    0.5 * SUBAXIS_GAP + (options.tickSizeOuter !== 0 ? 0.5 * strokeWidth : 0)
+                const SUBDOMAIN_GAP = 1;
+                const padding = options.subdomainIndicatorExtend ?
+                    0.5 * SUBDOMAIN_GAP + (options.tickSizeOuter !== 0 ? 0.5 * strokeWidth : 0)
                     : 0;
                 /** Magic D3 adjustment depending on devicePixelRatio */
-                const offset = subaxis.offset();
+                const offset = axis.offset();
                 const start = Math.min(svgRange[0] + padding, /* avoid zero length */ svgRange[1] - 0.5 * strokeWidth) + offset;
                 const end = Math.max(svgRange[1] - padding, /* avoid zero length */ svgRange[0] + 0.5 * strokeWidth) + offset;
-                const path = rangeIndicatorPath(position, options.tickSizeOuter, start, end);
-                rangeIndicator.attr('d', path);
-                // Add tooltip
-                const tooltipStart = domain.values[Math.max(0, Math.ceil(subaxisRange[0]))];
-                const tooltipEnd = domain.values[Math.min(domain.values.length - 1, Math.floor(subaxisRange[1]))];
-                const tooltip = `${tooltipStart} - ${tooltipEnd}`;
-                rangeIndicator.selectAll('title').data([tooltip]).join(enter => enter.append('title')).text(d => d);
-                rangeIndicator.style('pointer-events', 'auto');
-                // TODO: make tooltip more obvious?
+                return rangeIndicatorPath(position, options.tickSizeOuter, start, end);
             });
+            // Add tooltip
+            subdomainGroups.style('pointer-events', 'auto');
+            subdomainGroups.selectAll('title')
+                .data(subdomainRange => [subdomainRange])
+                .join(enter => enter.append('title'))
+                .text(subdomainRange => {
+                    const tooltipStart = domain.values[Math.max(0, Math.ceil(subdomainRange[0]))];
+                    const tooltipEnd = domain.values[Math.min(domain.values.length - 1, Math.floor(subdomainRange[1]))];
+                    return `${tooltipStart} - ${tooltipEnd}`;
+                });
         };
 
         updateAxis('top', this.params.top, this.state.xDomain);
@@ -276,12 +287,12 @@ function alignScale(scale: d3.ScaleLinear<number, number>, alignment: 'left' | '
     return scale.copy().domain([origDomain[0] - offset, origDomain[1] - offset]);
 }
 
-function setAxisTicks<TDomain>(axis: d3.Axis<d3.NumberValue>, axisOptions: AxisOptions<TDomain>, domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>, globalScale: d3.ScaleLinear<number, number>): d3.Axis<d3.NumberValue> {
-    const tickArguments = axisOptions.tickArguments({ domain, scale, globalScale });
+function setAxisTicks<TDomain>(axis: d3.Axis<d3.NumberValue>, axisOptions: AxisOptions<TDomain>, domain: Domain<TDomain>, scale: d3.ScaleLinear<number, number>): d3.Axis<d3.NumberValue> {
+    const tickArguments = axisOptions.tickArguments({ domain, scale: scale });
     axis.tickArguments(tickArguments);
-    const tickValues = axisOptions.tickValues({ domain, scale, globalScale, tickArguments });
+    const tickValues = axisOptions.tickValues({ domain, scale, tickArguments });
     if (tickValues) axis.tickValues(tickValues); else axis.tickValues(null);
-    const tickFormat = axisOptions.tickFormat({ domain, scale, globalScale, tickArguments });
+    const tickFormat = axisOptions.tickFormat({ domain, scale, tickArguments });
     if (tickFormat) axis.tickFormat(tickFormat); else axis.tickFormat(null);
     return axis;
 }

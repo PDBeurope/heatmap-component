@@ -233,9 +233,9 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
     });
 
     /** End-inclusive */
-    const xSubaxisRanges: [number, number][] = dom2.subaxisRanges.map(([start, stop]) => [start, stop - 1]);
+    const xSubdomainRanges: [number, number][] = dom2.subaxisRanges.map(([start, stop]) => [start, stop - 1]);
     /** End-inclusive */
-    const ySubaxisRanges: [number, number][] = dom1.subaxisRanges.map(([start, stop]) => [start, stop - 1]);
+    const ySubdomainRanges: [number, number][] = dom1.subaxisRanges.map(([start, stop]) => [start, stop - 1]);
 
     const AXIS_TICK_WIDTH = 20;
     const AXIS_TICK_HEIGHT = 12;
@@ -244,55 +244,29 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
         tickSizeInner: 6,
         tickSizeOuter: -3,
         tickPadding: 3,
-        subaxisRangeIndicatorExtend: true,
+        subdomainIndicatorExtend: true,
     };
-
-    const xTicksCache = SingleEntryCache<ScaleLinear<number, number>, Map<string, number[]>>(scaleToString, scale => computeTicks(dom2.domain, xSubaxisRanges, scale, AXIS_TICK_WIDTH));
-    const yTicksCache = SingleEntryCache<ScaleLinear<number, number>, Map<string, number[]>>(scaleToString, scale => computeTicks(dom1.domain, ySubaxisRanges, scale, AXIS_TICK_HEIGHT));
 
     heatmap.setAxes({
         left: {
             ...commonAxisOptions,
-            subaxisRanges: () => ySubaxisRanges,
-            tickValues: ({ globalScale, scale }) => yTicksCache.get(globalScale).get(scale.domain().join(',')) ?? [],
+            subdomainRanges: () => ySubdomainRanges,
+            tickValues: ({ scale }) => computeTicks(dom1.domain, ySubdomainRanges, scale, AXIS_TICK_HEIGHT)
         },
         bottom: {
             ...commonAxisOptions,
-            subaxisRanges: () => xSubaxisRanges,
-            tickValues: ({ globalScale, scale }) => xTicksCache.get(globalScale).get(scale.domain().join(',')) ?? [],
+            subdomainRanges: () => xSubdomainRanges,
+            tickValues: ({ scale }) => computeTicks(dom2.domain, xSubdomainRanges, scale, AXIS_TICK_WIDTH),
         },
     });
-    // TODO: consider changing per-subaxis ticks provider to global ticks provider
     const colorScale = ColorScale.continuous('Greens', [0, maxValue], [0.1, 1]); // [0.1, 1] is to skip the first 10% of the color palette to avoid almost-white colors
     heatmap.setColor(d => colorScale(d.frequency));
     heatmap.ensureCellAspectRatio({ cellAspectRatio: 1 }); // Resize the component, so that cell aspect ratio is 1:1
 }
 
 
-interface SingleEntryCache<I, O> {
-    get(input: I): O,
-}
-function SingleEntryCache<I, O>(key: (input: I) => string, compute: (input: I) => O): SingleEntryCache<I, O> {
-    let lastKey: string | undefined = undefined;
-    let lastValue: O | undefined = undefined;
-    return {
-        get: (input: I) => {
-            const k = key(input);
-            if (lastKey !== k) {
-                lastValue = compute(input);
-                lastKey = k;
-            }
-            return lastValue!;
-        },
-    };
-}
-
-function scaleToString(scale: ScaleLinear<number, number>): string {
-    return `${scale.domain().join(',')}:${scale.range().join(',')}`;
-};
-
 /** Ranges end-inclusive */
-function computeTicks(domain: ResidueNumber[], ranges: Ranges, scale: ScaleLinear<number, number>, minSpace: number, maxTicksPerRange: number = 7): Map<string, number[]> {
+function computeTicks(domain: ResidueNumber[], ranges: Ranges, scale: ScaleLinear<number, number>, minSpace: number, maxTicksPerRange: number = 7): number[] {
     const scaleRange = scale.range();
     const unitSpace = (scaleRange[scaleRange.length - 1] - scaleRange[0]) / (domain.length - 1);
     const minStep = minSpace / unitSpace;
@@ -341,7 +315,7 @@ function computeTicks(domain: ResidueNumber[], ranges: Ranges, scale: ScaleLinea
         }
     }
 
-    return new Map(ticksForRanges.map((ticks, i) => [ranges[i].join(','), ticks]));
+    return flatten(ticksForRanges);
 };
 
 /** Return the closest "nice value" greater or equal to `minStep`, e.g. 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50... */

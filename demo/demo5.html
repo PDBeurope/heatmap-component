@@ -14,7 +14,7 @@
     }
 
     #app .heatmap-axes {
-      .domain {
+      .heatmap-domain {
         stroke-width: 3;
 
         &:hover {
@@ -53,10 +53,10 @@
     <input type="radio" name="axes-kind" id="axes-full-sequence">
     <label for="axes-full-sequence" title="Show full polymer sequence on X and Y axis">Full sequence</label>
 
-    <input type="radio" name="axes-kind" id="axes-contact-regions">
+    <input type="radio" name="axes-kind" id="axes-contact-regions" checked>
     <label for="axes-contact-regions" title="Show only residues with at least one contact, plus a few surrounding residues">Only contact regions</label>
 
-    <input type="radio" name="axes-kind" id="axes-contact-residues" checked>
+    <input type="radio" name="axes-kind" id="axes-contact-residues">
     <label for="axes-contact-residues" title="Show only residues with at least one contact">Only contact residues</label>
   </form>
 

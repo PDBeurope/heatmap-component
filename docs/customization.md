@@ -331,8 +331,8 @@ Example:
 }
 ```
 
-An axis can be subdivided into multiple individually rendered subaxes, using the `subaxisRanges` parameter.
-The subaxis range indicators ("brackets") can be customized via `subaxisRangeIndicatorEndtick`, `subaxisRangeIndicatorExtend`.
+The axis domain indicator ("bracket") can be subdivided into multiple subdomains, using the `subdomainRanges` parameter.
+These indicators can be customized via `subdomainIndicatorExtend`, `tickSizeOuter` parameters or via CSS.
 
 ---
 
