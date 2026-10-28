@@ -253,15 +253,13 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
     heatmap.setAxes({
         left: {
             ...commonAxisOptions,
-            tickArguments: ({ scale }) => [tickNumber(scale.range(), AXIS_TICK_HEIGHT)],
             subaxisRanges: () => ySubaxisRanges,
-            tickValues: axesKind === 'axes-full-sequence' ? undefined : ({ globalScale, scale }) => yTicksCache.get(globalScale).get(scale.domain().join(',')) ?? [],
+            tickValues: ({ globalScale, scale }) => yTicksCache.get(globalScale).get(scale.domain().join(',')) ?? [],
         },
         bottom: {
             ...commonAxisOptions,
-            tickArguments: ({ scale }) => [tickNumber(scale.range(), AXIS_TICK_WIDTH)],
             subaxisRanges: () => xSubaxisRanges,
-            tickValues: axesKind === 'axes-full-sequence' ? undefined : ({ globalScale, scale }) => xTicksCache.get(globalScale).get(scale.domain().join(',')) ?? [],
+            tickValues: ({ globalScale, scale }) => xTicksCache.get(globalScale).get(scale.domain().join(',')) ?? [],
         },
     });
     // TODO: consider changing per-subaxis ticks provider to global ticks provider
@@ -294,15 +292,16 @@ function scaleToString(scale: ScaleLinear<number, number>): string {
 };
 
 /** Ranges end-inclusive */
-function computeTicks(domain: ResidueNumber[], ranges: Ranges, scale: ScaleLinear<number, number>, minSpace: number): Map<string, number[]> {
+function computeTicks(domain: ResidueNumber[], ranges: Ranges, scale: ScaleLinear<number, number>, minSpace: number, maxTicksPerRange: number = 7): Map<string, number[]> {
     const scaleRange = scale.range();
     const unitSpace = (scaleRange[scaleRange.length - 1] - scaleRange[0]) / (domain.length - 1);
     const minStep = minSpace / unitSpace;
-    const step = Math.max(1, niceTickStep(minStep));
     const domainIndex = new Map(domain.map((x, i) => [x, i]));
     function ticksForRange(range: [number, number]): number[] {
         const firstValue = domain[range[0]];
         const lastValue = domain[range[1]];
+        const minStepHere = Math.max(minStep, (lastValue - firstValue) / maxTicksPerRange);
+        const step = Math.max(1, niceTickStep(minStepHere));
         const ticks: number[] = [];
         for (let i = Math.ceil(firstValue / step); i <= lastValue / step; i++) {
             const value = i * step as ResidueNumber;
@@ -386,11 +385,6 @@ function prepareDomain(residues: ResidueNumber[], axesKind: AxesKind) {
         /** Ranges of indices in `domain`, corresponding to contiguous regions with data (including padding residues before and after) - for region rendering */
         regionRanges: contigsWithPadding,
     };
-}
-
-function tickNumber(scaleRange: number[], oneTickSpace: number) {
-    const space = Math.abs(scaleRange[scaleRange.length - 1] - scaleRange[0]);
-    return Math.min(9, Math.max(1, space / oneTickSpace));
 }
 
 /** Shape of data in the example Interface API response */
@@ -514,4 +508,3 @@ function flatten<T>(arrays: T[][]): T[] {
 }
 
 // TODO: split demo file
-// TODO: relook at tick spacing
