@@ -1,4 +1,7 @@
-import { clamp, isArray, range, uniq } from 'lodash';
+import clamp from 'lodash/clamp';
+import isArray from 'lodash/isArray';
+import range from 'lodash/range';
+import uniq from 'lodash/uniq';
 import * as d3 from '../d3-modules';
 import { Color } from './color';
 import { Domain } from './domain';

@@ -1,5 +1,5 @@
 import type { ScaleLinear } from 'd3';
-import { range } from 'lodash';
+import range from 'lodash/range';
 import type { AxisOptions } from '../heatmap-component/extensions/axes';
 import { ColorScale, Heatmap } from '../main';
 

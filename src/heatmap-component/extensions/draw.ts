@@ -1,4 +1,5 @@
-import { clamp, isNil } from 'lodash';
+import clamp from 'lodash/clamp';
+import isNil from 'lodash/isNil';
 import { Array2D } from '../data/array2d';
 import { Color } from '../data/color';
 import { Provider } from '../data/data-description';

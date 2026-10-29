@@ -1,4 +1,4 @@
-import { isNil } from 'lodash';
+import isNil from 'lodash/isNil';
 import * as d3 from './d3-modules';
 import { BoxSize } from './scales';
 

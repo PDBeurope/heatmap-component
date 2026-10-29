@@ -1,4 +1,4 @@
-import { range } from 'lodash';
+import range from 'lodash/range';
 import { ColorScale, Heatmap } from '../main';
 
 

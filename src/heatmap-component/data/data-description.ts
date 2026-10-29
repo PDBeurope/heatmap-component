@@ -1,4 +1,4 @@
-import { range } from 'lodash';
+import range from 'lodash/range';
 import { Array2D } from './array2d';
 import { Domain } from './domain';
 

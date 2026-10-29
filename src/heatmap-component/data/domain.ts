@@ -1,4 +1,6 @@
-import { clamp, sortedIndex, sortedIndexBy } from 'lodash';
+import clamp from 'lodash/clamp';
+import sortedIndex from 'lodash/sortedIndex';
+import sortedIndexBy from 'lodash/sortedIndexBy';
 import { IsNumeric, isNumericArray, sortDirection } from '../utils';
 
 

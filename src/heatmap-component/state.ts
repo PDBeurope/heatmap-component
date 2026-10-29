@@ -1,4 +1,7 @@
-import { clamp, isEqual, isNil, round } from 'lodash';
+import clamp from 'lodash/clamp';
+import isEqual from 'lodash/isEqual';
+import isNil from 'lodash/isNil';
+import round from 'lodash/round';
 import { BehaviorSubject } from 'rxjs';
 import * as d3 from './d3-modules';
 import { Array2D } from './data/array2d';
