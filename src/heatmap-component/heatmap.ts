@@ -1,13 +1,16 @@
 import { Color } from './data/color';
 import { DataDescription, Provider } from './data/data-description';
 import { Behavior } from './extension';
+import { AxesExtension, AxesExtensionParams } from './extensions/axes';
 import { BrushExtension, BrushExtensionParams } from './extensions/brush';
 import { DrawExtension, DrawExtensionParams } from './extensions/draw';
 import { MarkerBehavior, MarkerExtension, MarkerExtensionParams } from './extensions/marker';
+import { RegionsExtension, RegionsExtensionParams } from './extensions/regions';
 import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams } from './extensions/tooltip';
 import { ZoomExtension, ZoomExtensionParams } from './extensions/zoom';
 import { HeatmapCore } from './heatmap-core';
 import { XAlignmentMode, YAlignmentMode, ZoomEventValue } from './state';
+import { parsePixels } from './utils';
 
 
 /** Main class of the `heatmap-component` package.
@@ -23,6 +26,8 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         draw?: Behavior<DrawExtensionParams<TX, TY, TDatum>>,
         zoom?: Behavior<ZoomExtensionParams>,
         brush?: Behavior<BrushExtensionParams>,
+        axes?: Behavior<AxesExtensionParams<TX, TY>>,
+        regions?: Behavior<RegionsExtensionParams>,
     } = {};
 
     /** Create a new `Heatmap` and optionaly set `data`.
@@ -35,6 +40,8 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         heatmap.extensions.draw = heatmap.registerExtension(DrawExtension);
         heatmap.extensions.zoom = heatmap.registerExtension(ZoomExtension);
         heatmap.extensions.brush = heatmap.registerExtension(BrushExtension);
+        heatmap.extensions.axes = heatmap.registerExtension(AxesExtension);
+        heatmap.extensions.regions = heatmap.registerExtension(RegionsExtension);
 
         return heatmap;
     }
@@ -128,6 +135,39 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         return this;
     }
 
+    /** Set axes parameters.
+     *
+     * Example:
+     * ```
+     * heatmap.setAxes({ bottom: true, left: true });  // Turn on bottom x-axis and left y-axis
+     * heatmap.setAxes({ top: { offset: 5, tickArguments: () => [undefined, '.2f'] } });  // Turn on and customize top x-axis
+     * ```
+     *
+     * When displaying axes, positioning of the `div.heatmap-canvas-div` element must be adjusted to create space for the axes. Example:
+     * ```css
+     * .heatmap-canvas-div { top: 0.5em; bottom: 1.5em; left: 1.5em; right: 0.5em; }
+     * ```
+     */
+    setAxes(params: Partial<AxesExtensionParams<TX, TY>>): this {
+        this.extensions.axes?.update(params);
+        return this;
+    }
+
+    /** Set custom regions to be visualy marked. The regions are defined by 0-based column/row indices (not column/row names!), where the stop index is exclusive; e.g. `[0, 100]` marks columns with index 0 up to 99.
+     *
+     * Example:
+     * ```
+     * heatmap.setRegions({ xRegions: [[0, 100], [100, 200], [200, 250]] }); // Define regions along x-axis
+     * heatmap.setRegions({ xRegions: null }); // Remove regions along x-axis
+     * ```
+     *
+     * Regions can be styled via CSS `.heatmap-region-x, .heatmap-region-y, .heatmap-region-xy, ` classes.
+     */
+    setRegions(params: Partial<RegionsExtensionParams>): this {
+        this.extensions.regions?.update(params);
+        return this;
+    }
+
     /** Controls how column/row indices and names are aligned to X and Y axes, when using `.zoom` and `.events.zoom` */
     setAlignment(x: XAlignmentMode | undefined, y: YAlignmentMode | undefined): this {
         this.state.setAlignment(x, y);
@@ -154,6 +194,51 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
      */
     setBrushing(params: Partial<BrushExtensionParams>): this {
         this.extensions.brush?.update(params);
+        return this;
+    }
+
+    /** Resize the root element of the heatmap component to fit within the specified maximum dimensions while keeping heatmap cells at the requested aspect ratio.
+     * The maximum width and height can be provided in `options` or via the root element's CSS `max-width` and `max-height`; at least one maximum dimension must be defined.
+    * By default, the cell aspect ratio is 1:1 and the row and column counts are taken from the heatmap's current data.
+    *
+    * Note: Assumes that .heatmap-canvas-div CSS `inset` property (or `top`, `bottom`, `left`, `right`) is set in absolute units (px, em, rem...).
+    * Will not work correctly is it's in %.
+    *
+    * Example:
+    * ```
+    * heatmap.ensureCellAspectRatio({ cellAspectRatio: 1.5, maxComponentWidth: 800, maxComponentHeight: 600 });
+    * ```
+    */
+    ensureCellAspectRatio(options?: { cellAspectRatio?: number, nColumns?: number, nRows?: number, maxComponentWidth?: number, maxComponentHeight?: number }): this {
+        const appDiv = this.state.dom?.rootDiv.node();
+        const canvasDiv = this.state.dom?.canvasDiv.node();
+        if (!appDiv || !canvasDiv) return this;
+
+        const appDivStyle = window.getComputedStyle(appDiv);
+        const maxWidth = options?.maxComponentWidth ?? parsePixels(appDivStyle.maxWidth);
+        const maxHeight = options?.maxComponentHeight ?? parsePixels(appDivStyle.maxHeight);
+
+        const canvasDivstyle = window.getComputedStyle(canvasDiv);
+        const marginsInline = parsePixels(canvasDivstyle.left) + parsePixels(canvasDivstyle.right);
+        const marginsBlock = parsePixels(canvasDivstyle.top) + parsePixels(canvasDivstyle.bottom);
+
+        const nColumns = options?.nColumns ?? this.state.xDomain.values.length;
+        const nRows = options?.nRows ?? this.state.yDomain.values.length;
+        const cellAspectRatio = options?.cellAspectRatio ?? 1;
+
+        const maxCellWidth = isNaN(maxWidth) ? Infinity : (maxWidth - marginsInline) / nColumns;
+        const maxCellHeight = isNaN(maxHeight) ? Infinity : (maxHeight - marginsBlock) / nRows;
+        const cellHeight = Math.min(maxCellWidth / cellAspectRatio, maxCellHeight);
+        if (cellHeight === Infinity) {
+            console.warn(`Could not adjust aspect ratio: at least one of maxComponentWidth, maxComponentHeight must be defined (either via function arguments or via max-width, max-height CSS properties)`);
+            return this;
+        }
+        if (cellHeight <= 0) {
+            console.warn(`Could not adjust aspect ratio: computed cell size is negative or zero.`);
+            return this;
+        }
+        appDiv.style.width = `${cellHeight * nColumns * cellAspectRatio + marginsInline}px`;
+        appDiv.style.height = `${cellHeight * nRows + marginsBlock}px`;
         return this;
     }
 }

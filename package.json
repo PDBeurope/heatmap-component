@@ -26,7 +26,7 @@
     "watch-cpx": "cpx --watch src/*.css build/",
     "watch-tsc": "tsc --watch --preserveWatchOutput --incremental",
     "watch-webpack": "webpack -w --mode development --stats minimal --config ./webpack.config.js",
-    "serve": "http-server -p 7000",
+    "serve": "http-server -c-1 -p 7000",
     "lint": "eslint src",
     "test": "jest src",
     "prepack": "node scripts.js mv README.md README-git.md && node scripts.js mv README.npm.md README.md",
