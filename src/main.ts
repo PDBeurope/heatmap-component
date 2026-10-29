@@ -2,5 +2,5 @@
 
 export { Color } from './heatmap-component/data/color';
 export { ColorScale } from './heatmap-component/data/color-scale';
-export * as demos from './heatmap-component/demo';
+export * as demos from './demos';
 export { Heatmap } from './heatmap-component/heatmap';

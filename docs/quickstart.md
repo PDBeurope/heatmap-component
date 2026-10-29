@@ -117,8 +117,6 @@ heatmap.events.select.subscribe(e => console.log('Selected', e)); // fires when 
 
 And that's it! You now have a basic heatmap visualization displayed in your web page.
 
-Full HTML for this example [here](../demo/minimal-example.html)
+Full HTML for this example [here](../demos/minimal-example.html)
 
-Live demo: <https://pdbeurope.github.io/heatmap-component/demo/minimal-example.html>
-
-TODO: plunkr live example?
+Live demo: <https://pdbeurope.github.io/heatmap-component/demos/minimal-example.html>

@@ -14,4 +14,4 @@ HeatmapComponent uses a modular architecture designed to provide flexible functi
 
 - [**main.ts**](../src/main.ts) is the main file for importing `HeatmapComponent` as a dependency, [**index.ts**](../src/index.ts) is the entrypoint for the bundle.
 
-- **Demos** provide examples for HeatmapComponent usage and serve for testing ([TS](../src/heatmap-component/demo.ts), [HTML](../demo/))
+- **Demos** provide examples for HeatmapComponent usage and serve for testing ([TS](../src/demos/index.ts), [HTML](../demos))
