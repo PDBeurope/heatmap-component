@@ -10,6 +10,7 @@ import { DefaultTooltipExtensionParams, TooltipExtension, TooltipExtensionParams
 import { ZoomExtension, ZoomExtensionParams } from './extensions/zoom';
 import { HeatmapCore } from './heatmap-core';
 import { XAlignmentMode, YAlignmentMode, ZoomEventValue } from './state';
+import { parsePixels } from './utils';
 
 
 /** Main class of the `heatmap-component` package.
@@ -200,6 +201,9 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
      * The maximum width and height can be provided in `options` or via the root element's CSS `max-width` and `max-height`; at least one maximum dimension must be defined.
     * By default, the cell aspect ratio is 1:1 and the row and column counts are taken from the heatmap's current data.
     *
+    * Note: Assumes that .heatmap-canvas-div CSS `inset` property (or `top`, `bottom`, `left`, `right`) is set in absolute units (px, em, rem...).
+    * Will not work correctly is it's in %.
+    *
     * Example:
     * ```
     * heatmap.ensureCellAspectRatio({ cellAspectRatio: 1.5, maxComponentWidth: 800, maxComponentHeight: 600 });
@@ -211,12 +215,12 @@ export class Heatmap<TX, TY, TDatum> extends HeatmapCore<TX, TY, TDatum> {
         if (!appDiv || !canvasDiv) return this;
 
         const appDivStyle = window.getComputedStyle(appDiv);
-        const maxWidth = options?.maxComponentWidth ?? parseFloat(appDivStyle.maxWidth);
-        const maxHeight = options?.maxComponentHeight ?? parseFloat(appDivStyle.maxHeight);
+        const maxWidth = options?.maxComponentWidth ?? parsePixels(appDivStyle.maxWidth);
+        const maxHeight = options?.maxComponentHeight ?? parsePixels(appDivStyle.maxHeight);
 
         const canvasDivstyle = window.getComputedStyle(canvasDiv);
-        const marginsInline = parseFloat(canvasDivstyle.left) + parseFloat(canvasDivstyle.right);
-        const marginsBlock = parseFloat(canvasDivstyle.top) + parseFloat(canvasDivstyle.bottom);
+        const marginsInline = parsePixels(canvasDivstyle.left) + parsePixels(canvasDivstyle.right);
+        const marginsBlock = parsePixels(canvasDivstyle.top) + parsePixels(canvasDivstyle.bottom);
 
         const nColumns = options?.nColumns ?? this.state.xDomain.values.length;
         const nRows = options?.nRows ?? this.state.yDomain.values.length;

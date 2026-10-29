@@ -1,8 +1,8 @@
+import { ScaleLinear } from 'd3';
 import { range } from 'lodash';
 import { ColorScale, Heatmap } from '../main';
 import { DataDescription } from './data/data-description';
 import { AxisOptions } from './extensions/axes';
-import { ScaleLinear } from 'd3';
 
 
 /** Demo showing small data with a lot of customizations */

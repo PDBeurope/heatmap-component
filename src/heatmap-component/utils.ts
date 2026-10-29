@@ -128,3 +128,10 @@ export function shallowMerge<T>(old: T, new_?: Partial<T>): T {
     }
     return result;
 }
+
+/** Parse CSS length in pixels. Return NaN if it's 'none', throw error if it's in any other units. */
+export function parsePixels(value: string): number {
+    if (value === 'none') return NaN;
+    if (value.endsWith('px')) return parseFloat(value);
+    throw new Error(`Cannot parse CSS length value '${value} because it is not in pixels.'`);
+}
