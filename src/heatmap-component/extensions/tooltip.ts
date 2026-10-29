@@ -19,8 +19,10 @@ export interface TooltipExtensionParams<TX, TY, TDatum> {
      * i.e. when the user clicks on a cell, the tooltip will stay visible visible
      * until it is closed by close button or clicking elsewhere */
     pinnable: boolean,
-    /** Controls position of the tooltip relative to cursor (e.g. 'top-right' = tooltip is displayed top right from the cursor (anchored on bottom left) */
-    direction: Direction | 'auto',
+    /** Controls position of the tooltip relative to cursor (e.g. 'top-right' = tooltip is displayed top right from the cursor (anchored on bottom left).
+     * Use 'auto' to dynamically switch tooltip direction so that it always goes away from the nearest canvas edge.
+     * Use 'auto-top' to dynamically switch between 'top-left' and 'top-right', etc. */
+    direction: Direction | 'auto' | 'auto-top' | 'auto-bottom' | 'auto-left' | 'auto-right',
 }
 
 /** Default parameter values for `TooltipExtension` */
@@ -158,7 +160,7 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
             return out;
         }
 
-        out.direction = this.params.direction === 'auto' ? bestTooltipDirection(x, y, box) : this.params.direction;
+        out.direction = getTooltipDirection(x, y, box, this.params.direction);
         if (out.direction.includes('right')) {
             out.style.left = `${x}px`;
         } else {
@@ -175,11 +177,11 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
 
 type Direction = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
-function bestTooltipDirection(x: number, y: number, box: Box): Direction {
+function getTooltipDirection(x: number, y: number, box: Box, mode: TooltipExtensionParams<any, any, any>['direction']): Direction {
     const centerX = 0.5 * (box.xmax + box.xmin);
     const centerY = 0.5 * (box.ymax + box.ymin);
-    const vertical = y < centerY ? 'bottom' : 'top';
-    const horizontal = x <= centerX ? 'right' : 'left';
+    const vertical = mode.includes('top') ? 'top' : mode.includes('bottom') ? 'bottom' : (y < centerY ? 'bottom' : 'top');
+    const horizontal = mode.includes('right') ? 'right' : mode.includes('left') ? 'left' : (x <= centerX ? 'right' : 'left');
     return `${vertical}-${horizontal}`;
 }
 
