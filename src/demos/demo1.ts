@@ -31,6 +31,7 @@ export function demo1(divElementOrId: HTMLDivElement | string): void {
     const colorScale = ColorScale.continuous([0, 0.5, 1], ['#eeeeee', 'gold', 'red']);
     heatmap.setColor(d => colorScale(d.score));
     heatmap.setTooltip((d, x, y, xIndex, yIndex) => `<div style="font-weight: bold; margin-bottom: 0.5em;">Score: ${d.score}</div>Column ${x}, Row ${y}<br>Indices [${xIndex},${yIndex}]`);
+    heatmap.extensions.tooltip?.update({ anchor: 'auto' }); // This is default
     setTimeout(() => heatmap.setFilter(undefined), 2000);
     heatmap.setVisualParams({ xGapPixels: 0, yGapPixels: 0 });
     heatmap.events.select.subscribe(e => {

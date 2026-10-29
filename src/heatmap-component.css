@@ -82,8 +82,8 @@
 
 .heatmap-tooltip-content,
 .heatmap-pinned-tooltip-content {
-    margin-left: var(--tooltip-offset-x);
-    margin-bottom: var(--tooltip-offset-y);
+    margin-inline: var(--tooltip-offset-x);
+    margin-block: var(--tooltip-offset-y);
     border: solid black 1px;
     padding-block: 0.35em;
     padding-inline: 0.7em;
@@ -95,8 +95,8 @@
 
 .heatmap-pinned-tooltip-close {
     position: absolute;
-    top: -8px;
-    right: -8px;
+    top: calc(var(--tooltip-offset-y) - 8px);
+    right: calc(var(--tooltip-offset-x) - 8px);
     width: 16px;
     height: 16px;
     border-radius: 1000px;
@@ -104,6 +104,12 @@
     border: solid black 1px;
     pointer-events: initial;
     cursor: pointer;
+
+    /** Move close button to top left, if anchor is in top right */
+    .anchor-ne & {
+        left: calc(var(--tooltip-offset-x) - 8px);
+        right: unset;
+    }
 }
 
 .heatmap-pinned-tooltip-close svg {
@@ -121,6 +127,26 @@
     width: calc(var(--tooltip-offset-x) / 0.6);
     height: calc(var(--tooltip-offset-y) / 0.6);
     z-index: -1;
+
+    .anchor-se & {
+        transform: rotateY(180deg);
+        left: unset;
+        right: 0px;
+    }
+
+    .anchor-nw & {
+        bottom: unset;
+        top: 0px;
+        transform: rotateX(180deg);
+    }
+
+    .anchor-ne & {
+        left: unset;
+        right: 0px;
+        bottom: unset;
+        top: 0px;
+        transform: rotate(180deg);
+    }
 }
 
 .heatmap-pinned-tooltip-pin svg {

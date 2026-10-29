@@ -19,12 +19,15 @@ export interface TooltipExtensionParams<TX, TY, TDatum> {
      * i.e. when the user clicks on a cell, the tooltip will stay visible visible
      * until it is closed by close button or clicking elsewhere */
     pinnable: boolean,
+    /** Controls position of the tooltip relative to cursor (e.g. 'sw' = tooltip is anchored on south-west (displayed top left from the cursor (anchor))) */
+    anchor: Anchor | 'auto',
 }
 
 /** Default parameter values for `TooltipExtension` */
 export const DefaultTooltipExtensionParams: TooltipExtensionParams<unknown, unknown, unknown> = {
     tooltipProvider: DefaultTooltipProvider,
     pinnable: true,
+    anchor: 'auto',
 };
 
 
@@ -41,6 +44,12 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
         this.subscribe(this.state.events.resize, () => this.updatePinnedTooltipPosition());
     }
 
+    override update(params: Partial<TooltipExtensionParams<TX, TY, TDatum>>): void {
+        const needsRefresh = params.anchor && (params.anchor !== this.params.anchor);
+        super.update(params);
+        if (needsRefresh) this.updatePinnedTooltipPosition();
+    }
+
     /** Add a div with tooltip or update position of existing tooltip, for the `pointed` grid cell.
      * Remove existing tooltip, if `pointed` is `undefined`. */
     private drawTooltip(pointed: CellEventValue<TX, TY, TDatum>): void {
@@ -54,13 +63,15 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
                 // Create tooltip if doesn't exist
                 tooltip = attrd(this.state.dom.canvasDiv.append('div'), {
                     class: Class.TooltipBox,
-                    style: { position: 'absolute', ...tooltipPosition }
+                    style: { position: 'absolute', ...tooltipPosition.style }
                 });
+                assignAnchorClass(tooltip, tooltipPosition.anchor);
                 attrd(tooltip.append('div'), { class: Class.TooltipContent })
                     .html(tooltipText);
             } else {
                 // Update tooltip position and content if exists
-                attrd(tooltip, { style: tooltipPosition })
+                assignAnchorClass(tooltip, tooltipPosition.anchor);
+                attrd(tooltip, { style: tooltipPosition.style })
                     .select('.' + Class.TooltipContent)
                     .html(tooltipText);
             }
@@ -86,8 +97,9 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
 
             const tooltip = attrd(this.state.dom.canvasDiv.append('div'), {
                 class: Class.PinnedTooltipBox,
-                style: { position: 'absolute', ...tooltipPosition },
+                style: { position: 'absolute', ...tooltipPosition.style },
             });
+            assignAnchorClass(tooltip, tooltipPosition.anchor);
 
             // Tooltip content
             attrd(tooltip.append('div'), { class: Class.PinnedTooltipContent })
@@ -123,19 +135,60 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
                 offsetX: this.state.scales.worldToSvg.x(this.pinnedTooltip.x),
                 offsetY: this.state.scales.worldToSvg.y(this.pinnedTooltip.y),
             };
-            attrd(this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox), {
-                style: this.getTooltipPosition(domPosition),
+            const tooltipPosition = this.getTooltipPosition(domPosition);
+            const tooltip = attrd(this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox), {
+                style: tooltipPosition.style,
             });
+            assignAnchorClass(tooltip, tooltipPosition.anchor);
         }
     };
 
     /** Return tooltip position as CSS style parameters (for position:absolute within this.canvasDiv) for mouse event `e` triggered on this.svg.  */
     private getTooltipPosition(e: MouseEvent | { offsetX: number, offsetY: number }) {
-        const left = `${(e.offsetX ?? 0)}px`;
-        const bottom = `${Box.height(this.state.boxes.svg) - (e.offsetY ?? 0)}px`;
-        const display = Box.containsPoint(this.state.boxes.svg, { x: e.offsetX, y: e.offsetY }) ? 'unset' : 'none';
-        return { left, bottom, display };
+        const x = e.offsetX ?? 0;
+        const y = e.offsetY ?? 0;
+        const box = this.state.boxes.svg;
+        const out = {
+            anchor: 'sw' as Anchor,
+            style: { display: 'unset', left: 'unset', right: 'unset', top: 'unset', bottom: 'unset' },
+        };
+
+        if (!Box.containsPoint(box, { x, y })) {
+            out.style.display = 'none';
+            return out;
+        }
+
+        out.anchor = this.params.anchor === 'auto' ? bestTooltipAnchor(x, y, box) : this.params.anchor;
+        if (out.anchor.includes('w')) { // west
+            out.style.left = `${x}px`;
+        } else { // east
+            out.style.right = `${Box.width(this.state.boxes.svg) - x}px`;
+        }
+        if (out.anchor.includes('n')) { // north
+            out.style.top = `${y}px`;
+        } else { // south
+            out.style.bottom = `${Box.height(this.state.boxes.svg) - y}px`;
+        }
+        return out;
     }
+}
+
+type Anchor = 'nw' | 'ne' | 'sw' | 'se';
+
+function bestTooltipAnchor(x: number, y: number, box: Box): Anchor {
+    const centerX = 0.5 * (box.xmax + box.xmin);
+    const centerY = 0.5 * (box.ymax + box.ymin);
+    const vertical = y < centerY ? 'n' : 's';
+    const horizontal = x <= centerX ? 'w' : 'e';
+    return `${vertical}${horizontal}`;
+}
+
+function assignAnchorClass<S extends d3.Selection<any, any, any, any>>(selection: S, anchor: Anchor): S {
+    selection.classed('anchor-nw', anchor === 'nw');
+    selection.classed('anchor-ne', anchor === 'ne');
+    selection.classed('anchor-sw', anchor === 'sw');
+    selection.classed('anchor-se', anchor === 'se');
+    return selection;
 }
 
 
