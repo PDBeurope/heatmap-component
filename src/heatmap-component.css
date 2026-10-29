@@ -195,11 +195,3 @@
     /** Avoid region stroke overflowing to neighboring cells, avoid interference of strokes of neighboring regions */
     clip-path: content-box;
 }
-
-.heatmap-region-x {
-    fill: #ff000040;
-}
-
-.heatmap-region-y {
-    fill: #00ffff40;
-}
