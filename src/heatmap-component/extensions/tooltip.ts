@@ -19,15 +19,15 @@ export interface TooltipExtensionParams<TX, TY, TDatum> {
      * i.e. when the user clicks on a cell, the tooltip will stay visible visible
      * until it is closed by close button or clicking elsewhere */
     pinnable: boolean,
-    /** Controls position of the tooltip relative to cursor (e.g. 'sw' = tooltip is anchored on south-west (displayed top left from the cursor (anchor))) */
-    anchor: Anchor | 'auto',
+    /** Controls position of the tooltip relative to cursor (e.g. 'top-right' = tooltip is displayed top right from the cursor (anchored on bottom left) */
+    direction: Direction | 'auto',
 }
 
 /** Default parameter values for `TooltipExtension` */
 export const DefaultTooltipExtensionParams: TooltipExtensionParams<unknown, unknown, unknown> = {
     tooltipProvider: DefaultTooltipProvider,
     pinnable: true,
-    anchor: 'auto',
+    direction: 'auto',
 };
 
 
@@ -45,7 +45,7 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
     }
 
     override update(params: Partial<TooltipExtensionParams<TX, TY, TDatum>>): void {
-        const needsRefresh = params.anchor && (params.anchor !== this.params.anchor);
+        const needsRefresh = params.direction && (params.direction !== this.params.direction);
         super.update(params);
         if (needsRefresh) this.updatePinnedTooltipPosition();
     }
@@ -65,12 +65,12 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
                     class: Class.TooltipBox,
                     style: { position: 'absolute', ...tooltipPosition.style }
                 });
-                assignAnchorClass(tooltip, tooltipPosition.anchor);
+                assignDirectionClass(tooltip, tooltipPosition.direction);
                 attrd(tooltip.append('div'), { class: Class.TooltipContent })
                     .html(tooltipText);
             } else {
                 // Update tooltip position and content if exists
-                assignAnchorClass(tooltip, tooltipPosition.anchor);
+                assignDirectionClass(tooltip, tooltipPosition.direction);
                 attrd(tooltip, { style: tooltipPosition.style })
                     .select('.' + Class.TooltipContent)
                     .html(tooltipText);
@@ -99,7 +99,7 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
                 class: Class.PinnedTooltipBox,
                 style: { position: 'absolute', ...tooltipPosition.style },
             });
-            assignAnchorClass(tooltip, tooltipPosition.anchor);
+            assignDirectionClass(tooltip, tooltipPosition.direction);
 
             // Tooltip content
             attrd(tooltip.append('div'), { class: Class.PinnedTooltipContent })
@@ -139,7 +139,7 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
             const tooltip = attrd(this.state.dom.canvasDiv.selectAll('.' + Class.PinnedTooltipBox), {
                 style: tooltipPosition.style,
             });
-            assignAnchorClass(tooltip, tooltipPosition.anchor);
+            assignDirectionClass(tooltip, tooltipPosition.direction);
         }
     };
 
@@ -149,7 +149,7 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
         const y = e.offsetY ?? 0;
         const box = this.state.boxes.svg;
         const out = {
-            anchor: 'sw' as Anchor,
+            direction: 'top-right' as Direction,
             style: { display: 'unset', left: 'unset', right: 'unset', top: 'unset', bottom: 'unset' },
         };
 
@@ -158,36 +158,36 @@ export class TooltipBehavior<TX, TY, TDatum> extends BehaviorBase<TooltipExtensi
             return out;
         }
 
-        out.anchor = this.params.anchor === 'auto' ? bestTooltipAnchor(x, y, box) : this.params.anchor;
-        if (out.anchor.includes('w')) { // west
+        out.direction = this.params.direction === 'auto' ? bestTooltipDirection(x, y, box) : this.params.direction;
+        if (out.direction.includes('right')) {
             out.style.left = `${x}px`;
-        } else { // east
+        } else {
             out.style.right = `${Box.width(this.state.boxes.svg) - x}px`;
         }
-        if (out.anchor.includes('n')) { // north
+        if (out.direction.includes('bottom')) {
             out.style.top = `${y}px`;
-        } else { // south
+        } else {
             out.style.bottom = `${Box.height(this.state.boxes.svg) - y}px`;
         }
         return out;
     }
 }
 
-type Anchor = 'nw' | 'ne' | 'sw' | 'se';
+type Direction = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
-function bestTooltipAnchor(x: number, y: number, box: Box): Anchor {
+function bestTooltipDirection(x: number, y: number, box: Box): Direction {
     const centerX = 0.5 * (box.xmax + box.xmin);
     const centerY = 0.5 * (box.ymax + box.ymin);
-    const vertical = y < centerY ? 'n' : 's';
-    const horizontal = x <= centerX ? 'w' : 'e';
-    return `${vertical}${horizontal}`;
+    const vertical = y < centerY ? 'bottom' : 'top';
+    const horizontal = x <= centerX ? 'right' : 'left';
+    return `${vertical}-${horizontal}`;
 }
 
-function assignAnchorClass<S extends d3.Selection<any, any, any, any>>(selection: S, anchor: Anchor): S {
-    selection.classed('anchor-nw', anchor === 'nw');
-    selection.classed('anchor-ne', anchor === 'ne');
-    selection.classed('anchor-sw', anchor === 'sw');
-    selection.classed('anchor-se', anchor === 'se');
+function assignDirectionClass<S extends d3.Selection<any, any, any, any>>(selection: S, direction: Direction): S {
+    selection.classed('direction-top-left', direction === 'top-left');
+    selection.classed('direction-top-right', direction === 'top-right');
+    selection.classed('direction-bottom-left', direction === 'bottom-left');
+    selection.classed('direction-bottom-right', direction === 'bottom-right');
     return selection;
 }
 

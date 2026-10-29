@@ -105,8 +105,8 @@
     pointer-events: initial;
     cursor: pointer;
 
-    /** Move close button to top left, if anchor is in top right */
-    .anchor-ne & {
+    /** Move close button to top left, if the pin is in top right */
+    .direction-bottom-left & {
         left: calc(var(--tooltip-offset-x) - 8px);
         right: unset;
     }
@@ -128,19 +128,19 @@
     height: calc(var(--tooltip-offset-y) / 0.6);
     z-index: -1;
 
-    .anchor-se & {
+    .direction-top-left & {
         transform: rotateY(180deg);
         left: unset;
         right: 0px;
     }
 
-    .anchor-nw & {
+    .direction-bottom-right & {
         bottom: unset;
         top: 0px;
         transform: rotateX(180deg);
     }
 
-    .anchor-ne & {
+    .direction-bottom-left & {
         left: unset;
         right: 0px;
         bottom: unset;

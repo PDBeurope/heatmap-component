@@ -22,7 +22,7 @@ export function demo3(divElementOrId: HTMLDivElement | string): void {
     const colorScale = ColorScale.continuous([-1, 0, 1], ['#E13D3D', 'white', '#2C8C11']); // like d3.scaleLinear([-1, 0, 1], ['#E13D3D', 'white', '#2C8C11']);
     heatmap.setColor(d => colorScale(d.score));
     heatmap.setVisualParams({ xGapRelative: 0.1, yGapRelative: 0.1, xGapPixels: null, yGapPixels: null });
-    heatmap.extensions.tooltip?.update({ anchor: 'sw' });
+    heatmap.extensions.tooltip?.update({ direction: 'top-right' });
     heatmap.render(divElementOrId);
     (window as any).heatmap = heatmap;
 }
