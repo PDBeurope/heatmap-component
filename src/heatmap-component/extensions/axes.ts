@@ -163,8 +163,9 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
         const canvasBox = Box.create(canvasLeft, canvasTop, canvasLeft + canvasRect.width, canvasTop + canvasRect.height);
 
         // Create/update axes SVG
-        const currentAxesSvg = this.state.dom.mainDiv.selectAll<SVGSVGElement, unknown>(`.${Class.Axes}`).data([undefined]);
-        const axesSvg = currentAxesSvg.enter().append('svg').attr('class', Class.Axes).merge(currentAxesSvg); // TODO: .join
+        const axesSvg = this.state.dom.mainDiv.selectAll<SVGSVGElement, unknown>(`.${Class.Axes}`)
+            .data([undefined])
+            .join(enter => enter.append('svg').attr('class', Class.Axes));
 
         // Create/update/remove individual axes
         this.updateAxis(axesSvg, canvasBox, 'top', this.params.top, this.state.xDomain);
@@ -190,22 +191,18 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
             case 'top':
                 axisFn = d3.axisTop;
                 translate = [canvasBox.xmin, canvasBox.ymin - options.axisPadding];
-                // translate = [canvasLeft, canvasTop - options.axisPadding];
                 break;
             case 'bottom':
                 axisFn = d3.axisBottom;
                 translate = [canvasBox.xmin, canvasBox.ymax + options.axisPadding];
-                // translate = [canvasLeft, canvasTop + canvasRect.height + options.axisPadding];
                 break;
             case 'left':
                 axisFn = d3.axisLeft;
                 translate = [canvasBox.xmin - options.axisPadding, canvasBox.ymin];
-                // translate = [canvasLeft - options.axisPadding, canvasTop];
                 break;
             case 'right':
                 axisFn = d3.axisRight;
                 translate = [canvasBox.xmax + options.axisPadding, canvasBox.ymin];
-                // translate = [canvasLeft + canvasRect.width + options.axisPadding, canvasTop];
                 break;
         }
         const alignmentMode = (position === 'top' || position === 'bottom') ? this.state.xAlignment : this.state.yAlignment;
@@ -239,12 +236,12 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
 
         // Update (sub)domain indicators:
 
-        /** Groups for (sub)domain indicators */
-        const subdomainGroups = group.selectAll<SVGPathElement, unknown>(`.${subdomainClass}`)
+        /** Path elements for (sub)domain indicators */
+        const subdomainPaths = group.selectAll<SVGPathElement, unknown>(`.${subdomainClass}`)
             .data(subdomainRanges)
             .join(enter => enter.append('path').attr('class', subdomainClass));
-        const strokeWidth = getStrokeWidth(subdomainGroups);
-        subdomainGroups.attr('d', (subdomainRange) => {
+        const strokeWidth = getStrokeWidth(subdomainPaths);
+        subdomainPaths.attr('d', (subdomainRange) => {
             const worldRange = options.subdomainIndicatorExtend ? extendRange(subdomainRange, alignmentMode) : subdomainRange;
             const svgRange = worldRange.map(scale);
             /** Gap in pixels to be inserted between range indicators of too adjacent subaxes if they are extended outwards (to avoid overlap) */
@@ -259,8 +256,8 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
             return rangeIndicatorPath(position, options.tickSizeOuter, start, end);
         });
         // Add tooltip
-        subdomainGroups.style('pointer-events', 'auto');
-        subdomainGroups.selectAll('title')
+        subdomainPaths.style('pointer-events', 'auto');
+        subdomainPaths.selectAll('title')
             .data(subdomainRange => [subdomainRange])
             .join(enter => enter.append('title'))
             .text(subdomainRange => {
@@ -268,7 +265,7 @@ export class AxesBehavior<TX, TY> extends BehaviorBase<AxesExtensionParams<TX, T
                 const tooltipEnd = domain.values[Math.min(domain.values.length - 1, Math.floor(subdomainRange[1]))];
                 return `${tooltipStart} - ${tooltipEnd}`;
             });
-    };
+    }
 }
 
 

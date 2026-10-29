@@ -58,9 +58,9 @@ export class RegionsBehavior extends BehaviorBase<RegionsExtensionParams> {
         const svgBox = this.state.boxes.svg;
         const svg = this.state.dom.svg;
 
-        updateRegionGroups(svg, Class.RegionX, xRegions?.map(d => Box.create(xScale(d[0]), svgBox.ymin, xScale(d[1]), svgBox.ymax)), 'x');
-        updateRegionGroups(svg, Class.RegionY, yRegions?.map(d => Box.create(svgBox.xmin, yScale(d[0]), svgBox.xmax, yScale(d[1]))), 'y');
-        updateRegionGroups(svg, Class.RegionXY, xyRegions?.map(d => Box.create(xScale(d[0]), yScale(d[2]), xScale(d[1]), yScale(d[3]))), 'xy');
+        updateRegionGroups(svg, Class.RegionsX, Class.RegionX, xRegions?.map(d => Box.create(xScale(d[0]), svgBox.ymin, xScale(d[1]), svgBox.ymax)), 'x');
+        updateRegionGroups(svg, Class.RegionsY, Class.RegionY, yRegions?.map(d => Box.create(svgBox.xmin, yScale(d[0]), svgBox.xmax, yScale(d[1]))), 'y');
+        updateRegionGroups(svg, Class.RegionsXY, Class.RegionXY, xyRegions?.map(d => Box.create(xScale(d[0]), yScale(d[2]), xScale(d[1]), yScale(d[3]))), 'xy');
     }
 
     private clearRegions(): void {
@@ -73,31 +73,38 @@ export class RegionsBehavior extends BehaviorBase<RegionsExtensionParams> {
     private regionsVisible = false;
 }
 
-function getOrCreateRegionGroups<TData>(svg: Selection<SVGSVGElement, any, any, any>, className: string, data: TData[] | undefined) {
-    const groups = svg.selectAll<SVGGElement, unknown>(`g.${className}`).data(data ?? []);
-    groups.exit().remove();
-    const enterGroups = groups.enter().append('g').attr('class', className);
-    enterGroups.append('rect').attr('stroke', 'none');
-    enterGroups.append('path');
-    return enterGroups.merge(groups);
-}
 
-function updateRegionGroups(svg: Selection<SVGSVGElement, any, any, any>, className: string, boxes: Box[] | undefined, strokes: 'x' | 'y' | 'xy') {
-    const gRegionsX = getOrCreateRegionGroups(svg, className, boxes);
-    gRegionsX.select('rect')
+function updateRegionGroups(svg: Selection<SVGSVGElement, any, any, any>, groupClassName: string, className: string, boxes: Box[] | undefined, strokes: 'x' | 'y' | 'xy') {
+    /** Main group for all regions of the same type (each type is rendered in a separate group to avoid awkward stacking when region added afterwards) */
+    const group = svg.selectAll<SVGGElement, unknown>(`g.${groupClassName}`)
+        .data([undefined])
+        .join(enter => enter.append('g').attr('class', groupClassName));
+
+    /** Groups for individual regions */
+    const regionGroups = group.selectAll<SVGGElement, unknown>(`g.${className}`)
+        .data(boxes ?? [])
+        .join(enter => {
+            const enterGroups = enter.append('g').attr('class', className);
+            enterGroups.append('rect').attr('stroke', 'none');
+            enterGroups.append('path');
+            return enterGroups;
+        });
+
+    regionGroups.select('rect')
         .attr('x', b => b.xmin)
         .attr('width', b => b.xmax - b.xmin)
         .attr('y', b => b.ymin)
         .attr('height', b => b.ymax - b.ymin);
+
     if (strokes === 'x') {
         // Draw vertical edges
-        gRegionsX.select('path').attr('d', b => `M${b.xmin} ${b.ymin} L ${b.xmin} ${b.ymax} M${b.xmax} ${b.ymin} L ${b.xmax} ${b.ymax} `);
+        regionGroups.select('path').attr('d', b => `M${b.xmin} ${b.ymin} L ${b.xmin} ${b.ymax} M${b.xmax} ${b.ymin} L ${b.xmax} ${b.ymax} `);
     } else if (strokes === 'y') {
         // Draw horizontal edges
-        gRegionsX.select('path').attr('d', b => `M${b.xmin} ${b.ymin} L ${b.xmax} ${b.ymin} M${b.xmin} ${b.ymax} L ${b.xmax} ${b.ymax} `);
+        regionGroups.select('path').attr('d', b => `M${b.xmin} ${b.ymin} L ${b.xmax} ${b.ymin} M${b.xmin} ${b.ymax} L ${b.xmax} ${b.ymax} `);
     } else {
         // Draw vertical and horizontal edges
-        gRegionsX.select('path').attr('d', b => `M${b.xmin} ${b.ymin} L ${b.xmin} ${b.ymax} M${b.xmax} ${b.ymin} L ${b.xmax} ${b.ymax} M${b.xmin} ${b.ymin} L ${b.xmax} ${b.ymin} M${b.xmin} ${b.ymax} L ${b.xmax} ${b.ymax} `);
+        regionGroups.select('path').attr('d', b => `M${b.xmin} ${b.ymin} L ${b.xmin} ${b.ymax} M${b.xmax} ${b.ymin} L ${b.xmax} ${b.ymax} M${b.xmin} ${b.ymin} L ${b.xmax} ${b.ymin} M${b.xmin} ${b.ymax} L ${b.xmax} ${b.ymax} `);
     }
 }
 
