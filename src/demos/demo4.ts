@@ -1,4 +1,3 @@
-import range from 'lodash/range';
 import { ColorScale, Heatmap } from '../main';
 
 
@@ -72,6 +71,15 @@ function setTextContent(elementSelector: string, content: unknown, numberPrecisi
     const elements = document.querySelectorAll(elementSelector);
     if (typeof content === 'number' && numberPrecision >= 0) content = content.toFixed(numberPrecision);
     elements.forEach(element => element.textContent = `${content}`);
+}
+
+/** Return array with values from start (inclusive) to stop (exclusive) */
+function range<T extends number>(start: number, stop: number): T[] {
+    const out: T[] = [];
+    for (let i = start; i < stop; i++) {
+        out.push(i as T);
+    }
+    return out;
 }
 
 /** Flatten a nested array. Dumb implementation, but doesn't matter, this is just a demo. Would use `flatMap` but it's not available in es2015. */

@@ -1,5 +1,4 @@
 import type { ScaleLinear } from 'd3';
-import range from 'lodash/range';
 import type { AxisOptions } from '../heatmap-component/extensions/axes';
 import { ColorScale, Heatmap } from '../main';
 
@@ -68,9 +67,9 @@ function loadInterface(heatmap: Heatmap<ResidueNumber, ResidueNumber, InterfaceC
     });
 
     /** End-inclusive */
-    const xSubdomainRanges: [number, number][] = dom2.subaxisRanges.map(([start, stop]) => [start, stop - 1]);
+    const xSubdomainRanges: [number, number][] = dom2.subdomainRanges.map(([start, stop]) => [start, stop - 1]);
     /** End-inclusive */
-    const ySubdomainRanges: [number, number][] = dom1.subaxisRanges.map(([start, stop]) => [start, stop - 1]);
+    const ySubdomainRanges: [number, number][] = dom1.subdomainRanges.map(([start, stop]) => [start, stop - 1]);
 
     const AXIS_TICK_WIDTH = 20;
     const AXIS_TICK_HEIGHT = 12;
@@ -171,28 +170,28 @@ function ResidueNumber(num: number): ResidueNumber { return num as ResidueNumber
 function prepareDomain(residues: ResidueNumber[], axesKind: AxesKind) {
     const fullSequence = guessFullSequence(residues);
     // TODO: get real full sequences from somewhere
-    const domain =
-        axesKind === 'axes-full-sequence' ? fullSequence
-            : axesKind === 'axes-contact-regions' ? removeGaps(fullSequence, residues, CONTIG_MAX_GAP)
-                : residues;
     const contigsInFullSequence: Ranges =
         axesKind === 'axes-full-sequence' ? [[0, fullSequence.length]]
             : axesKind === 'axes-contact-regions' ? getContiguousRegions(fullSequence, residues, CONTIG_MAX_GAP)
                 : getContiguousRegions(fullSequence, residues, 0);
-    const resNameToDomainIndex: { [resName: string]: number } = {};
-    domain.forEach((resName, i) => resNameToDomainIndex[resName] = i);
+    const regionsInFullSequence = axesKind === 'axes-contact-regions' ?
+        Ranges.extendBy(contigsInFullSequence, CONTIG_EXTENSION, [0, fullSequence.length])
+        : contigsInFullSequence;
+    const domain = Ranges.toArray(regionsInFullSequence).map(i => fullSequence[i]);
+    const resNumToDomainIndex: { [resNum: ResidueNumber]: number } = {};
+    domain.forEach((resNum, i) => resNumToDomainIndex[resNum] = i);
     function rangesFromFullSequenceToDomain(ranges: Ranges): Ranges {
-        return ranges.map(([start, stop]) => [resNameToDomainIndex[fullSequence[start]], resNameToDomainIndex[fullSequence[stop - 1]] + 1]);
+        return ranges.map(([start, stop]) => [resNumToDomainIndex[fullSequence[start]], resNumToDomainIndex[fullSequence[stop - 1]] + 1]);
     }
-    const contigs: Ranges = rangesFromFullSequenceToDomain(contigsInFullSequence);
-    const contigsWithPadding: Ranges | null = axesKind === 'axes-contact-regions' ? rangesFromFullSequenceToDomain(getContiguousRegions(fullSequence, domain, 0)) : null;
+    const contigs = rangesFromFullSequenceToDomain(contigsInFullSequence);
+    const regions = rangesFromFullSequenceToDomain(regionsInFullSequence);
     return {
         /** List of residue numbers corresponding to rows/columns */
         domain,
-        /** Ranges of indices in `domain`, corresponding to contiguous regions with data (excluding padding residues before and after) - for subaxis rendering */
-        subaxisRanges: contigs,
+        /** Ranges of indices in `domain`, corresponding to contiguous regions with data (excluding padding residues before and after) - for subdomain rendering */
+        subdomainRanges: contigs,
         /** Ranges of indices in `domain`, corresponding to contiguous regions with data (including padding residues before and after) - for region rendering */
-        regionRanges: contigsWithPadding,
+        regionRanges: axesKind === 'axes-contact-regions' ? regions : null,
     };
 }
 
@@ -242,23 +241,7 @@ function uniqueResidueNumbers(resNames: string[]): ResidueNumber[] {
 function guessFullSequence(resNums: ResidueNumber[]): ResidueNumber[] {
     const min = Math.min(1, ...resNums);
     const max = Math.max(1, ...resNums);
-    return range(min, max + 1) as ResidueNumber[];
-}
-
-function removeGaps<T>(fullSequence: T[], present: T[], maxGap: number): T[] {
-    const n = fullSequence.length;
-    const presentSet = new Set(present);
-    const presentMask = fullSequence.map(item => presentSet.has(item));
-    const dilatedMask = presentMask.map(() => false);
-    const radius = Math.ceil(maxGap / 2);
-    for (let i = 0; i < n; i++) {
-        if (presentMask[i]) {
-            const jFrom = Math.max(0, i - radius);
-            const jTo = Math.min(n - 1, i + radius);
-            for (let j = jFrom; j <= jTo; j++) dilatedMask[j] = true;
-        }
-    }
-    return fullSequence.filter((item, i) => dilatedMask[i]);
+    return range<ResidueNumber>(min, max + 1);
 }
 
 /** Find contiguous regions of items in `fullSequence` which are also present in `present`, allowing gaps of at most `maxGap` missing items. */
@@ -282,6 +265,22 @@ function getContiguousRegions<T>(fullSequence: T[], present: T[], maxGap: number
 
 /** Collection of non-overlapping ranges of indices. `start` is inclusive, `stop` is exclusive. */
 type Ranges = [start: number, stop: number][];
+const Ranges = {
+    /** Extend start and stop of each range by `radius`, but making sure to stay within `bounds` (bounds stop exclusive). */
+    extendBy(ranges: Ranges, radius: number, bounds: [number, number]): Ranges {
+        return ranges.map(([start, stop]) => [Math.max(start - radius, bounds[0]), Math.min(stop + radius, bounds[1])]);
+    },
+    /** Convert Ranges to array of indices */
+    toArray(ranges: Ranges): number[] {
+        const out: number[] = [];
+        for (const [start, stop] of ranges) {
+            for (let i = start; i < stop; i++) {
+                out.push(i);
+            }
+        }
+        return out;
+    },
+};
 
 
 /** Set text content to all HTML elements selected by `elementSelector`.
@@ -303,6 +302,15 @@ function getAxesKind(): AxesKind {
     const selectedButton = document.querySelector('input[name=axes-kind]:checked');
     if (!selectedButton) throw new Error('Could not find axes kind');
     return selectedButton.getAttribute('id') as AxesKind;
+}
+
+/** Return array with values from start (inclusive) to stop (exclusive) */
+function range<T extends number>(start: number, stop: number): T[] {
+    const out: T[] = [];
+    for (let i = start; i < stop; i++) {
+        out.push(i as T);
+    }
+    return out;
 }
 
 /** Flatten a nested array. Dumb implementation, but doesn't matter, this is just a demo. Would use `flatMap` but it's not available in es2015. */
