@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file, following t
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-03
+
 - AxesExtension
 - RegionsExtension
 - Add `ensureCellAspectRatio` method
